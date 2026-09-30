@@ -21,7 +21,7 @@ export interface Config {
 }
 
 /** Origins the app itself runs on: Capacitor's Android/iOS WebViews and the Vite dev server. */
-const DEFAULT_ORIGINS = ['https://localhost', 'http://localhost', 'capacitor://localhost', 'http://localhost:3000'];
+const DEFAULT_ORIGINS = ['https://localhost', 'http://localhost', 'capacitor://localhost', 'http://localhost:3000', 'http://127.0.0.1:3000'];
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = envSchema.safeParse(env);

@@ -96,6 +96,11 @@ export const rowSchemas = {
   categories: categoryRowSchema,
 } as const;
 
+/** Column names of each synced table, in schema order. */
+export const syncColumns = Object.fromEntries(
+  syncTables.map((t) => [t, Object.keys(rowSchemas[t].shape)]),
+) as Record<SyncTable, string[]>;
+
 export interface RowTypes {
   lists: ListRow;
   items: ItemRow;
