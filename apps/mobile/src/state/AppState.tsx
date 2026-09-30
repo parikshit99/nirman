@@ -1,11 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { buildItemDatabase, type ExtractedMaterial, type ItemRow, type ListRow, type MaterialEntry } from '@nirman/shared';
+import { exportBackup, parseBackup, restoreBackup } from '../data/backup.ts';
 import * as repo from '../data/repo.ts';
 import { DRAFT_IDS, type Job, type ListKind, type ListMeta, type Snapshot } from '../data/repo.ts';
 import type { Db } from '../data/sql.ts';
-import type { ApiClient } from '../lib/api.ts';
-import type { Session } from '../lib/session.ts';
-import type { SyncEngine, SyncStatus } from '../sync/engine.ts';
+import type { JobWorker, WorkerStatus } from '../jobs/worker.ts';
+import { settingsStore, type Settings } from '../lib/settings.ts';
 
 export interface HistoryRecord extends ListRow {
   items: ItemRow[];
@@ -13,36 +13,32 @@ export interface HistoryRecord extends ListRow {
 
 export interface Services {
   db: Db;
-  api: ApiClient;
-  engine: SyncEngine;
-  /** Fires when sync changed local data. */
+  worker: JobWorker;
+  /** Current settings; the worker reads the key from here. */
+  settings: { current: Settings };
+  /** Fires when the worker changed stored data (queue or items). */
   onDataChanged(fn: () => void): () => void;
 }
 
-/** Wait this long after a local edit before syncing, so bursts of edits go in one push. */
-const SYNC_AFTER_EDIT_MS = 2_000;
-
-function useAppStateValue({ db, api, engine, onDataChanged }: Services, initial: Snapshot) {
+function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: Services, initial: Snapshot) {
   const [snapshot, setSnapshot] = useState(initial);
-  const [sync, setSync] = useState<SyncStatus>(engine.status);
-  const [session, setSession] = useState<Session | null>(api.current);
+  const [status, setStatus] = useState<WorkerStatus>(worker.status);
+  const [settings, setSettings] = useState<Settings>(settingsRef.current);
 
   const refresh = useCallback(async () => setSnapshot(await repo.loadSnapshot(db)), [db]);
 
   useEffect(() => onDataChanged(() => void refresh()), [onDataChanged, refresh]);
-  useEffect(() => engine.subscribe(() => setSync(engine.status)), [engine]);
-  useEffect(() => api.onSessionChange(setSession), [api]);
+  useEffect(() => worker.subscribe(() => setStatus(worker.status)), [worker]);
 
-  /** Wrap a repository write: refresh the UI and schedule a sync. */
+  /** Wrap a repository write so the UI refreshes afterwards. */
   const write = useCallback(
     <A extends unknown[], R>(fn: (db: Db, ...args: A) => Promise<R>) =>
       async (...args: A): Promise<R> => {
         const result = await fn(db, ...args);
         await refresh();
-        engine.requestSync(SYNC_AFTER_EDIT_MS);
         return result;
       },
-    [db, engine, refresh],
+    [db, refresh],
   );
 
   const actions = useMemo(
@@ -69,55 +65,29 @@ function useAppStateValue({ db, api, engine, onDataChanged }: Services, initial:
       async enqueueJob(job: repo.NewJob) {
         await repo.enqueueJob(db, job);
         await refresh();
-        engine.requestSync();
+        worker.schedule();
       },
       async retryJob(job: Job) {
         await repo.setJobStatus(db, job.id, 'pending');
         await refresh();
-        engine.requestSync();
+        worker.schedule();
       },
-      syncNow: () => engine.requestSync(),
+      processQueue: () => worker.schedule(),
+      async saveSettings(next: Settings) {
+        await settingsStore.save(next);
+        settingsRef.current = next;
+        setSettings(next);
+        worker.schedule();
+      },
+      exportBackup: () => exportBackup(db),
+      parseBackup,
+      async restoreBackup(backup: Parameters<typeof restoreBackup>[1]) {
+        await restoreBackup(db, backup);
+        await refresh();
+      },
     }),
-    [db, engine, refresh, write],
+    [db, worker, settingsRef, refresh, write],
   );
-
-  /**
-   * Sign in. Data already on the phone is kept and uploaded, unless it belongs
-   * to a different account: then `confirmWipe` decides whether to erase it.
-   */
-  const signIn = useCallback(
-    async (
-      mode: 'login' | 'register',
-      serverUrl: string,
-      email: string,
-      password: string,
-      confirmWipe: (otherEmail: string) => Promise<boolean>,
-    ): Promise<boolean> => {
-      const next = await api.requestSession(mode, serverUrl, email, password);
-      const owner = await repo.getMeta(db, 'owner_user_id');
-      if (owner && owner !== next.user.id) {
-        const ownerEmail = (await repo.getMeta(db, 'owner_email')) ?? 'another account';
-        if (!(await confirmWipe(ownerEmail))) {
-          await api.revoke(next);
-          return false;
-        }
-        await repo.wipeLocalData(db);
-      }
-      await repo.setMeta(db, 'owner_user_id', next.user.id);
-      await repo.setMeta(db, 'owner_email', next.user.email);
-      await api.adopt(next);
-      await refresh();
-      return true;
-    },
-    [api, db, refresh],
-  );
-
-  /** Sign out and remove this account's data from the phone. */
-  const signOut = useCallback(async () => {
-    await api.signOut();
-    await repo.wipeLocalData(db);
-    await refresh();
-  }, [api, db, refresh]);
 
   const derived = useMemo(() => {
     const byList = new Map<string, ItemRow[]>();
@@ -144,7 +114,7 @@ function useAppStateValue({ db, api, engine, onDataChanged }: Services, initial:
     };
   }, [snapshot]);
 
-  return { snapshot, sync, session, actions, signIn, signOut, ...derived };
+  return { snapshot, status, settings, actions, ...derived };
 }
 
 export type AppState = ReturnType<typeof useAppStateValue>;

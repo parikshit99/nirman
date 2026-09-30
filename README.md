@@ -1,81 +1,55 @@
 # Nirmāṇ Auditor
 
-An offline-first Android app for tracking construction materials. Site staff photograph bills or handwritten notes, dictate (English or Hindi) or type what was bought. The backend reads it with Google Gemini and turns it into clean line items: Hindi/Hinglish terms become standard English names and units. The app keeps an audit log with vendor rates, Bills of Quantities for quotes, saved sessions per site, and a material price database built from everything recorded.
+An Android app for tracking construction materials on site. You photograph bills or handwritten notes, dictate (English or Hindi) or type what was bought. Google Gemini reads it and turns it into clean line items: Hindi/Hinglish terms become standard English names and units. The app keeps:
+
+- an **audit log** with rates, totals and vendors;
+- **Bills of Quantities** for vendor quotes;
+- **saved sessions** per site;
+- a **material price database** built from everything you record.
+
+Everything is stored **only on your phone**. There is no server or account.
 
 ## How it works
 
-```
-apps/mobile      React + Vite UI packaged as an Android app with Capacitor
-apps/server      Fastify + PostgreSQL API: accounts, sync, AI extraction
-packages/shared  Types/validation, prompt + parsing, price-database logic
-```
+- **Local database.** All records live in SQLite inside the app, and every screen works without internet.
+- **AI reading.** Entries go straight from the phone to Google Gemini using your own API key. An entry made offline is queued and read automatically once the phone is online. Photos and notes leave the phone only for that Gemini request.
+- **Learns your corrections.** If you fix an item's name or unit, the correction is remembered and used for future readings.
+- **Backup.** *Settings → Save backup* shares one `.json` file with everything; save it to Google Drive, WhatsApp or email. *Restore* on any phone brings it all back. Queued, unread entries are not included.
 
-- **Offline first.** The phone keeps its own SQLite database, and every screen reads and writes it directly, so the app works with no signal.
-- **Queued AI extraction.** An entry captured offline (text, voice or up to 5 photos) is queued on the phone. When a connection returns, the queue is sent to the server, which calls Gemini, and the items are added to the list. The Gemini key only ever lives on the server.
-- **Sync and backup.** Changed rows are pushed to the server and changes from other devices are pulled. If the same row changes on two devices, the most recent edit wins, and deletions sync too. The account holds the backup, and signing in on a new phone restores everything.
-- **Using it without an account.** The app works without an account. Anything recorded is uploaded the first time you sign in.
+## Using the app
 
-## Local development
+1. Install the APK (see below).
+2. On first launch, paste your Gemini API key. Get one free at [aistudio.google.com](https://aistudio.google.com) → *Get API key*. It is stored encrypted on the phone and can be changed later in Settings; *Test key* checks it works. You can skip this and type items in by hand.
+3. Back up from Settings now and then.
 
-Requirements: Node 22 and Docker (or any Postgres 16).
+## Development
+
+Requirements: Node 22. Android builds also need JDK 21 and the Android SDK (or Android Studio).
 
 ```bash
 npm install
-docker compose up -d db                 # Postgres on :5432 (also creates nirman_test)
-cp apps/server/.env.example apps/server/.env   # set JWT_SECRET and GEMINI_API_KEY
-npm run dev:server                      # API on http://localhost:8080 (runs migrations)
-npm run dev:mobile                      # app on http://localhost:3000
+npm run dev        # the app in a browser at http://localhost:3000 (data kept in IndexedDB)
+npm run lint       # type-check
+npm test           # unit tests
 ```
 
-In the browser the app uses an in-memory SQLite database (sql.js) saved to IndexedDB, so it behaves like the phone.
+Code layout:
 
-### Tests
-
-```bash
-TEST_DATABASE_URL=postgres://nirman:nirman@localhost:5432/nirman_test npm test
-npm run lint
+```
+apps/mobile      React + Vite UI, packaged as an Android app with Capacitor
+  src/data       SQLite schema, repository and backup
+  src/jobs       queue worker that sends offline entries to Gemini
+packages/shared  types/validation, Gemini prompt + parsing, price-database logic
 ```
 
-The tests cover:
-- the shared domain logic;
-- every server route, run against real Postgres;
-- the phone's local database;
-- an end-to-end run in which two simulated phones edit offline and sync through the real server.
-
-## Android app
+### Building the Android app
 
 ```bash
-npm run build -w apps/mobile
+npm run build
 cd apps/mobile
 npx cap sync android
-npx cap open android        # build/run from Android Studio, or:
+npx cap open android            # build/run from Android Studio, or:
 cd android && ./gradlew assembleDebug
 ```
 
-- Set `VITE_API_URL` (see `apps/mobile/.env.example`) to your server before building.
-- To test against a server running on your computer from the emulator, use `http://10.0.2.2:8080` and build with `CAP_ALLOW_HTTP=1` so plain HTTP is allowed. Release builds should talk to an HTTPS server.
-- CI (`.github/workflows/ci.yml`) builds a debug APK on every push and uploads it as an artifact. The API URL comes from the repository variable `NIRMAAN_API_URL`.
-- For Play Store releases, add a signing config and use `./gradlew bundleRelease`.
-
-## Deploying the server
-
-`apps/server/Dockerfile` builds a small image; build it from the repo root with `docker build -f apps/server/Dockerfile .`. It runs on Cloud Run or any container host.
-
-| Variable | Purpose |
-| --- | --- |
-| `DATABASE_URL` | Postgres connection string (migrations run on start) |
-| `JWT_SECRET` | 32+ random characters for signing access tokens |
-| `GEMINI_API_KEY` | Google Gemini key used for extraction |
-| `GEMINI_MODEL` | Optional, defaults to `gemini-3-flash-preview` |
-| `CORS_ORIGINS` | Optional extra browser origins (the app's own origins are allowed already) |
-
-### API
-
-| Endpoint | |
-| --- | --- |
-| `POST /auth/register`, `/auth/login` | Email + password; returns access and refresh tokens |
-| `POST /auth/refresh`, `/auth/logout` | Rotate or revoke a refresh token |
-| `POST /sync/push` | Upload changed rows (newest `updated_at` wins) |
-| `GET /sync/pull?since=<cursor>` | Rows changed since the cursor, paged |
-| `POST /extractions` | Text and/or JPEGs → material line items; retries with the same `job_id` reuse the result |
-| `GET /health` | Liveness + database check |
+CI (`.github/workflows/ci.yml`) type-checks, runs the tests and builds a debug APK on every push. Download the APK from the workflow run's artifacts. For a Play Store release, add a signing config and run `./gradlew bundleRelease`.

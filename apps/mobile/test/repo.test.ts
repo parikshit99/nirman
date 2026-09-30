@@ -4,7 +4,6 @@ import {
   DRAFT_IDS,
   addCategory,
   addItems,
-  applyRemoteChanges,
   bulkEditMaterials,
   clearListItems,
   completeJob,
@@ -12,17 +11,14 @@ import {
   deleteItem,
   deleteList,
   enqueueJob,
-  getDirtyRows,
   getJobImages,
   indexRates,
   learningMap,
   loadSnapshot,
-  markPushed,
   restoreToDraft,
   saveDraftToHistory,
   setListNotes,
   updateItem,
-  wipeLocalData,
 } from '../src/data/repo.ts';
 import { migrateLocal } from '../src/data/schema.ts';
 import { freshDb } from './helpers.ts';
@@ -38,17 +34,15 @@ describe('local repository', () => {
     const snap = await loadSnapshot(db);
     expect(snap.categories.map((c) => c.name)).toEqual(['Civil', 'Electrical', 'Plumbing', 'Carpenter', 'Hvac', 'Tile', 'Stone', 'Other']);
     expect(snap.lists.map((l) => l.id).sort()).toEqual([DRAFT_IDS.audit, DRAFT_IDS.boq]);
-    expect(snap.unsynced).toBe(0);
   });
 
-  it('adds items newest-first, computes totals and tracks unsynced rows', async () => {
+  it('adds items newest-first and computes totals', async () => {
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.audit, [cement, sand]);
     await addItems(db, DRAFT_IDS.audit, [{ ...sand, item_name: 'Bricks' }]);
     const snap = await loadSnapshot(db);
     expect(snap.items.map((i) => i.item_name)).toEqual(['Bricks', 'Cement', 'Sand']);
     expect(snap.items.find((i) => i.item_name === 'Cement')?.total_amount).toBe(7500);
-    expect(snap.unsynced).toBe(3);
   });
 
   it('learns corrections when name or unit changes', async () => {
@@ -136,34 +130,5 @@ describe('local repository', () => {
     expect(snap.jobs).toHaveLength(0);
     expect(snap.items.map((i) => i.list_id)).toEqual([DRAFT_IDS.audit]);
     expect(await getJobImages(db, jobId)).toEqual([]);
-  });
-
-  it('keeps rows dirty if edited during a push, and merges remote rows by last write', async () => {
-    const db = await freshDb();
-    await addItems(db, DRAFT_IDS.audit, [cement]);
-    const pushed = await getDirtyRows(db, 'items', 100);
-    await updateItem(db, pushed[0].id, { quantity: 99 });
-    await markPushed(db, 'items', pushed);
-    expect(await getDirtyRows(db, 'items', 100)).toHaveLength(1);
-
-    const local = (await getDirtyRows(db, 'items', 100))[0];
-    const older = { ...local, quantity: 1, updated_at: '2020-01-01T00:00:00.000Z' };
-    const newer = { ...local, quantity: 2, updated_at: '2099-01-01T00:00:00.000Z' };
-    await applyRemoteChanges(db, { items: [older] }, '5');
-    expect((await loadSnapshot(db)).items[0].quantity).toBe(99);
-    await applyRemoteChanges(db, { items: [newer] }, '6');
-    const snap = await loadSnapshot(db);
-    expect(snap.items[0].quantity).toBe(2);
-    expect(snap.unsynced).toBe(0);
-  });
-
-  it('wipes everything but re-seeds defaults', async () => {
-    const db = await freshDb();
-    await addItems(db, DRAFT_IDS.audit, [cement]);
-    await wipeLocalData(db);
-    const snap = await loadSnapshot(db);
-    expect(snap.items).toHaveLength(0);
-    expect(snap.categories).toHaveLength(8);
-    expect(snap.lists).toHaveLength(2);
   });
 });

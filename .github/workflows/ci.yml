@@ -9,20 +9,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: nirman
-          POSTGRES_PASSWORD: nirman
-          POSTGRES_DB: nirman_test
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U nirman"
-          --health-interval 2s
-          --health-retries 20
-    env:
-      TEST_DATABASE_URL: postgres://nirman:nirman@localhost:5432/nirman_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,7 +18,6 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
-      - run: npm run build -w apps/server
 
   android:
     needs: test
@@ -54,9 +39,6 @@ jobs:
       - run: npm ci
       - name: Build web bundle
         run: npm run build -w apps/mobile
-        env:
-          # Set this repository variable to your deployed server, e.g. https://nirmaan-api.example.com
-          VITE_API_URL: ${{ vars.NIRMAAN_API_URL }}
       - run: npx cap sync android
         working-directory: apps/mobile
       - name: Build debug APK
@@ -66,15 +48,8 @@ jobs:
         with:
           name: nirmaan-auditor-debug-apk
           path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
-      - name: Check the Gemini key is not in the app
+      - name: Check no API key is bundled in the app
         run: |
-          if unzip -p apps/mobile/android/app/build/outputs/apk/debug/*.apk | grep -a -q "GEMINI_API_KEY\|generativelanguage.googleapis.com"; then
-            echo "The APK references the Gemini API directly"; exit 1
+          if unzip -p apps/mobile/android/app/build/outputs/apk/debug/*.apk | grep -a -q -E "AIza[0-9A-Za-z_-]{35}"; then
+            echo "The APK contains something that looks like a Google API key"; exit 1
           fi
-
-  server-image:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker build -f apps/server/Dockerfile -t nirmaan-server .

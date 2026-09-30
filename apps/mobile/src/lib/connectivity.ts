@@ -1,6 +1,6 @@
 import { App } from '@capacitor/app';
 import { Network } from '@capacitor/network';
-import type { Connectivity } from '../sync/engine.ts';
+import type { Connectivity } from '../jobs/worker.ts';
 
 export const connectivity: Connectivity = {
   async isOnline() {
