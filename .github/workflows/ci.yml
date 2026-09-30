@@ -48,6 +48,9 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: android-actions/setup-android@v3
+        with:
+          # The default list includes the long-removed 'tools' package, which makes sdkmanager fail.
+          packages: platform-tools
       - run: npm ci
       - name: Build web bundle
         run: npm run build -w apps/mobile
