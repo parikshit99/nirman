@@ -1,0 +1,6 @@
+{
+  "name": "Nirmāṇ Auditor",
+  "description": "AI-powered construction material auditor for extracting purchase data from text, speech, and images with automatic Hindi-to-English normalization.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}
