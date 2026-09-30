@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Nirmaan Auditor</string>
+    <string name="title_activity_main">Nirmaan Auditor</string>
+    <string name="package_name">com.nirmaan.auditor</string>
+    <string name="custom_url_scheme">com.nirmaan.auditor</string>
+</resources>
