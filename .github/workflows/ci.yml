@@ -22,6 +22,8 @@ jobs:
   android:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # to publish the latest-debug release
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -53,3 +55,16 @@ jobs:
           if unzip -p apps/mobile/android/app/build/outputs/apk/debug/*.apk | grep -a -q -E "AIza[0-9A-Za-z_-]{35}"; then
             echo "The APK contains something that looks like a Google API key"; exit 1
           fi
+      - name: Publish as the latest-debug release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk nirmaan-auditor-debug.apk
+          # Move the tag to this commit so the release always matches the APK.
+          git tag -f latest-debug
+          git push -f origin refs/tags/latest-debug
+          gh release view latest-debug >/dev/null 2>&1 || gh release create latest-debug --prerelease \
+            --title "Latest debug APK" --notes "Built automatically from the latest commit on main."
+          gh release edit latest-debug --notes "Built automatically from main at ${GITHUB_SHA::7}."
+          gh release upload latest-debug nirmaan-auditor-debug.apk --clobber
