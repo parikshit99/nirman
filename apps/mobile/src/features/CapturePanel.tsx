@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { DRAFT_IDS, type Job, type ListKind } from '../data/repo.ts';
-import { capturePhoto } from '../lib/camera.ts';
+import { chooseFromGallery, takePhoto } from '../lib/camera.ts';
 import { compressImage, dataUrlToBase64, readFileAsDataUrl } from '../lib/images.ts';
 import { isNative } from '../lib/platform.ts';
 import { startDictation, type SpeechLanguage } from '../lib/speech.ts';
@@ -29,6 +29,7 @@ export function CapturePanel({ kind }: { kind: ListKind }) {
   const [inputText, setInputText] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [sourceMenu, setSourceMenu] = useState(false);
   const [category, setCategory] = useState(categoryNames[0] ?? 'Civil');
   const [listening, setListening] = useState(false);
   const [language, setLanguage] = useState<SpeechLanguage>('en-IN');
@@ -36,7 +37,7 @@ export function CapturePanel({ kind }: { kind: ListKind }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jobs = jobsFor(kind);
 
-  const addImages = async (dataUrls: Promise<string | null>[]) => {
+  const addImages = async (dataUrls: (string | Promise<string | null>)[]) => {
     const results = (await Promise.all(dataUrls)).filter((x): x is string => !!x);
     setImages((prev) => [...prev, ...results].slice(0, MAX_IMAGES));
   };
@@ -52,14 +53,17 @@ export function CapturePanel({ kind }: { kind: ListKind }) {
 
   const addPhoto = async () => {
     if (images.length >= MAX_IMAGES) return;
-    if (!isNative) {
-      fileInputRef.current?.click();
-      return;
-    }
+    if (isNative) setSourceMenu(true);
+    else fileInputRef.current?.click();
+  };
+
+  const pickFrom = async (source: 'camera' | 'gallery') => {
+    setSourceMenu(false);
     try {
-      await addImages([capturePhoto()]);
+      if (source === 'camera') await addImages([takePhoto()]);
+      else await addImages(await chooseFromGallery(MAX_IMAGES - images.length));
     } catch (err) {
-      await dialogs.alert('Could not open the camera', (err as Error).message);
+      await dialogs.alert(source === 'camera' ? 'Could not open the camera' : 'Could not open the gallery', (err as Error).message);
     }
   };
 
@@ -272,7 +276,41 @@ export function CapturePanel({ kind }: { kind: ListKind }) {
           )}
         </div>
       </div>
+      {sourceMenu && <PhotoSourceSheet remaining={MAX_IMAGES - images.length} onPick={pickFrom} onClose={() => setSourceMenu(false)} />}
     </>
+  );
+}
+
+/** Camera or gallery; the gallery allows picking several photos at once. */
+function PhotoSourceSheet({ remaining, onPick, onClose }: { remaining: number; onPick(source: 'camera' | 'gallery'): void; onClose(): void }) {
+  const option = 'w-full flex items-center gap-3 px-4 py-4 rounded-xl bg-gray-50 hover:bg-gray-100 text-sm font-bold text-gray-800';
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Add bill or note"
+        className="bg-white w-full max-w-md rounded-t-2xl p-4 pb-6 space-y-2 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-[10px] font-mono uppercase tracking-widest text-gray-400 font-bold px-1 pb-1">Add bill or note</p>
+        <button className={option} onClick={() => onPick('camera')}>
+          <Camera size={20} className="text-orange-500" /> Take photo
+        </button>
+        <button className={option} onClick={() => onPick('gallery')}>
+          <ImageIcon size={20} className="text-orange-500" />
+          <span>
+            Choose from gallery
+            <span className="block text-[10px] font-normal text-gray-500">
+              Up to {remaining} photo{remaining === 1 ? '' : 's'}
+            </span>
+          </span>
+        </button>
+        <button onClick={onClose} className="w-full py-3 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 
