@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { buildItemDatabase, type ExtractedMaterial, type ItemRow, type ListRow, type MaterialEntry } from '@nirman/shared';
 import { exportBackup, parseBackup, restoreBackup } from '../data/backup.ts';
 import * as repo from '../data/repo.ts';
-import { DRAFT_IDS, type Job, type ListKind, type ListMeta, type Snapshot } from '../data/repo.ts';
+import { DRAFT_IDS, type Job, type ListKind, type Snapshot } from '../data/repo.ts';
 import type { Db } from '../data/sql.ts';
 import type { JobWorker, WorkerStatus } from '../jobs/worker.ts';
 import { settingsStore, type Settings } from '../lib/settings.ts';
