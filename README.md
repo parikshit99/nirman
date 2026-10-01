@@ -9,6 +9,8 @@ An Android app for tracking construction materials on site. You photograph bills
 
 Everything is stored **only on your phone**. There is no server or account.
 
+**[⬇ Download the latest APK](https://github.com/parikshit99/nirman/releases/download/latest-debug/nirmaan-auditor-debug.apk)**: rebuilt automatically every time a change is merged into `main`. While this repository is private, you need to be signed in to GitHub for the link to work.
+
 ## How it works
 
 - **Local database.** All records live in SQLite inside the app, and every screen works without internet.
@@ -18,7 +20,7 @@ Everything is stored **only on your phone**. There is no server or account.
 
 ## Using the app
 
-1. Install the APK (see below).
+1. [Download the latest APK](https://github.com/parikshit99/nirman/releases/download/latest-debug/nirmaan-auditor-debug.apk) on the phone and open it. Android asks once to allow installs from your browser or Files app.
 2. On first launch, paste your Gemini API key. Get one free at [aistudio.google.com](https://aistudio.google.com) → *Get API key*. It is stored encrypted on the phone and can be changed later in Settings; *Test key* checks it works. You can skip this and type items in by hand.
 3. Back up from Settings now and then.
 
@@ -52,4 +54,4 @@ npx cap open android            # build/run from Android Studio, or:
 cd android && ./gradlew assembleDebug
 ```
 
-CI (`.github/workflows/ci.yml`) type-checks, runs the tests and builds a debug APK on every push. Download the APK from the workflow run's artifacts. For a Play Store release, add a signing config and run `./gradlew bundleRelease`.
+CI (`.github/workflows/ci.yml`) type-checks, runs the tests and builds a debug APK on every push. Builds of `main` are published to the [`latest-debug` release](https://github.com/parikshit99/nirman/releases/tag/latest-debug), which is where the download link above points; builds of a pull request are under that workflow run's *Artifacts*. For a Play Store release, add a signing config and run `./gradlew bundleRelease`.
