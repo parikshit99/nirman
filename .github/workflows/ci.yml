@@ -50,6 +50,11 @@ jobs:
         with:
           name: nirmaan-auditor-debug-apk
           path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
+      - name: Show the APK signing certificate (must be identical on every build)
+        continue-on-error: true # informational only
+        run: |
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
+          "$APKSIGNER" verify --print-certs apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk | grep -E 'SHA-256'
       - name: Check no API key is bundled in the app
         run: |
           if unzip -p apps/mobile/android/app/build/outputs/apk/debug/*.apk | grep -a -q -E "AIza[0-9A-Za-z_-]{35}"; then

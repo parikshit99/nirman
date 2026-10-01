@@ -21,6 +21,8 @@ Everything is stored **only on your phone**. There is no server or account.
 ## Using the app
 
 1. [Download the latest APK](https://github.com/parikshit99/nirman/releases/download/latest-debug/nirmaan-auditor-debug.apk) on the phone and open it. Android asks once to allow installs from your browser or Files app.
+   - Builds are signed with a fixed key, so each new APK installs as an update and keeps your data.
+   - If an update fails with "App not installed", your phone has an older copy signed with a different key. Do this once: *Settings → Save backup*, uninstall the app, install the new APK, then *Settings → Restore*.
 2. On first launch, paste your Gemini API key. Get one free at [aistudio.google.com](https://aistudio.google.com) → *Get API key*. It is stored encrypted on the phone and can be changed later in Settings; *Test key* checks it works. You can skip this and type items in by hand.
 3. Back up from Settings now and then.
 
