@@ -12,11 +12,11 @@ import { DialogProvider } from './components/Dialogs.tsx';
 import { ensureDrafts, loadSnapshot, resetStuckJobs } from './data/repo.ts';
 import { migrateLocal } from './data/schema.ts';
 import { openCapacitorSqlite, openSqlJs, type Db } from './data/sql.ts';
-import { ApiClient } from './lib/api.ts';
+import { JobWorker } from './jobs/worker.ts';
 import { connectivity } from './lib/connectivity.ts';
 import { isNative } from './lib/platform.ts';
 import { AppStateProvider, type Services } from './state/AppState.tsx';
-import { SyncEngine } from './sync/engine.ts';
+import { settingsStore } from './lib/settings.ts';
 import './index.css';
 
 async function openDatabase(): Promise<Db> {
@@ -33,15 +33,13 @@ async function bootstrap() {
     await ensureDrafts(db);
     await resetStuckJobs(db);
 
-    const api = new ApiClient();
-    await api.init();
-
+    const settings = { current: await settingsStore.load() };
     const dataListeners = new Set<() => void>();
-    const engine = new SyncEngine(db, api, () => dataListeners.forEach((fn) => fn()));
+    const worker = new JobWorker(db, () => settings.current, () => dataListeners.forEach((fn) => fn()));
     const services: Services = {
       db,
-      api,
-      engine,
+      worker,
+      settings,
       onDataChanged(fn) {
         dataListeners.add(fn);
         return () => dataListeners.delete(fn);
@@ -58,7 +56,7 @@ async function bootstrap() {
         </DialogProvider>
       </StrictMode>,
     );
-    await engine.start(connectivity);
+    await worker.start(connectivity);
   } catch (err) {
     console.error(err);
     root.render(

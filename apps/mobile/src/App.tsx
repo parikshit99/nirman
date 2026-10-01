@@ -3,11 +3,11 @@ import { AnimatePresence } from 'motion/react';
 import { Database, Download, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Save, Search, Trash2 } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { guessCategory, todayISO } from '@nirman/shared';
-import { AccountModal } from './components/AccountModal.tsx';
 import { useDialogs } from './components/Dialogs.tsx';
 import { PdfPreviewModal } from './components/PdfPreviewModal.tsx';
 import { SaveModal } from './components/SaveModal.tsx';
-import { SyncBadge } from './components/SyncBadge.tsx';
+import { SettingsModal } from './components/SettingsModal.tsx';
+import { StatusChip } from './components/StatusChip.tsx';
 import type { ListKind, ListMeta } from './data/repo.ts';
 import { CapturePanel } from './features/CapturePanel.tsx';
 import { DatabaseView } from './features/DatabaseView.tsx';
@@ -58,7 +58,7 @@ const kindOf = (tab: AppTab): ListKind | null => (tab === 'auditor' ? 'audit' : 
 
 export default function App() {
   const state = useAppState();
-  const { actions, history, itemDatabase, itemsFor, boqNotes, categoryNames, uniqueAddresses, session } = state;
+  const { actions, history, itemDatabase, itemsFor, boqNotes, categoryNames, uniqueAddresses, settings } = state;
   const dialogs = useDialogs();
 
   const [activeTab, setActiveTab] = useState<AppTab>('auditor');
@@ -70,8 +70,8 @@ export default function App() {
   );
   const [saveState, setSaveState] = useState<SaveState | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(() => !session && !prefs.get('nirmaan_onboarded', false));
-  const [firstRun] = useState(accountOpen);
+  const [settingsOpen, setSettingsOpen] = useState(() => !settings.geminiApiKey && !prefs.get('nirmaan_onboarded', false));
+  const [firstRun, setFirstRun] = useState(settingsOpen);
 
   const kind = kindOf(activeTab);
   const activeItems = kind ? itemsFor(kind) : [];
@@ -174,7 +174,7 @@ export default function App() {
       linkRecord(kind, null);
     } else if (activeTab === 'history') {
       const ok = await dialogs.confirm('Delete all saved sessions?', {
-        message: `${history.length} sessions will be deleted from this phone and from your backup.`,
+        message: `${history.length} sessions will be permanently deleted from this phone.`,
         confirmLabel: 'Delete all',
         danger: true,
       });
@@ -192,9 +192,10 @@ export default function App() {
     }
   };
 
-  const closeAccount = () => {
+  const closeSettings = () => {
     prefs.set('nirmaan_onboarded', true);
-    setAccountOpen(false);
+    setSettingsOpen(false);
+    setFirstRun(false);
   };
 
   const canClear = kind ? activeItems.length > 0 : activeTab === 'history' && history.length > 0;
@@ -213,7 +214,7 @@ export default function App() {
             <p className="text-gray-500 font-mono uppercase tracking-widest leading-none mt-1 text-[10px]">Offline Material Management</p>
           </div>
           <div className="md:hidden">
-            <SyncBadge onClick={() => setAccountOpen(true)} />
+            <StatusChip onClick={() => setSettingsOpen(true)} />
           </div>
         </div>
 
@@ -233,7 +234,7 @@ export default function App() {
 
         <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto justify-between md:justify-end">
           <div className="hidden md:block">
-            <SyncBadge onClick={() => setAccountOpen(true)} />
+            <StatusChip onClick={() => setSettingsOpen(true)} />
           </div>
           {kind && (
             <div className="text-right pr-3 border-r border-gray-100 leading-tight">
@@ -352,7 +353,7 @@ export default function App() {
             onClose={() => setPreviewOpen(false)}
           />
         )}
-        {accountOpen && <AccountModal key="account" onClose={closeAccount} firstRun={firstRun && !session} />}
+        {settingsOpen && <SettingsModal key="settings" onClose={closeSettings} firstRun={firstRun} />}
       </AnimatePresence>
     </div>
   );

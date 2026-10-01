@@ -24,7 +24,7 @@ import { startDictation, type SpeechLanguage } from '../lib/speech.ts';
 import { useAppState } from '../state/AppState.tsx';
 
 export function CapturePanel({ kind }: { kind: ListKind }) {
-  const { actions, sync, session, boqNotes, learningCount, categoryNames, jobsFor } = useAppState();
+  const { actions, status, settings, boqNotes, learningCount, categoryNames, jobsFor } = useAppState();
   const dialogs = useDialogs();
   const [inputText, setInputText] = useState('');
   const [images, setImages] = useState<string[]>([]);
@@ -114,7 +114,7 @@ export function CapturePanel({ kind }: { kind: ListKind }) {
           <p className="text-xs font-bold text-blue-900 mb-1">Works offline</p>
           <p className="text-[10px] text-blue-700 leading-normal">
             {kind === 'audit'
-              ? 'Records are saved on this phone first and backed up to your account when online. Notes and photos are sent to the AI service for extraction.'
+              ? 'Records are stored only on this phone and work offline. Notes and photos are sent to Google Gemini to be read; offline entries wait until you are online.'
               : 'Create a list for price quotation. Rate and total are left blank for vendor quotes.'}
           </p>
           {learningCount > 0 && (
@@ -268,7 +268,7 @@ export function CapturePanel({ kind }: { kind: ListKind }) {
           </button>
 
           {jobs.length > 0 && (
-            <JobList jobs={jobs} offline={!sync.online} signedIn={!!session} onRetry={actions.retryJob} onDelete={(j) => actions.deleteJob(j.id)} />
+            <JobList jobs={jobs} offline={!status.online} hasKey={!!settings.geminiApiKey} onRetry={actions.retryJob} onDelete={(j) => actions.deleteJob(j.id)} />
           )}
         </div>
       </div>
@@ -332,17 +332,17 @@ function BoqNotes({ notes, onChange }: { notes: string; onChange(n: string): voi
 function JobList({
   jobs,
   offline,
-  signedIn,
+  hasKey,
   onRetry,
   onDelete,
 }: {
   jobs: Job[];
   offline: boolean;
-  signedIn: boolean;
+  hasKey: boolean;
   onRetry(job: Job): void;
   onDelete(job: Job): void;
 }) {
-  const waitingReason = !signedIn ? 'Sign in to process' : offline ? 'Will process when online' : 'Queued';
+  const waitingReason = !hasKey ? 'Add your Gemini API key in Settings' : offline ? 'Will be read when online' : 'Queued';
   return (
     <div className="space-y-2">
       <div className="text-[10px] font-mono uppercase tracking-widest text-gray-400">Extraction Queue</div>

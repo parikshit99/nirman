@@ -2,9 +2,9 @@ import { DEFAULT_CATEGORIES } from '@nirman/shared';
 import type { Db, SqlExecutor } from './sql.ts';
 
 /**
- * Local schema. Synced tables mirror the server (apps/server/migrations) plus a
- * `dirty` flag marking rows that still need to be pushed. `jobs` and
- * `job_images` hold AI extractions queued while offline and never sync.
+ * The phone's database. `jobs` and `job_images` hold AI extractions queued
+ * until the phone is online. Add new migrations to the end of the list; never
+ * edit one that has shipped.
  */
 const MIGRATIONS: string[] = [
   `
@@ -18,9 +18,7 @@ const MIGRATIONS: string[] = [
     site_date TEXT,
     notes TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    deleted_at TEXT,
-    dirty INTEGER NOT NULL DEFAULT 0
+    updated_at TEXT NOT NULL
   );
   CREATE TABLE items (
     id TEXT PRIMARY KEY,
@@ -34,9 +32,7 @@ const MIGRATIONS: string[] = [
     vendor TEXT NOT NULL DEFAULT '',
     date TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    deleted_at TEXT,
-    dirty INTEGER NOT NULL DEFAULT 0
+    updated_at TEXT NOT NULL
   );
   CREATE INDEX items_list_idx ON items (list_id);
   CREATE TABLE indexed_rates (
@@ -46,26 +42,18 @@ const MIGRATIONS: string[] = [
     date TEXT NOT NULL,
     price REAL NOT NULL,
     vendor TEXT NOT NULL DEFAULT '',
-    indexed_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    deleted_at TEXT,
-    dirty INTEGER NOT NULL DEFAULT 0
+    indexed_at TEXT NOT NULL
   );
   CREATE TABLE learned_terms (
     id TEXT PRIMARY KEY,
     item_name TEXT NOT NULL,
     unit TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    deleted_at TEXT,
-    dirty INTEGER NOT NULL DEFAULT 0
+    updated_at TEXT NOT NULL
   );
   CREATE TABLE categories (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    deleted_at TEXT,
-    dirty INTEGER NOT NULL DEFAULT 0
+    created_at TEXT NOT NULL
   );
   CREATE TABLE jobs (
     id TEXT PRIMARY KEY,
@@ -84,15 +72,11 @@ const MIGRATIONS: string[] = [
     data TEXT NOT NULL,
     PRIMARY KEY (job_id, idx)
   );
-  CREATE TABLE meta (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-  );
   `,
 ];
 
-/** Seed rows use an old timestamp so any real edit or delete from another device wins. */
-export const SEED_TIMESTAMP = '2000-01-01T00:00:00.000Z';
+/** Default categories sort before anything the user adds. */
+const SEED_TIMESTAMP = '2000-01-01T00:00:00.000Z';
 
 export async function migrateLocal(db: Db): Promise<void> {
   await db.exec('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)');
@@ -115,8 +99,8 @@ export async function seedCategories(tx: SqlExecutor) {
   for (const [i, name] of DEFAULT_CATEGORIES.entries()) {
     const createdAt = new Date(Date.parse(SEED_TIMESTAMP) + i).toISOString();
     await tx.run(
-      'INSERT OR IGNORE INTO categories (id, name, created_at, updated_at, deleted_at, dirty) VALUES (?, ?, ?, ?, NULL, 0)',
-      [name.toLowerCase(), name, createdAt, SEED_TIMESTAMP],
+      'INSERT OR IGNORE INTO categories (id, name, created_at) VALUES (?, ?, ?)',
+      [name.toLowerCase(), name, createdAt],
     );
   }
 }

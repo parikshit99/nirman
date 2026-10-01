@@ -1,9 +1,8 @@
 import {
   materialKey,
   normalizeTerm,
-  shouldReplace,
-  syncColumns,
-  syncTables,
+  dataTables,
+  tableColumns,
   todayISO,
   type CategoryRow,
   type ExtractedMaterial,
@@ -12,10 +11,10 @@ import {
   type LearnedTermRow,
   type LearningMap,
   type ListRow,
+  type DataTable,
   type RowTypes,
-  type SyncTable,
 } from '@nirman/shared';
-import { SEED_TIMESTAMP, seedCategories } from './schema.ts';
+import { seedCategories } from './schema.ts';
 import type { Db, SqlExecutor, SqlValue } from './sql.ts';
 
 export type ListKind = ListRow['kind'];
@@ -42,8 +41,6 @@ export interface Snapshot {
   learned: LearnedTermRow[];
   categories: CategoryRow[];
   jobs: Job[];
-  /** Number of local changes not yet pushed to the server. */
-  unsynced: number;
 }
 
 export interface ListMeta {
@@ -56,61 +53,34 @@ export interface ListMeta {
 export const newId = () => crypto.randomUUID();
 
 let lastNowMs = 0;
-/** Strictly increasing wall-clock timestamps, so two writes never share one. */
+/** Strictly increasing timestamps, so rows written back to back keep their order. */
 function nowISO(): string {
   lastNowMs = Math.max(Date.now(), lastNowMs + 1);
   return new Date(lastNowMs).toISOString();
-}
-
-/**
- * Timestamp for a local edit of a row: always later than the version being
- * replaced, even if that came from a device whose clock runs ahead. This is
- * what lets the push step tell "edited again since pushed" apart.
- */
-function editTimestamp(previous?: string): string {
-  const now = nowISO();
-  if (!previous) return now;
-  const next = Date.parse(previous) + 1;
-  return next > Date.parse(now) ? new Date(next).toISOString() : now;
 }
 
 // ---------------------------------------------------------------------------
 // Generic row helpers
 // ---------------------------------------------------------------------------
 
-async function writeRow<T extends SyncTable>(tx: SqlExecutor, table: T, row: RowTypes[T], dirty: boolean) {
-  const cols = syncColumns[table];
+export async function writeRow<T extends DataTable>(tx: SqlExecutor, table: T, row: RowTypes[T]) {
+  const cols = tableColumns[table];
   const values = cols.map((c) => (row as Record<string, SqlValue>)[c] ?? null);
-  await tx.run(
-    `INSERT OR REPLACE INTO ${table} (${cols.join(', ')}, dirty) VALUES (${cols.map(() => '?').join(', ')}, ?)`,
-    [...values, dirty ? 1 : 0],
-  );
+  await tx.run(`INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, values);
 }
 
-async function getRow<T extends SyncTable>(tx: SqlExecutor, table: T, id: string): Promise<RowTypes[T] | undefined> {
-  const [row] = await tx.all<RowTypes[T]>(`SELECT ${syncColumns[table].join(', ')} FROM ${table} WHERE id = ?`, [id]);
+async function getRow<T extends DataTable>(tx: SqlExecutor, table: T, id: string): Promise<RowTypes[T] | undefined> {
+  const [row] = await tx.all<RowTypes[T]>(`SELECT ${tableColumns[table].join(', ')} FROM ${table} WHERE id = ?`, [id]);
   return row;
 }
 
-/** Local edit: bump updated_at and mark for push. */
-async function touch<T extends SyncTable>(tx: SqlExecutor, table: T, row: RowTypes[T]) {
-  const [current] = await tx.all<{ updated_at: string }>(`SELECT updated_at FROM ${table} WHERE id = ?`, [row.id]);
-  await writeRow(tx, table, { ...row, updated_at: editTimestamp(current?.updated_at) }, true);
+/** Save an edited row with a fresh updated_at. */
+async function touch<T extends 'lists' | 'items' | 'learned_terms'>(tx: SqlExecutor, table: T, row: RowTypes[T]) {
+  await writeRow(tx, table, { ...row, updated_at: nowISO() });
 }
 
-async function softDelete(tx: SqlExecutor, table: SyncTable, where: string, params: SqlValue[]) {
-  const rows = await tx.all<{ id: string; updated_at: string }>(
-    `SELECT id, updated_at FROM ${table} WHERE deleted_at IS NULL AND ${where}`,
-    params,
-  );
-  for (const row of rows) {
-    const ts = editTimestamp(row.updated_at);
-    await tx.run(`UPDATE ${table} SET deleted_at = ?, updated_at = ?, dirty = 1 WHERE id = ?`, [ts, ts, row.id]);
-  }
-}
-
-const live = <T extends SyncTable>(table: T, order: string) =>
-  `SELECT ${syncColumns[table].join(', ')} FROM ${table} WHERE deleted_at IS NULL ORDER BY ${order}`;
+export const selectAll = <T extends DataTable>(table: T, order: string) =>
+  `SELECT ${tableColumns[table].join(', ')} FROM ${table} ORDER BY ${order}`;
 
 // ---------------------------------------------------------------------------
 // Reads
@@ -118,16 +88,15 @@ const live = <T extends SyncTable>(table: T, order: string) =>
 
 export async function loadSnapshot(db: Db): Promise<Snapshot> {
   return db.transaction(async (tx) => {
-    const lists = await tx.all<ListRow>(live('lists', 'created_at DESC'));
-    const items = await tx.all<ItemRow>(live('items', 'created_at DESC, id'));
-    const rates = await tx.all<IndexedRateRow>(live('indexed_rates', 'indexed_at DESC'));
-    const learned = await tx.all<LearnedTermRow>(live('learned_terms', 'id'));
-    const categories = await tx.all<CategoryRow>(live('categories', 'created_at, id'));
+    const lists = await tx.all<ListRow>(selectAll('lists', 'created_at DESC'));
+    const items = await tx.all<ItemRow>(selectAll('items', 'created_at DESC, id'));
+    const rates = await tx.all<IndexedRateRow>(selectAll('indexed_rates', 'indexed_at DESC'));
+    const learned = await tx.all<LearnedTermRow>(selectAll('learned_terms', 'id'));
+    const categories = await tx.all<CategoryRow>(selectAll('categories', 'created_at, id'));
     const jobs = await tx.all<Job>(
       `SELECT j.*, (SELECT COUNT(*) FROM job_images i WHERE i.job_id = j.id) AS image_count FROM jobs j ORDER BY created_at`,
     );
-    const dirty = await tx.all<{ n: number }>(syncTables.map((t) => `SELECT COUNT(*) AS n FROM ${t} WHERE dirty = 1`).join(' UNION ALL '));
-    return { lists, items, rates, learned, categories, jobs, unsynced: dirty.reduce((a, r) => a + r.n, 0) };
+    return { lists, items, rates, learned, categories, jobs };
   });
 }
 
@@ -139,17 +108,20 @@ export function learningMap(learned: LearnedTermRow[]): LearningMap {
 // Lists and items
 // ---------------------------------------------------------------------------
 
-/** Make sure both working drafts exist. Seed timestamps let a synced draft win. */
+/** Make sure both working drafts (current audit and BOQ lists) exist. */
 export async function ensureDrafts(db: Db) {
-  await db.transaction(async (tx) => {
-    for (const kind of ['audit', 'boq'] as const) {
-      if (await getRow(tx, 'lists', DRAFT_IDS[kind])) continue;
-      await writeRow(tx, 'lists', {
-        id: DRAFT_IDS[kind], kind, status: 'draft', title: '', address: '', category: '', site_date: null, notes: '',
-        created_at: SEED_TIMESTAMP, updated_at: SEED_TIMESTAMP, deleted_at: null,
-      }, false);
-    }
-  });
+  await db.transaction(ensureDraftRows);
+}
+
+async function ensureDraftRows(tx: SqlExecutor) {
+  for (const kind of ['audit', 'boq'] as const) {
+    if (await getRow(tx, 'lists', DRAFT_IDS[kind])) continue;
+    const ts = nowISO();
+    await writeRow(tx, 'lists', {
+      id: DRAFT_IDS[kind], kind, status: 'draft', title: '', address: '', category: '', site_date: null, notes: '',
+      created_at: ts, updated_at: ts,
+    });
+  }
 }
 
 /**
@@ -179,8 +151,7 @@ async function insertMaterials(tx: SqlExecutor, listId: string, materials: Extra
       date: m.date || '',
       created_at: ts,
       updated_at: ts,
-      deleted_at: null,
-    }, true);
+    });
   }
 }
 
@@ -206,17 +177,17 @@ export async function updateItem(db: Db, id: string, patch: ItemPatch) {
 
     const term = normalizeTerm(item.original_term || item.item_name);
     if (term && (next.item_name !== item.item_name || next.unit !== item.unit)) {
-      await touch(tx, 'learned_terms', { id: term, item_name: next.item_name, unit: next.unit, updated_at: '', deleted_at: null });
+      await touch(tx, 'learned_terms', { id: term, item_name: next.item_name, unit: next.unit, updated_at: '' });
     }
   });
 }
 
 export async function deleteItem(db: Db, id: string) {
-  await db.transaction((tx) => softDelete(tx, 'items', 'id = ?', [id]));
+  await db.run('DELETE FROM items WHERE id = ?', [id]);
 }
 
 export async function clearListItems(db: Db, listId: string) {
-  await db.transaction((tx) => softDelete(tx, 'items', 'list_id = ?', [listId]));
+  await db.run('DELETE FROM items WHERE list_id = ?', [listId]);
 }
 
 export async function setListNotes(db: Db, listId: string, notes: string) {
@@ -228,12 +199,12 @@ export async function setListNotes(db: Db, listId: string, notes: string) {
 
 async function copyItems(tx: SqlExecutor, fromListId: string, toListId: string) {
   const items = await tx.all<ItemRow>(
-    `SELECT ${syncColumns.items.join(', ')} FROM items WHERE list_id = ? AND deleted_at IS NULL`,
+    `SELECT ${tableColumns.items.join(', ')} FROM items WHERE list_id = ?`,
     [fromListId],
   );
   for (const item of items) {
     const ts = nowISO();
-    await writeRow(tx, 'items', { ...item, id: newId(), list_id: toListId, updated_at: ts }, true);
+    await writeRow(tx, 'items', { ...item, id: newId(), list_id: toListId, updated_at: ts });
   }
 }
 
@@ -246,7 +217,7 @@ export async function saveDraftToHistory(db: Db, kind: ListKind, meta: ListMeta,
     const draft = await getRow(tx, 'lists', DRAFT_IDS[kind]);
     const notes = kind === 'boq' ? draft?.notes ?? '' : undefined;
     const existing = targetId ? await getRow(tx, 'lists', targetId) : undefined;
-    const ts = editTimestamp(existing?.updated_at);
+    const ts = nowISO();
     const id = existing?.id ?? newId();
 
     await writeRow(tx, 'lists', {
@@ -260,9 +231,8 @@ export async function saveDraftToHistory(db: Db, kind: ListKind, meta: ListMeta,
       notes: notes ?? existing?.notes ?? '',
       created_at: existing?.created_at ?? ts,
       updated_at: ts,
-      deleted_at: null,
-    }, true);
-    if (existing) await softDelete(tx, 'items', 'list_id = ?', [id]);
+    });
+    if (existing) await tx.run('DELETE FROM items WHERE list_id = ?', [id]);
     await copyItems(tx, DRAFT_IDS[kind], id);
     return id;
   });
@@ -284,15 +254,15 @@ export async function renameList(db: Db, id: string, title: string) {
 
 export async function deleteList(db: Db, id: string) {
   await db.transaction(async (tx) => {
-    await softDelete(tx, 'items', 'list_id = ?', [id]);
-    await softDelete(tx, 'lists', 'id = ?', [id]);
+    await tx.run('DELETE FROM items WHERE list_id = ?', [id]);
+    await tx.run('DELETE FROM lists WHERE id = ?', [id]);
   });
 }
 
 export async function deleteAllHistory(db: Db) {
   await db.transaction(async (tx) => {
-    await softDelete(tx, 'items', `list_id IN (SELECT id FROM lists WHERE status = 'saved')`, []);
-    await softDelete(tx, 'lists', `status = 'saved'`, []);
+    await tx.run(`DELETE FROM items WHERE list_id IN (SELECT id FROM lists WHERE status = 'saved')`);
+    await tx.run(`DELETE FROM lists WHERE status = 'saved'`);
   });
 }
 
@@ -304,7 +274,7 @@ export async function restoreToDraft(db: Db, historyId: string): Promise<ListKin
     const draftId = DRAFT_IDS[record.kind];
     const draft = await getRow(tx, 'lists', draftId);
     if (!draft) return undefined;
-    await softDelete(tx, 'items', 'list_id = ?', [draftId]);
+    await tx.run('DELETE FROM items WHERE list_id = ?', [draftId]);
     await copyItems(tx, historyId, draftId);
     if (record.kind === 'boq') await touch(tx, 'lists', { ...draft, notes: record.notes });
     return record.kind;
@@ -318,8 +288,8 @@ export async function restoreToDraft(db: Db, historyId: string): Promise<ListKin
 export async function bulkEditMaterials(db: Db, keys: Set<string>, patch: { unit?: string; vendor?: string; price?: number }) {
   await db.transaction(async (tx) => {
     const items = await tx.all<ItemRow>(
-      `SELECT ${syncColumns.items.join(', ')} FROM items
-       WHERE deleted_at IS NULL AND list_id IN (SELECT id FROM lists WHERE status = 'saved' OR id = ?)`,
+      `SELECT ${tableColumns.items.join(', ')} FROM items
+       WHERE list_id IN (SELECT id FROM lists WHERE status = 'saved' OR id = ?)`,
       [DRAFT_IDS.audit],
     );
     for (const item of items) {
@@ -341,24 +311,21 @@ export async function bulkEditMaterials(db: Db, keys: Set<string>, patch: { unit
 // ---------------------------------------------------------------------------
 
 export async function clearLearning(db: Db) {
-  await db.transaction((tx) => softDelete(tx, 'learned_terms', '1 = 1', []));
+  await db.run('DELETE FROM learned_terms');
 }
 
 /** Index item rates; an identical rate (same material, date and price) is replaced. */
 export async function indexRates(db: Db, items: Pick<ItemRow, 'item_name' | 'unit' | 'unit_price' | 'vendor' | 'date'>[]) {
   await db.transaction(async (tx) => {
     const indexedAt = nowISO();
-    const existing = await tx.all<IndexedRateRow>(live('indexed_rates', 'indexed_at'));
+    let existing = await tx.all<IndexedRateRow>(selectAll('indexed_rates', 'indexed_at'));
     for (const item of items) {
       if (!item.item_name) continue;
       const date = item.date || todayISO();
       const key = materialKey(item.item_name, item.unit);
-      for (const r of existing) {
-        if (!r.deleted_at && materialKey(r.item_name, r.unit) === key && r.date === date && r.price === item.unit_price) {
-          await softDelete(tx, 'indexed_rates', 'id = ?', [r.id]);
-          r.deleted_at = indexedAt;
-        }
-      }
+      const same = (r: IndexedRateRow) => materialKey(r.item_name, r.unit) === key && r.date === date && r.price === item.unit_price;
+      for (const r of existing.filter(same)) await tx.run('DELETE FROM indexed_rates WHERE id = ?', [r.id]);
+      existing = existing.filter((r) => !same(r));
       await writeRow(tx, 'indexed_rates', {
         id: newId(),
         item_name: item.item_name,
@@ -367,15 +334,13 @@ export async function indexRates(db: Db, items: Pick<ItemRow, 'item_name' | 'uni
         price: item.unit_price || 0,
         vendor: item.vendor || 'Unknown',
         indexed_at: indexedAt,
-        updated_at: indexedAt,
-        deleted_at: null,
-      }, true);
+      });
     }
   });
 }
 
 export async function deleteIndexedRate(db: Db, id: string) {
-  await db.transaction((tx) => softDelete(tx, 'indexed_rates', 'id = ?', [id]));
+  await db.run('DELETE FROM indexed_rates WHERE id = ?', [id]);
 }
 
 export async function addCategory(db: Db, name: string) {
@@ -383,15 +348,13 @@ export async function addCategory(db: Db, name: string) {
   if (!trimmed) return;
   await db.transaction(async (tx) => {
     const id = trimmed.toLowerCase();
-    const existing = await getRow(tx, 'categories', id);
-    if (existing && !existing.deleted_at) return;
-    const ts = editTimestamp(existing?.updated_at);
-    await writeRow(tx, 'categories', { id, name: trimmed, created_at: existing?.created_at ?? ts, updated_at: ts, deleted_at: null }, true);
+    if (await getRow(tx, 'categories', id)) return;
+    await writeRow(tx, 'categories', { id, name: trimmed, created_at: nowISO() });
   });
 }
 
 export async function deleteCategory(db: Db, id: string) {
-  await db.transaction((tx) => softDelete(tx, 'categories', 'id = ?', [id]));
+  await db.run('DELETE FROM categories WHERE id = ?', [id]);
 }
 
 // ---------------------------------------------------------------------------
@@ -457,49 +420,17 @@ export async function resetStuckJobs(db: Db) {
 }
 
 // ---------------------------------------------------------------------------
-// Sync support
+// Whole-database operations (backup restore)
 // ---------------------------------------------------------------------------
 
-export async function getMeta(db: Db, key: string): Promise<string | undefined> {
-  const [row] = await db.all<{ value: string }>('SELECT value FROM meta WHERE key = ?', [key]);
-  return row?.value;
-}
-
-export async function setMeta(db: Db, key: string, value: string) {
-  await db.run('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', [key, value]);
-}
-
-export async function getDirtyRows<T extends SyncTable>(db: Db, table: T, limit: number): Promise<RowTypes[T][]> {
-  return db.all<RowTypes[T]>(`SELECT ${syncColumns[table].join(', ')} FROM ${table} WHERE dirty = 1 LIMIT ?`, [limit]);
-}
-
-/** Clear the dirty flag, unless the row was edited again while the push was in flight. */
-export async function markPushed(db: Db, table: SyncTable, rows: { id: string; updated_at: string }[]) {
-  await db.transaction(async (tx) => {
-    for (const r of rows) {
-      await tx.run(`UPDATE ${table} SET dirty = 0 WHERE id = ? AND updated_at = ?`, [r.id, r.updated_at]);
-    }
-  });
-}
-
-/** Merge rows pulled from the server (last write wins) and store the new cursor. */
-export async function applyRemoteChanges(db: Db, changes: { [T in SyncTable]?: RowTypes[T][] }, cursor: string) {
-  await db.transaction(async (tx) => {
-    for (const table of syncTables) {
-      for (const row of changes[table] ?? []) {
-        const local = await getRow(tx, table, row.id);
-        if (shouldReplace(row, local)) await writeRow(tx, table, row as RowTypes[typeof table], false);
-      }
-    }
-    await tx.run('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', ['sync_cursor', cursor]);
-  });
-}
-
-/** Remove every local row (used when switching accounts). */
-export async function wipeLocalData(db: Db) {
-  await db.transaction(async (tx) => {
-    for (const t of [...syncTables, 'jobs', 'job_images', 'meta']) await tx.run(`DELETE FROM ${t}`);
+/** Delete all records and queued jobs, then restore the default categories and drafts. */
+export async function clearAllData(tx: SqlExecutor, { seedDefaults = true } = {}) {
+  for (const t of [...dataTables, 'jobs', 'job_images']) await tx.run(`DELETE FROM ${t}`);
+  if (seedDefaults) {
     await seedCategories(tx);
-  });
-  await ensureDrafts(db);
+    await ensureDraftRows(tx);
+  }
 }
+
+/** Make sure drafts exist after rows were replaced wholesale (e.g. by a restore). */
+export { ensureDraftRows };

@@ -5,7 +5,6 @@ import {
   materialDatabaseToCSV,
   materialKey,
   parseExtractionOutput,
-  shouldReplace,
   type ItemRow,
   type ListRow,
   type IndexedRateRow,
@@ -16,14 +15,14 @@ const ts = (d: string) => `${d}T10:00:00.000Z`;
 function list(id: string, over: Partial<ListRow> = {}): ListRow {
   return {
     id, kind: 'audit', status: 'saved', title: 't', address: 'Site A', category: 'Civil',
-    site_date: '2026-01-01', notes: '', created_at: ts('2026-01-01'), updated_at: ts('2026-01-01'), deleted_at: null, ...over,
+    site_date: '2026-01-01', notes: '', created_at: ts('2026-01-01'), updated_at: ts('2026-01-01'), ...over,
   };
 }
 function item(id: string, list_id: string, over: Partial<ItemRow> = {}): ItemRow {
   return {
     id, list_id, item_name: 'Cement', original_term: 'bori', quantity: 10, unit: 'Bag', unit_price: 400,
     total_amount: 4000, vendor: 'Sharma', date: '2026-01-01', created_at: ts('2026-01-01'),
-    updated_at: ts('2026-01-01'), deleted_at: null, ...over,
+    updated_at: ts('2026-01-01'), ...over,
   };
 }
 
@@ -42,17 +41,16 @@ describe('materialKey', () => {
 });
 
 describe('buildItemDatabase', () => {
-  it('aggregates saved lists and indexed rates, ignoring drafts and deletions', () => {
+  it('aggregates saved lists and indexed rates, ignoring drafts', () => {
     const lists = [list('l1'), list('l2', { status: 'draft' }), list('l3', { created_at: ts('2026-02-01'), address: 'Site B' })];
     const items = [
       item('i1', 'l1'),
       item('i2', 'l2', { unit_price: 999 }),
       item('i3', 'l3', { unit_price: 420, date: '2026-02-01', vendor: 'Gupta' }),
-      item('i4', 'l3', { unit_price: 1, deleted_at: ts('2026-02-02') }),
     ];
     const rates: IndexedRateRow[] = [{
       id: 'r1', item_name: 'cement', unit: 'bag', date: '2026-03-01', price: 450, vendor: 'Manual',
-      indexed_at: ts('2026-03-01'), updated_at: ts('2026-03-01'), deleted_at: null,
+      indexed_at: ts('2026-03-01'),
     }];
     const db = buildItemDatabase(lists, items, rates, {});
     expect(db).toHaveLength(1);
@@ -88,15 +86,5 @@ describe('parseExtractionOutput', () => {
   });
   it('returns [] for garbage', () => {
     expect(parseExtractionOutput('nope')).toEqual([]);
-  });
-});
-
-describe('shouldReplace', () => {
-  const row = (u: string, d: string | null = null) => ({ updated_at: u, deleted_at: d });
-  it('prefers newer rows and deletions on ties', () => {
-    expect(shouldReplace(row(ts('2026-01-02')), row(ts('2026-01-01')))).toBe(true);
-    expect(shouldReplace(row(ts('2026-01-01')), row(ts('2026-01-02')))).toBe(false);
-    expect(shouldReplace(row(ts('2026-01-01'), ts('2026-01-01')), row(ts('2026-01-01')))).toBe(true);
-    expect(shouldReplace(row(ts('2026-01-01')), null)).toBe(true);
   });
 });

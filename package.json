@@ -7,10 +7,9 @@
     "apps/*"
   ],
   "scripts": {
-    "dev:mobile": "npm run dev -w apps/mobile",
-    "dev:server": "npm run dev -w apps/server",
+    "dev": "npm run dev -w apps/mobile",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build -w apps/mobile"
   }
 }

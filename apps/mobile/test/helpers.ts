@@ -8,12 +8,3 @@ export async function freshDb() {
   await ensureDrafts(db);
   return db;
 }
-
-export function memorySessionStore() {
-  let value: any = null;
-  return {
-    get: async () => value,
-    set: async (s: any) => { value = s; },
-    clear: async () => { value = null; },
-  };
-}

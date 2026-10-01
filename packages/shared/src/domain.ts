@@ -78,7 +78,7 @@ export interface MaterialEntry {
 
 /**
  * Build the material price database from saved sessions and manually indexed
- * rates. Draft lists and soft-deleted rows are ignored.
+ * rates. Draft lists are ignored.
  */
 export function buildItemDatabase(
   lists: ListRow[],
@@ -102,10 +102,10 @@ export function buildItemDatabase(
     return e;
   };
 
-  const savedLists = new Map(lists.filter((l) => l.status === 'saved' && !l.deleted_at).map((l) => [l.id, l]));
+  const savedLists = new Map(lists.filter((l) => l.status === 'saved').map((l) => [l.id, l]));
 
   for (const raw of items) {
-    if (raw.deleted_at || !raw.item_name) continue;
+    if (!raw.item_name) continue;
     const list = savedLists.get(raw.list_id);
     if (!list) continue;
 
@@ -125,7 +125,6 @@ export function buildItemDatabase(
   }
 
   for (const rate of rates) {
-    if (rate.deleted_at) continue;
     const { item_name, unit } = applyLearning(learning, rate);
     const e = entry(item_name, unit);
     e.priceHistory.push({
