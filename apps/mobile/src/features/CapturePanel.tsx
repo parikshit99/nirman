@@ -293,7 +293,7 @@ function BoqNotes({ notes, onChange }: { notes: string; onChange(n: string): voi
     [],
   );
   if (notes !== lastSeen) {
-    // Updated elsewhere (sync, restore from history).
+    // Updated elsewhere (restoring a backup or a saved session).
     setLastSeen(notes);
     setValue(notes);
   }
