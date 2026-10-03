@@ -93,21 +93,71 @@ export function classifyError(err: unknown): ExtractionError {
   return new ExtractionError('Could not reach Gemini; will retry when online.', 'retry');
 }
 
-export function createGeminiExtractor(apiKey: string, model: string): Extractor {
+const isUnknownModel = (err: unknown) => (err as { status?: number })?.status === 404;
+
+/**
+ * Pick the model to use when the configured one no longer exists (Google
+ * retires preview models): the "flash latest" alias if offered, otherwise the
+ * newest stable Flash model that can generate content. Previews only as a last resort.
+ */
+export function pickReplacementModel(models: { name?: string; supportedActions?: string[] }[]): string | null {
+  const candidates = models
+    .filter((m) => !m.supportedActions || m.supportedActions.includes('generateContent'))
+    .map((m) => (m.name ?? '').replace(/^models\//, ''))
+    .filter((name) => /flash/.test(name) && !/lite|image|tts|audio|live|embed|thinking|exp/.test(name));
+  if (candidates.includes('gemini-flash-latest')) return 'gemini-flash-latest';
+  const version = (name: string) => Number(name.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] ?? 0);
+  const rank = (name: string) => [/preview/.test(name) ? 0 : 1, version(name), /^gemini-[\d.]+-flash$/.test(name) ? 1 : 0];
+  const sorted = candidates
+    .filter((n) => version(n) > 0)
+    .sort((a, b) => {
+      const [ra, rb] = [rank(a), rank(b)];
+      for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return rb[i] - ra[i];
+      return a.localeCompare(b);
+    });
+  return sorted[0] ?? null;
+}
+
+async function findReplacementModel(ai: GoogleGenAI): Promise<string | null> {
+  try {
+    const models: { name?: string; supportedActions?: string[] }[] = [];
+    for await (const m of await ai.models.list({ config: { pageSize: 100 } })) models.push(m);
+    return pickReplacementModel(models);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param onModelReplaced called when the configured model was unknown to Gemini
+ *   and another one was used instead, so it can be saved for next time.
+ */
+export function createGeminiExtractor(apiKey: string, model: string, onModelReplaced?: (model: string) => void): Extractor {
   const ai = new GoogleGenAI({ apiKey });
+  let current = model;
+  const call = (parts: Part[], systemInstruction: string, responseSchema: object) =>
+    ai.models.generateContent({
+      model: current,
+      contents: { parts },
+      config: {
+        systemInstruction,
+        responseMimeType: 'application/json',
+        responseSchema,
+        abortSignal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+    });
   const generate = async (parts: Part[], systemInstruction: string, responseSchema: object): Promise<string> => {
     try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: { parts },
-        config: {
-          systemInstruction,
-          responseMimeType: 'application/json',
-          responseSchema,
-          abortSignal: AbortSignal.timeout(TIMEOUT_MS),
-        },
-      });
-      return response.text ?? '[]';
+      try {
+        return (await call(parts, systemInstruction, responseSchema)).text ?? '[]';
+      } catch (err) {
+        if (!isUnknownModel(err)) throw err;
+        const replacement = await findReplacementModel(ai);
+        if (!replacement || replacement === current) throw err;
+        current = replacement;
+        onModelReplaced?.(replacement);
+        return (await call(parts, systemInstruction, responseSchema)).text ?? '[]';
+      }
     } catch (err) {
       throw classifyError(err);
     }
@@ -132,15 +182,26 @@ export function createGeminiExtractor(apiKey: string, model: string): Extractor 
   };
 }
 
-/** One tiny request to check the key and model work. Throws ExtractionError if not. */
-export async function testGeminiKey(apiKey: string, model: string): Promise<void> {
+/**
+ * One tiny request to check the key and model work. Throws ExtractionError if
+ * not. Returns the model that worked, which differs from `model` when that one
+ * no longer exists and a replacement was found.
+ */
+export async function testGeminiKey(apiKey: string, model: string): Promise<string> {
   const ai = new GoogleGenAI({ apiKey });
+  const ping = (m: string) =>
+    ai.models.generateContent({ model: m, contents: 'Reply with OK.', config: { maxOutputTokens: 5, abortSignal: AbortSignal.timeout(20_000) } });
   try {
-    await ai.models.generateContent({
-      model,
-      contents: 'Reply with OK.',
-      config: { maxOutputTokens: 5, abortSignal: AbortSignal.timeout(20_000) },
-    });
+    try {
+      await ping(model);
+      return model;
+    } catch (err) {
+      if (!isUnknownModel(err)) throw err;
+      const replacement = await findReplacementModel(ai);
+      if (!replacement || replacement === model) throw err;
+      await ping(replacement);
+      return replacement;
+    }
   } catch (err) {
     throw classifyError(err);
   }

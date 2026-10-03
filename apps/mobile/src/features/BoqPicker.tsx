@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { FileCode, Search, X } from 'lucide-react';
 import { useAppState } from '../state/AppState.tsx';
+import { useBackHandler } from '../lib/backButton.ts';
 
 /** Choose the saved BOQ a vendor's quote answers. */
 export function BoqPicker({ onPick, onClose }: { onPick(boqId: string): void; onClose(): void }) {
   const { savedBoqs, quotesFor } = useAppState();
+  useBackHandler(onClose);
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
   const boqs = savedBoqs.filter((b) => !q || `${b.title} ${b.address} ${b.category}`.toLowerCase().includes(q));

@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { AlertTriangle, Calendar, Check, ChevronRight, FileCode, HardHat, History, Trash2, Truck, X, Zap } from 'lucide-react';
-import { materialKey, todayISO, type ItemRow, type MaterialEntry } from '@nirman/shared';
+import { materialKey, parseAmount, todayISO, type ItemRow, type MaterialEntry } from '@nirman/shared';
+import { useDialogs } from '../components/Dialogs.tsx';
 import type { ItemPatch, ListKind } from '../data/repo.ts';
 import { useAppState } from '../state/AppState.tsx';
+import { useBackHandler } from '../lib/backButton.ts';
+import { UndoButton } from '../components/UndoButton.tsx';
 
 interface Props {
   kind: ListKind;
@@ -12,9 +15,10 @@ interface Props {
 }
 
 export function ItemLog({ kind, items, searching }: Props) {
-  const { actions, itemDatabase, itemsFor } = useAppState();
+  const { actions, itemDatabase, itemsFor, pendingDeletes } = useAppState();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const dialogs = useDialogs();
   const isAudit = kind === 'audit';
   const byKey = new Map<string, MaterialEntry>(itemDatabase.map((e) => [e.key, e]));
 
@@ -31,16 +35,26 @@ export function ItemLog({ kind, items, searching }: Props) {
 
   const saveEdit = async () => {
     if (!editingId) return;
+    const quantity = draft.quantity.trim() ? parseAmount(draft.quantity) : 0;
+    const unitPrice = draft.unit_price.trim() ? parseAmount(draft.unit_price) : 0;
+    if (quantity === null || unitPrice === null) {
+      await dialogs.alert('Check the number', `“${quantity === null ? draft.quantity : draft.unit_price}” is not a number. Use digits, e.g. 1500 or 1,500.`);
+      return;
+    }
     const patch: ItemPatch = {
       item_name: draft.item_name.trim(),
-      quantity: Number(draft.quantity) || 0,
+      quantity,
       unit: draft.unit.trim(),
-      unit_price: Number(draft.unit_price) || 0,
+      unit_price: unitPrice,
       vendor: draft.vendor.trim(),
     };
     await actions.updateItem(editingId, patch);
     setEditingId(null);
   };
+
+  useBackHandler(() => setEditingId(null), editingId !== null);
+  // Leaving the list carries out any delete still waiting for undo.
+  useEffect(() => () => void actions.flushDeletes(), [actions]);
 
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => setDraft((p) => ({ ...p, [field]: e.target.value }));
   const auditItems = itemsFor('audit');
@@ -81,7 +95,8 @@ export function ItemLog({ kind, items, searching }: Props) {
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 20 }}
                       className={`grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_40px] items-center px-4 md:px-6 py-4 transition-colors
-                        ${editingId === item.id ? 'bg-orange-50/50 ring-1 ring-orange-200 z-10' : 'hover:bg-gray-100/50'}`}
+                        ${editingId === item.id ? 'bg-orange-50/50 ring-1 ring-orange-200 z-10' : 'hover:bg-gray-100/50'}
+                        ${pendingDeletes.has(item.id) ? 'bg-red-50/40' : ''}`}
                     >
                       {editingId === item.id ? (
                         <>
@@ -127,7 +142,7 @@ export function ItemLog({ kind, items, searching }: Props) {
                           <div className="text-right">
                             {isAudit ? (
                               <div className="text-[10px] md:text-xs font-mono font-bold text-orange-600">
-                                ₹{((Number(draft.quantity) || 0) * (Number(draft.unit_price) || 0)).toLocaleString('en-IN')}
+                                ₹{((parseAmount(draft.quantity) ?? 0) * (parseAmount(draft.unit_price) ?? 0)).toLocaleString('en-IN')}
                               </div>
                             ) : (
                               '--'
@@ -161,7 +176,9 @@ export function ItemLog({ kind, items, searching }: Props) {
                           dbMatch={byKey.get(materialKey(item.item_name, item.unit))}
                           onEdit={() => startEditing(item)}
                           onIndex={() => actions.indexRates([item])}
-                          onDelete={() => actions.deleteItem(item.id)}
+                          pendingDelete={pendingDeletes.has(item.id)}
+                          onDelete={() => actions.deleteItemLater(item.id)}
+                          onUndo={() => actions.undoDelete(item.id)}
                         />
                       )}
                     </motion.div>
@@ -197,14 +214,18 @@ function ItemRowView({
   dbMatch,
   onEdit,
   onIndex,
+  pendingDelete,
   onDelete,
+  onUndo,
 }: {
   item: ItemRow;
   isAudit: boolean;
   dbMatch?: MaterialEntry;
   onEdit(): void;
   onIndex(): void;
+  pendingDelete: boolean;
   onDelete(): void;
+  onUndo(): void;
 }) {
   const diffPercent =
     dbMatch && item.unit_price && dbMatch.latestPrice > 0 ? ((item.unit_price - dbMatch.latestPrice) / dbMatch.latestPrice) * 100 : 0;
@@ -213,6 +234,22 @@ function ItemRowView({
   const itemDate = item.date || todayISO();
   const last = dbMatch?.priceHistory[dbMatch.priceHistory.length - 1];
   const isIndexed = !!last && dbMatch!.latestPrice === item.unit_price && last.date === itemDate;
+
+  if (pendingDelete) {
+    return (
+      <div className="col-span-full min-w-0 flex items-center gap-3">
+        <div className="flex-1 min-w-0 flex items-center gap-3 opacity-60">
+          <span className="font-bold text-xs md:text-sm line-through truncate">{item.item_name}</span>
+          <span className="text-[11px] md:text-sm font-mono line-through shrink-0">
+            {item.quantity} {item.unit}
+          </span>
+          {isAudit && <span className="text-[11px] md:text-sm font-mono line-through shrink-0">₹{(item.total_amount || 0).toLocaleString('en-IN')}</span>}
+          <span className="text-[10px] text-red-600 shrink-0">Deleted</span>
+        </div>
+        <UndoButton onUndo={onUndo} label={item.item_name} />
+      </div>
+    );
+  }
 
   return (
     <>

@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { AlertTriangle, Info } from 'lucide-react';
+import { useBackHandler } from '../lib/backButton.ts';
 
 interface DialogRequest {
   kind: 'alert' | 'confirm' | 'prompt';
@@ -52,6 +53,8 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
     current?.resolve(value);
     setQueue((q) => q.slice(1));
   };
+  // Back cancels the dialog, like tapping outside it.
+  useBackHandler(() => current && close(current.kind === 'alert' ? true : current.kind === 'confirm' ? false : null), !!current);
 
   return (
     <DialogContext.Provider value={api}>

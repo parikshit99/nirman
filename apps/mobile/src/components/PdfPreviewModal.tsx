@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { Download, FileCode, X } from 'lucide-react';
 import type { ItemRow } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
+import { useBackHandler } from '../lib/backButton.ts';
 
 interface Props {
   kind: ListKind;
@@ -13,6 +14,7 @@ interface Props {
 
 /** On-screen preview matching the generated PDF. */
 export function PdfPreviewModal({ kind, items, notes, onDownload, onClose }: Props) {
+  useBackHandler(onClose);
   const isAudit = kind === 'audit';
   const total = items.reduce((sum, i) => sum + (i.total_amount || 0), 0);
   return (

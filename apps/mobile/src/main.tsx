@@ -13,6 +13,7 @@ import { ensureDrafts, loadSnapshot, resetStuckJobs } from './data/repo.ts';
 import { migrateLocal } from './data/schema.ts';
 import { openCapacitorSqlite, openSqlJs, type Db } from './data/sql.ts';
 import { JobWorker } from './jobs/worker.ts';
+import { installBackButton } from './lib/backButton.ts';
 import { connectivity } from './lib/connectivity.ts';
 import { isNative } from './lib/platform.ts';
 import { AppStateProvider, type Services } from './state/AppState.tsx';
@@ -35,7 +36,17 @@ async function bootstrap() {
 
     const settings = { current: await settingsStore.load() };
     const dataListeners = new Set<() => void>();
-    const worker = new JobWorker(db, () => settings.current, () => dataListeners.forEach((fn) => fn()));
+    const worker = new JobWorker(
+      db,
+      () => settings.current,
+      () => dataListeners.forEach((fn) => fn()),
+      undefined,
+      // Remember a replacement model so the next reading doesn't look it up again.
+      (geminiModel) => {
+        settings.current = { ...settings.current, geminiModel };
+        void settingsStore.save(settings.current);
+      },
+    );
     const services: Services = {
       db,
       worker,
@@ -56,6 +67,7 @@ async function bootstrap() {
         </DialogProvider>
       </StrictMode>,
     );
+    await installBackButton();
     await worker.start(connectivity);
   } catch (err) {
     console.error(err);

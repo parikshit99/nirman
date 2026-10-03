@@ -4,6 +4,7 @@ import {
   guessCategory,
   materialDatabaseToCSV,
   materialKey,
+  parseAmount,
   parseExtractionOutput,
   type ItemRow,
   type ListRow,
@@ -86,5 +87,22 @@ describe('parseExtractionOutput', () => {
   });
   it('returns [] for garbage', () => {
     expect(parseExtractionOutput('nope')).toEqual([]);
+  });
+});
+
+describe('parseAmount', () => {
+  it('reads numbers as typed in India', () => {
+    expect(parseAmount('1,500')).toBe(1500);
+    expect(parseAmount('₹ 1,50,000')).toBe(150000);
+    expect(parseAmount('Rs. 380')).toBe(380);
+    expect(parseAmount('12.5')).toBe(12.5);
+    expect(parseAmount(' 7 ')).toBe(7);
+    expect(parseAmount(42)).toBe(42);
+  });
+  it('returns null instead of guessing', () => {
+    expect(parseAmount('')).toBeNull();
+    expect(parseAmount('abc')).toBeNull();
+    expect(parseAmount('1.2.3')).toBeNull();
+    expect(parseAmount(undefined)).toBeNull();
   });
 });

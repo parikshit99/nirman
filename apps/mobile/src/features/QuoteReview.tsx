@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Trash2 } from 'lucide-react';
-import { compareQuotes, normalizeTerm, type QuoteLineRow, type QuoteRow } from '@nirman/shared';
+import { compareQuotes, normalizeTerm, parseAmount, type QuoteLineRow, type QuoteRow } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { VsLastBadge, rupees } from '../components/PriceBadges.tsx';
 import type { QuoteLinePatch } from '../data/repo.ts';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
+import { UndoButton } from '../components/UndoButton.tsx';
 
 /**
  * Check the AI's reading of one vendor quote: every line with the BOQ item it
@@ -12,9 +13,12 @@ import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
  * the last recorded price. Confirming adds the prices to the database.
  */
 export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote: QuoteRow; onDone(): void }) {
-  const { linesFor, itemDatabase, learning, actions } = useAppState();
+  const { linesFor, itemDatabase, learning, actions, pendingDeletes } = useAppState();
   const dialogs = useDialogs();
-  const lines = linesFor(quote.id);
+  const allLines = linesFor(quote.id);
+  /** Lines that count: deleted ones stay listed (struck through) until the undo window ends. */
+  const lines = allLines.filter((l) => !pendingDeletes.has(l.id));
+  useEffect(() => () => void actions.flushDeletes(), [actions]);
   const readOnly = quote.status === 'confirmed';
   const { rows, vendors } = compareQuotes(boq.items, [quote], lines, itemDatabase, learning);
   const summary = vendors[0];
@@ -35,6 +39,7 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
       confirmLabel: 'Confirm',
     });
     if (!ok) return;
+    await actions.flushDeletes();
     await actions.confirmQuote(quote.id);
     onDone();
   };
@@ -95,7 +100,15 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
       <section>
         <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">What the vendor wrote ({lines.length} lines)</h4>
         <div className="space-y-2">
-          {lines.map((line) => {
+          {allLines.map((line) => {
+            if (pendingDeletes.has(line.id)) {
+              return (
+                <div key={line.id} className="p-3 rounded-xl border border-red-100 bg-red-50/40 flex items-center justify-between gap-2">
+                  <span className="text-sm line-through text-gray-500 truncate">“{line.original_term || line.item_name}”</span>
+                  <UndoButton onUndo={() => actions.undoDelete(line.id)} label={line.original_term || line.item_name} />
+                </div>
+              );
+            }
             const match = line.boq_item_id ? itemsById.get(line.boq_item_id) : undefined;
             const duplicate = !!line.boq_item_id && firstLineFor.get(line.boq_item_id) !== line.id;
             return (
@@ -108,7 +121,7 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
                 boq={boq}
                 readOnly={readOnly}
                 onChange={(patch) => actions.updateQuoteLine(line.id, patch)}
-                onDelete={() => actions.deleteQuoteLine(line.id)}
+                onDelete={() => actions.deleteQuoteLineLater(line.id)}
               />
             );
           })}
@@ -185,7 +198,11 @@ function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDel
           value={rate}
           disabled={readOnly}
           onChange={(e) => setRate(e.target.value)}
-          onBlur={() => Number(rate) !== line.unit_price && onChange({ unit_price: Number(rate) || 0 })}
+          onBlur={() => {
+            const value = rate.trim() ? parseAmount(rate) : 0;
+            if (value === null) setRate(String(line.unit_price || ''));
+            else if (value !== line.unit_price) onChange({ unit_price: value });
+          }}
           aria-label="Rate"
           placeholder="Rate"
           className={`w-28 ${field} font-mono`}

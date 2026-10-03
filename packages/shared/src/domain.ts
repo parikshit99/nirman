@@ -11,6 +11,18 @@ export function materialKey(name: string, unit: string | undefined | null): stri
   return JSON.stringify([normalizeTerm(name), normalizeTerm(unit || 'unit')]);
 }
 
+/**
+ * Read a number the way people type it on site: "1,500", "₹ 1,50,000",
+ * "Rs. 380", "12.5". Returns null for empty or unreadable input (never a
+ * silent 0 or a truncated value).
+ */
+export function parseAmount(input: string | number | null | undefined): number | null {
+  if (typeof input === 'number') return Number.isFinite(input) ? input : null;
+  const cleaned = (input ?? '').replace(/₹|rs\.?|inr/gi, '').replace(/[,\s]/g, '');
+  if (!/^-?(\d+\.?\d*|\.\d+)$/.test(cleaned)) return null;
+  return Number(cleaned);
+}
+
 export function todayISO(now: Date = new Date()): string {
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, '0');

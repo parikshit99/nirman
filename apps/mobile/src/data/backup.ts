@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { dataTables, rowSchemas, type RowTypes } from '@nirman/shared';
+import { dataTables, rowSchemas, todayISO, type RowTypes } from '@nirman/shared';
 import { clearAllData, ensureDraftRows, selectAll, writeRow } from './repo.ts';
 import type { Db } from './sql.ts';
 
@@ -69,4 +69,5 @@ export async function restoreBackup(db: Db, backup: Backup): Promise<void> {
   });
 }
 
-export const backupFilename = (date = new Date()) => `nirmaan-backup-${date.toISOString().slice(0, 10)}.json`;
+/** Named by the phone's local date (an IST backup at 1 AM is today's, not yesterday's UTC date). */
+export const backupFilename = (date = new Date()) => `nirmaan-backup-${todayISO(date)}.json`;

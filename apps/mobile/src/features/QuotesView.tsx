@@ -10,6 +10,7 @@ import { isNative } from '../lib/platform.ts';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
 import { QuoteCompare } from './QuoteCompare.tsx';
 import { QuoteReview } from './QuoteReview.tsx';
+import { useBackHandler } from '../lib/backButton.ts';
 
 type Screen = { name: 'list' | 'add' | 'compare' } | { name: 'review'; quoteId: string };
 
@@ -22,6 +23,8 @@ export function QuotesView({ boqId, onClose }: { boqId: string; onClose(): void 
   const [screen, setScreen] = useState<Screen>(() =>
     quotes.length === 0 ? { name: 'add' } : confirmed.length > 0 ? { name: 'compare' } : { name: 'list' },
   );
+  // Back steps out of a quote or the add form first, then closes.
+  useBackHandler(() => (screen.name === 'review' || screen.name === 'add' ? setScreen({ name: 'list' }) : onClose()));
   if (!boq) return null;
 
   const reviewing = screen.name === 'review' ? quotes.find((q) => q.id === screen.quoteId) : undefined;
