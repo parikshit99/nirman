@@ -50,7 +50,7 @@ export function QuotesView({ boqId, onClose }: { boqId: string; onClose(): void 
           )}
           <div className="min-w-0 flex-1">
             <h3 id="quotes-title" className="text-sm font-bold truncate">Vendor quotes · {boq.title || 'Untitled BOQ'}</h3>
-            <p className="text-[10px] text-gray-500 font-mono truncate">
+            <p className="text-[11px] text-gray-500 font-mono truncate">
               {boq.items.length} BOQ items{boq.address ? ` · ${boq.address}` : ''}
             </p>
           </div>
@@ -66,7 +66,7 @@ export function QuotesView({ boqId, onClose }: { boqId: string; onClose(): void 
                 key={name}
                 onClick={() => setScreen({ name })}
                 aria-current={screen.name === name ? 'page' : undefined}
-                className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider ${screen.name === name ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                className={`flex-1 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider ${screen.name === name ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'}`}
               >
                 {name === 'compare' ? `Compare (${confirmed.length})` : `Quotes (${quotes.length})`}
               </button>
@@ -141,7 +141,7 @@ function QuoteList({ boq, quotes, onAdd, onOpen }: { boq: HistoryRecord; quotes:
             <div className="flex justify-between items-start gap-2">
               <div className="min-w-0">
                 <div className="font-bold text-sm text-gray-900 truncate">{q.vendor || 'Unnamed vendor'}</div>
-                <div className="text-[10px] font-mono text-gray-400">{new Date(q.quote_date).toLocaleDateString('en-IN')}</div>
+                <div className="text-[11px] font-mono text-gray-400">{new Date(q.quote_date).toLocaleDateString('en-IN')}</div>
               </div>
               <button onClick={() => remove(q)} className="p-1.5 text-gray-300 hover:text-red-500" aria-label={`Delete ${q.vendor}'s quote`}>
                 <Trash2 size={16} />
@@ -150,12 +150,12 @@ function QuoteList({ boq, quotes, onAdd, onOpen }: { boq: HistoryRecord; quotes:
             <div className="text-[11px] mt-2">{state}</div>
             <div className="flex gap-2 mt-3">
               {job?.status === 'failed' && (
-                <button onClick={() => actions.retryJob(job)} className="flex-1 py-2 bg-gray-100 rounded-lg text-[10px] font-bold uppercase flex items-center justify-center gap-1">
+                <button onClick={() => actions.retryJob(job)} className="flex-1 py-2 bg-gray-100 rounded-lg text-[11px] font-bold uppercase flex items-center justify-center gap-1">
                   <RotateCcw size={12} /> Retry
                 </button>
               )}
               {!job && lines.length > 0 && (
-                <button onClick={() => onOpen(q)} className="flex-1 py-2 bg-gray-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                <button onClick={() => onOpen(q)} className="flex-1 py-2 bg-gray-900 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider">
                   {q.status === 'confirmed' ? 'View lines' : 'Review & confirm'}
                 </button>
               )}
@@ -212,7 +212,7 @@ function AddQuote({ boqId, onDone }: { boqId: string; onDone(): void }) {
       </p>
       <div className="grid grid-cols-[1fr_auto] gap-3">
         <label className="block">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Vendor</span>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Vendor</span>
           <input
             value={vendor}
             onChange={(e) => setVendor(e.target.value)}
@@ -227,13 +227,13 @@ function AddQuote({ boqId, onDone }: { boqId: string; onDone(): void }) {
           </datalist>
         </label>
         <label className="block">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Quote date</span>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Quote date</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none" />
         </label>
       </div>
 
       <div>
-        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Photos of the quote</span>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Photos of the quote</span>
         <div className="mt-1 grid grid-cols-3 gap-2">
           {images.map((src, idx) => (
             <div key={idx} className="relative aspect-square rounded-lg border border-gray-200 overflow-hidden">
@@ -253,7 +253,7 @@ function AddQuote({ boqId, onDone }: { boqId: string; onDone(): void }) {
               className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-gray-500"
             >
               {isNative ? <Camera size={20} /> : <ImageIcon size={20} />}
-              <span className="text-[9px] font-bold uppercase">Add page</span>
+              <span className="text-[11px] font-bold uppercase">Add page</span>
             </button>
           )}
         </div>
@@ -273,7 +273,7 @@ function AddQuote({ boqId, onDone }: { boqId: string; onDone(): void }) {
       </div>
 
       <label className="block">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Or type / paste the quote (optional)</span>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Or type / paste the quote (optional)</span>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -290,7 +290,7 @@ function AddQuote({ boqId, onDone }: { boqId: string; onDone(): void }) {
       >
         {busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Read quote
       </button>
-      {!vendor.trim() && <p className="text-[10px] text-gray-400 text-center">Enter the vendor's name to continue.</p>}
+      {!vendor.trim() && <p className="text-[11px] text-gray-400 text-center">Enter the vendor's name to continue.</p>}
       {sourceMenu && <PhotoSourceSheet remaining={MAX_IMAGES - images.length} onPick={pickFrom} onClose={() => setSourceMenu(false)} />}
     </div>
   );

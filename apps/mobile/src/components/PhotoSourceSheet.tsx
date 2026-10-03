@@ -14,7 +14,7 @@ export function PhotoSourceSheet({ remaining, onPick, onClose }: { remaining: nu
         className="bg-white w-full max-w-md rounded-t-2xl p-4 pb-6 space-y-2 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <p className="text-[10px] font-mono uppercase tracking-widest text-gray-400 font-bold px-1 pb-1">Add bill or note</p>
+        <p className="text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold px-1 pb-1">Add bill or note</p>
         <button className={option} onClick={() => onPick('camera')}>
           <Camera size={20} className="text-orange-500" /> Take photo
         </button>
@@ -22,12 +22,12 @@ export function PhotoSourceSheet({ remaining, onPick, onClose }: { remaining: nu
           <ImageIcon size={20} className="text-orange-500" />
           <span>
             Choose from gallery
-            <span className="block text-[10px] font-normal text-gray-500">
+            <span className="block text-[11px] font-normal text-gray-500">
               Up to {remaining} photo{remaining === 1 ? '' : 's'}
             </span>
           </span>
         </button>
-        <button onClick={onClose} className="w-full py-3 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+        <button onClick={onClose} className="w-full py-3 text-[11px] font-bold uppercase tracking-widest text-gray-500">
           Cancel
         </button>
       </div>

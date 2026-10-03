@@ -49,8 +49,10 @@ export function DatabaseView(props: Props) {
 }
 
 function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddress }: Props) {
-  const { actions, categoryNames, uniqueAddresses } = useAppState();
+  const { actions, categoryNames, uniqueAddresses, itemDatabase, itemsFor, pendingDeletes } = useAppState();
   const dialogs = useDialogs();
+  const totalMaterials = itemDatabase.length;
+  const unsavedPriced = itemsFor('audit').filter((i) => i.unit_price > 0 && !pendingDeletes.has(i.id)).length;
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulk, setBulk] = useState({ unit: '', vendor: '', price: '' });
@@ -111,19 +113,19 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
               setSelectMode(!selectMode);
               setSelected(new Set());
             }}
-            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all border
               ${selectMode ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
           >
             {selectMode ? 'Cancel Selection' : 'Select Items'}
           </button>
           {selectMode && selected.size > 0 && (
-            <div className="text-[10px] font-mono font-bold text-orange-600 flex items-center bg-orange-50 px-3 rounded-lg border border-orange-100">
+            <div className="text-[11px] font-mono font-bold text-orange-600 flex items-center bg-orange-50 px-3 rounded-lg border border-orange-100">
               {selected.size} Selected
             </div>
           )}
           <button
             onClick={exportCsv}
-            className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border bg-white text-green-600 border-green-200 hover:border-green-400 hover:bg-green-50 flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all border bg-white text-green-600 border-green-200 hover:border-green-400 hover:bg-green-50 flex items-center gap-1.5"
           >
             <Download size={12} /> Export CSV
           </button>
@@ -141,23 +143,22 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
                 placeholder="New Unit"
                 value={bulk.unit}
                 onChange={(e) => setBulk((p) => ({ ...p, unit: e.target.value }))}
-                className="px-2 py-1 text-[10px] border border-gray-200 rounded w-16 outline-none focus:border-orange-300"
+                className="px-2 py-1 text-[11px] border border-gray-200 rounded w-16 outline-none focus:border-orange-300"
               />
               <input
                 placeholder="New Vendor"
                 value={bulk.vendor}
                 onChange={(e) => setBulk((p) => ({ ...p, vendor: e.target.value }))}
-                className="px-2 py-1 text-[10px] border border-gray-200 rounded w-20 outline-none focus:border-orange-300"
+                className="px-2 py-1 text-[11px] border border-gray-200 rounded w-20 outline-none focus:border-orange-300"
               />
               <input
-                type="number"
                 inputMode="decimal"
                 placeholder="New Price"
                 value={bulk.price}
                 onChange={(e) => setBulk((p) => ({ ...p, price: e.target.value }))}
-                className="px-2 py-1 text-[10px] border border-gray-200 rounded w-16 outline-none focus:border-orange-300"
+                className="px-2 py-1 text-[11px] border border-gray-200 rounded w-16 outline-none focus:border-orange-300"
               />
-              <button onClick={applyBulk} className="bg-orange-500 text-white px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-orange-600">
+              <button onClick={applyBulk} className="bg-orange-500 text-white px-3 py-1 rounded text-[11px] font-bold uppercase hover:bg-orange-600">
                 Apply to All
               </button>
             </motion.div>
@@ -165,102 +166,106 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
         </AnimatePresence>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm w-full">
-        <div className="overflow-x-auto">
-          <div className="min-w-[700px]">
-            <div className="grid grid-cols-[auto_1.5fr_1fr_2fr_1.5fr] px-6 py-4 bg-gray-50 border-b border-gray-200 items-center">
-              <div className="w-8" />
-              <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Material Item</div>
-              <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-center">Latest Price (₹)</div>
-              <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Suppliers / Vendors</div>
-              <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-right pr-4">Price Trend</div>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {entries.length === 0 ? (
-                <div className="p-20 text-center text-gray-300">
-                  <Database size={48} className="mx-auto mb-4 opacity-20" />
-                  <p className="font-mono text-sm uppercase tracking-widest">No Items Match Filters</p>
-                </div>
-              ) : (
-                entries.map((item, idx) => {
-                  const points = item.priceHistory.filter((h) => h.price > 0);
-                  const isSelected = selected.has(item.key);
-                  return (
-                    <div
-                      key={item.key}
-                      onClick={() => selectMode && toggle(item.key)}
-                      className={`grid grid-cols-[auto_1.5fr_1fr_2fr_1.5fr] px-6 py-5 items-center hover:bg-gray-50/80 transition-colors ${selectMode ? 'cursor-pointer' : ''}
-                        ${isSelected ? 'bg-orange-50/50' : ''}`}
-                    >
-                      <div className="w-8 flex items-center">
-                        {selectMode && (
-                          <div
-                            className={`w-4 h-4 rounded border flex items-center justify-center transition-colors
-                              ${isSelected ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-300 bg-white'}`}
-                          >
-                            {isSelected && <Check size={10} strokeWidth={4} />}
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <div className="font-bold text-sm text-gray-900">{item.name}</div>
-                        <div className="text-[10px] text-gray-400 font-mono uppercase tracking-tighter">Unit: {item.unit}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="font-mono font-bold text-sm">₹{Math.round(item.latestPrice).toLocaleString('en-IN')}</div>
-                        <div className="text-[9px] text-gray-400 font-mono">
-                          Range: ₹{item.minPrice}-₹{item.maxPrice}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {item.vendors.map((v) => (
-                          <span key={v} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[9px] font-bold flex items-center gap-1 border border-gray-200">
-                            <Truck size={8} /> {v}
-                          </span>
-                        ))}
-                        {item.vendors.length === 0 && <span className="text-[10px] text-gray-300 italic">No vendors linked</span>}
-                      </div>
-                      <div className="h-16 w-full flex justify-end">
-                        <div className="w-full max-w-[150px] h-full">
-                          {points.length > 1 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                              <AreaChart data={points}>
-                                <defs>
-                                  <linearGradient id={`colorPrice-${idx}`} x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
-                                  </linearGradient>
-                                </defs>
-                                <Area type="monotone" dataKey="price" stroke="#f97316" fillOpacity={1} fill={`url(#colorPrice-${idx})`} strokeWidth={2} />
-                                <Tooltip
-                                  labelFormatter={(_, payload) => payload?.[0]?.payload?.date ?? ''}
-                                  labelStyle={{ fontSize: '10px' }}
-                                  contentStyle={{ fontSize: '10px', borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                  formatter={(value) => [`₹${value}`, 'Price']}
-                                />
-                              </AreaChart>
-                            </ResponsiveContainer>
-                          ) : (
-                            <div className="h-full w-full flex items-center justify-center text-[10px] text-gray-300 font-mono italic border border-dashed border-gray-100 rounded">
-                              Need 2+ data pts
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm w-full divide-y divide-gray-100">
+        {entries.length === 0 ? (
+          <div className="p-10 text-center text-gray-400 space-y-2">
+            <Database size={40} className="mx-auto opacity-30" />
+            {totalMaterials > 0 ? (
+              <p className="text-sm">No materials match the search or filters.</p>
+            ) : (
+              <>
+                <p className="text-sm font-bold text-gray-600">No prices yet</p>
+                <p className="text-xs leading-relaxed max-w-sm mx-auto">
+                  Prices appear here when you save a session (Save button) or tap <b>Index rate</b> on an Audit item.
+                  {unsavedPriced > 0 && ` Your Audit list has ${unsavedPriced} priced item${unsavedPriced === 1 ? '' : 's'} not added yet.`}
+                </p>
+              </>
+            )}
           </div>
-        </div>
+        ) : (
+          entries.map((item, idx) => {
+            const points = item.priceHistory.filter((h) => h.price > 0);
+            const isSelected = selected.has(item.key);
+            return (
+              <div
+                key={item.key}
+                onClick={() => selectMode && toggle(item.key)}
+                className={`px-4 md:px-6 py-4 flex gap-3 transition-colors ${selectMode ? 'cursor-pointer' : ''} ${isSelected ? 'bg-orange-50/60' : ''}`}
+              >
+                {selectMode && (
+                  <div
+                    className={`mt-0.5 w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors
+                      ${isSelected ? 'bg-orange-500 border-orange-500 text-white' : 'border-gray-300 bg-white'}`}
+                  >
+                    {isSelected && <Check size={12} strokeWidth={4} />}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0 md:grid md:grid-cols-[1.5fr_1fr_1.5fr] md:gap-4 md:items-center">
+                  <div className="flex justify-between gap-2 md:block">
+                    <div className="min-w-0">
+                      <div className="font-bold text-sm text-gray-900">{item.name}</div>
+                      <div className="text-xs text-gray-500">per {item.unit}</div>
+                    </div>
+                    <div className="text-right md:hidden shrink-0">
+                      <div className="font-mono font-bold text-sm">₹{Math.round(item.latestPrice).toLocaleString('en-IN')}</div>
+                      {item.minPrice !== item.maxPrice && (
+                        <div className="text-xs text-gray-500 font-mono">
+                          ₹{item.minPrice.toLocaleString('en-IN')}–₹{item.maxPrice.toLocaleString('en-IN')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="hidden md:block">
+                    <div className="font-mono font-bold text-sm">₹{Math.round(item.latestPrice).toLocaleString('en-IN')}</div>
+                    {item.minPrice !== item.maxPrice && (
+                      <div className="text-xs text-gray-500 font-mono">
+                        Range ₹{item.minPrice.toLocaleString('en-IN')}–₹{item.maxPrice.toLocaleString('en-IN')}
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-2 md:mt-0 space-y-2">
+                    <div className="flex flex-wrap gap-1">
+                      {item.vendors.map((v) => (
+                        <span key={v} className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs flex items-center gap-1 border border-gray-200">
+                          <Truck size={12} /> {v}
+                        </span>
+                      ))}
+                      {item.vendors.length === 0 && <span className="text-xs text-gray-400 italic">No vendor yet</span>}
+                    </div>
+                    {points.length > 1 && (
+                      <div className="h-12 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={points}>
+                            <defs>
+                              <linearGradient id={`colorPrice-${idx}`} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                                <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <Area type="monotone" dataKey="price" stroke="#f97316" fillOpacity={1} fill={`url(#colorPrice-${idx})`} strokeWidth={2} />
+                            <Tooltip
+                              labelFormatter={(_, payload) => payload?.[0]?.payload?.date ?? ''}
+                              labelStyle={{ fontSize: '12px' }}
+                              contentStyle={{ fontSize: '12px', borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                              formatter={(value) => [`₹${value}`, 'Price']}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl flex items-center gap-4">
         <TrendingUp className="text-orange-500 shrink-0" />
         <div>
           <h4 className="text-xs font-bold text-gray-700">Database Indexing Active</h4>
-          <p className="text-[10px] text-gray-500">Every saved session and indexed rate adds to your material price history.</p>
+          <p className="text-[11px] text-gray-500">Every saved session and indexed rate adds to your material price history.</p>
         </div>
       </div>
     </>
@@ -272,54 +277,39 @@ function IndexedLog() {
   const rates = snapshot.rates;
   useEffect(() => () => void actions.flushDeletes(), [actions]);
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm w-full">
-      <div className="overflow-x-auto">
-        <div className="min-w-[650px]">
-          <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_auto] px-6 py-4 bg-gray-50 border-b border-gray-200 items-center">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Material Item</div>
-            <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-center">Cost Rate (₹)</div>
-            <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Vendor</div>
-            <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-right">Indexed When</div>
-            <div className="w-8 pl-4" />
-          </div>
-          <div className="divide-y divide-gray-100">
-            {rates.length === 0 ? (
-              <div className="p-20 text-center text-gray-300">
-                <p className="font-mono text-sm uppercase tracking-widest">No Manual Indexing Found</p>
-              </div>
-            ) : (
-              rates.map((rate) => (
-                <div
-                  key={rate.id}
-                  className={`grid grid-cols-[1.5fr_1fr_1fr_1fr_auto] px-6 py-4 items-center hover:bg-gray-50/80 transition-colors ${pendingDeletes.has(rate.id) ? 'line-through opacity-60 bg-red-50/40' : ''}`}
-                >
-                  <div>
-                    <div className="font-bold text-sm text-gray-900">{rate.item_name}</div>
-                    <div className="text-[10px] text-gray-400 font-mono uppercase tracking-tighter">Unit: {rate.unit}</div>
-                  </div>
-                  <div className="text-center font-mono font-bold text-sm text-gray-600">₹{rate.price}</div>
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 font-mono">
-                    <Truck size={12} /> {rate.vendor}
-                  </div>
-                  <div className="text-right flex flex-col items-end">
-                    <div className="text-[10px] font-bold text-gray-600">{rate.date}</div>
-                    <div className="text-[8px] text-gray-400 font-mono">{new Date(rate.indexed_at).toLocaleString('en-GB')}</div>
-                  </div>
-                  <div className="pl-4">
-                    {pendingDeletes.has(rate.id) ? (
-                      <UndoButton onUndo={() => actions.undoDelete(rate.id)} label={rate.item_name} />
-                    ) : (
-                      <button onClick={() => actions.deleteIndexedRateLater(rate.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" aria-label="Remove from index">
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </div>
+    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm w-full divide-y divide-gray-100">
+      {rates.length === 0 ? (
+        <div className="p-10 text-center text-gray-400 text-sm">No indexed rates yet. Tap “Index rate” on an Audit item to add one.</div>
+      ) : (
+        rates.map((rate) => {
+          const pendingDelete = pendingDeletes.has(rate.id);
+          return (
+            <div key={rate.id} className={`px-4 md:px-6 py-3 flex items-center gap-3 ${pendingDelete ? 'bg-red-50/40' : ''}`}>
+              <div className={`flex-1 min-w-0 ${pendingDelete ? 'line-through opacity-60' : ''}`}>
+                <div className="flex justify-between gap-2">
+                  <span className="font-bold text-sm text-gray-900 truncate">{rate.item_name}</span>
+                  <span className="font-mono font-bold text-sm shrink-0">
+                    ₹{rate.price.toLocaleString('en-IN')} <span className="text-xs font-normal text-gray-500">/ {rate.unit}</span>
+                  </span>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
+                <div className="text-xs text-gray-500 flex flex-wrap gap-x-3">
+                  <span className="flex items-center gap-1">
+                    <Truck size={12} /> {rate.vendor}
+                  </span>
+                  <span>{rate.date}</span>
+                </div>
+              </div>
+              {pendingDelete ? (
+                <UndoButton onUndo={() => actions.undoDelete(rate.id)} label={rate.item_name} />
+              ) : (
+                <button onClick={() => actions.deleteIndexedRateLater(rate.id)} className="p-2 -mr-2 text-red-500 hover:bg-red-50 rounded-lg" aria-label={`Remove ${rate.item_name} from index`}>
+                  <Trash2 size={18} />
+                </button>
+              )}
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }
@@ -334,8 +324,8 @@ function Categories() {
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm max-w-2xl mx-auto">
       <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-        <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Work Categories</div>
-        <div className="text-[10px] font-mono text-gray-500">{snapshot.categories.length} Total</div>
+        <div className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Work Categories</div>
+        <div className="text-[11px] font-mono text-gray-500">{snapshot.categories.length} Total</div>
       </div>
       <div className="p-6">
         <div className="flex gap-2 mb-6">

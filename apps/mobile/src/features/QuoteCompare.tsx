@@ -50,25 +50,25 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
             <div className="flex justify-between items-center gap-2">
               <span className="font-bold text-sm truncate">{v.quote.vendor}</span>
               {v === best && (
-                <span className="text-[9px] font-bold text-green-700 flex items-center gap-1 shrink-0">
+                <span className="text-[11px] font-bold text-green-700 flex items-center gap-1 shrink-0">
                   <Trophy size={10} /> Cheapest overall
                 </span>
               )}
             </div>
             <div className="text-lg font-mono font-bold">{rupees(Math.round(v.total))}</div>
-            <div className="text-[10px] text-gray-500 space-x-1">
+            <div className="text-[11px] text-gray-500 space-x-1">
               <span>{shortDate(v.quote.quote_date)}</span>
               <span>· {v.quoted}/{boq.items.length} quoted</span>
               {v.missing.length > 0 && <b className="text-red-600">· {v.missing.length} missing</b>}
               {v.unitIssues > 0 && <span className="text-orange-700">· {v.unitIssues} other unit</span>}
             </div>
             {multi && comparison.commonItems < boq.items.length && (
-              <div className="text-[10px] text-gray-600 mt-1">
+              <div className="text-[11px] text-gray-600 mt-1">
                 {rupees(Math.round(v.commonTotal))} on the {comparison.commonItems} item{comparison.commonItems === 1 ? '' : 's'} all vendors quoted
               </div>
             )}
             {v.vsLast !== null && (
-              <div className={`text-[10px] font-bold mt-1 ${v.vsLast > 0.005 ? 'text-red-600' : v.vsLast < -0.005 ? 'text-green-700' : 'text-gray-500'}`}>
+              <div className={`text-[11px] font-bold mt-1 ${v.vsLast > 0.005 ? 'text-red-600' : v.vsLast < -0.005 ? 'text-green-700' : 'text-gray-500'}`}>
                 {pct(v.vsLast)} vs last prices for the same items ({rupees(Math.round(v.lastTotal))})
               </div>
             )}
@@ -84,11 +84,11 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
                 <span className="font-mono text-gray-400 mr-1 text-xs">{row.sr}.</span>
                 <span className="font-bold text-sm">{row.item.item_name}</span>
               </div>
-              <span className="text-[10px] text-gray-500 font-mono shrink-0">
+              <span className="text-[11px] text-gray-500 font-mono shrink-0">
                 {row.item.quantity} {row.item.unit}
               </span>
             </div>
-            <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-2">
+            <div className="text-[11px] text-gray-500 mt-1 flex items-center gap-2">
               {row.history.last ? (
                 <>
                   <span>
@@ -114,7 +114,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
 
       <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-xl">
         <table className="w-full text-xs min-w-[640px]">
-          <thead className="bg-gray-50 text-[9px] uppercase tracking-wider text-gray-500">
+          <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
             <tr>
               <th className="text-left p-2 font-bold">Item (BOQ qty)</th>
               <th className="text-left p-2 font-bold">Past prices</th>
@@ -131,7 +131,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
                 <td className="p-2">
                   <span className="font-mono text-gray-400 mr-1">{row.sr}.</span>
                   <span className="font-bold">{row.item.item_name}</span>
-                  <div className="text-[10px] text-gray-500">
+                  <div className="text-[11px] text-gray-500">
                     {row.item.quantity} {row.item.unit}
                   </div>
                 </td>
@@ -139,18 +139,18 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
                   {row.history.last ? (
                     <div className="space-y-0.5">
                       <div className="font-mono">{rupees(row.history.last.price)}</div>
-                      <div className="text-[9px] text-gray-500">
+                      <div className="text-[11px] text-gray-500">
                         {shortDate(row.history.last.date)} · {row.history.last.vendor}
                       </div>
                       {row.history.points.length > 1 && (
-                        <div className="flex items-center gap-1 text-[9px] text-gray-400">
+                        <div className="flex items-center gap-1 text-[11px] text-gray-400">
                           <Sparkline points={row.history.points} />
                           {rupees(row.history.min)}–{rupees(row.history.max)}
                         </div>
                       )}
                     </div>
                   ) : (
-                    <span className="text-[10px] text-gray-400 italic">No past price</span>
+                    <span className="text-[11px] text-gray-400 italic">No past price</span>
                   )}
                 </td>
                 {comparison.vendors.map((v) => (
@@ -166,7 +166,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
 
       {comparison.vendors.some((v) => v.extras.length > 0) && (
         <section>
-          <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Also quoted (not in the BOQ)</h4>
+          <h4 className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-2">Also quoted (not in the BOQ)</h4>
           <ul className="text-xs space-y-1">
             {comparison.vendors.flatMap((v) =>
               v.extras.map((l) => (
@@ -185,10 +185,10 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
       )}
 
       <div className="flex gap-2">
-        <button onClick={onAdd} className="flex-1 py-3 bg-white border border-gray-200 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+        <button onClick={onAdd} className="flex-1 py-3 bg-white border border-gray-200 rounded-xl text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2">
           <Plus size={14} /> Add vendor quote
         </button>
-        <button onClick={exportPdf} className="flex-1 py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+        <button onClick={exportPdf} className="flex-1 py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2">
           <Download size={14} /> Comparison PDF
         </button>
       </div>
@@ -198,19 +198,19 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
 
 /** One vendor's rate for one item: lowest marker, change against the last price, unit/quantity notes. */
 function PriceCell({ cell }: { cell?: QuoteCell }) {
-  if (!cell || cell.price <= 0) return <span className="text-[10px] text-red-500 italic">not quoted</span>;
+  if (!cell || cell.price <= 0) return <span className="text-[11px] text-red-500 italic">not quoted</span>;
   return (
     <div className="text-right">
       <div className={`font-mono font-bold text-xs ${cell.cheapest ? 'text-green-700' : ''}`}>
         {rupees(cell.price)}
         {cell.unitDiffers && <span className="text-orange-600 font-normal">/{cell.line.unit}</span>}
-        {cell.cheapest && <span className="ml-1 text-[9px] font-bold">· Lowest</span>}
+        {cell.cheapest && <span className="ml-1 text-[11px] font-bold">· Lowest</span>}
       </div>
       <div className="mt-0.5">
         <VsLastBadge vsLast={cell.vsLast} last={cell.lastPoint} />
       </div>
-      {cell.unitDiffers && <div className="text-[9px] text-orange-700">different unit, not compared</div>}
-      {cell.qtyDiffers && <div className="text-[9px] text-gray-500">quoted for {cell.line.quantity}</div>}
+      {cell.unitDiffers && <div className="text-[11px] text-orange-700">different unit, not compared</div>}
+      {cell.qtyDiffers && <div className="text-[11px] text-gray-500">quoted for {cell.line.quantity}</div>}
     </div>
   );
 }
