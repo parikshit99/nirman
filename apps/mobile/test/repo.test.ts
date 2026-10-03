@@ -140,6 +140,22 @@ describe('local repository', () => {
     expect(learningMap(snap.learned).bori).toEqual({ item_name: 'OPC Cement', unit: 'Bag' });
   });
 
+  it('does not pull in other materials read from the same word when renaming', async () => {
+    const db = await freshDb();
+    const bagCement = { ...cement, original_term: 'cement' };
+    await addItems(db, DRAFT_IDS.audit, [bagCement]);
+    await saveDraftToHistory(db, 'audit', meta);
+    await addItems(db, DRAFT_IDS.boq, [{ ...bagCement, unit: 'kg', unit_price: 9 }]);
+    await saveDraftToHistory(db, 'boq', { ...meta, title: 'Loose cement' });
+
+    await renameMaterial(db, materialKey('Cement', 'Bag'), { item_name: 'OPC Cement', unit: 'ton' });
+    const snap = await loadSnapshot(db);
+    const names = buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned)).map((e) => `${e.name}/${e.unit}`);
+    expect(names.sort()).toEqual(['Cement/kg', 'OPC Cement/ton']);
+    // "cement" is also used per kg, so it is not remembered as OPC Cement per ton.
+    expect(learningMap(snap.learned).cement).toBeUndefined();
+  });
+
   it('corrects one price in a saved list or an added rate, and hides materials', async () => {
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.audit, [cement]);
@@ -161,6 +177,13 @@ describe('local repository', () => {
     expect(snap.hidden.map((h) => h.id)).toEqual([ref.key]);
     expect(snap.items.find((i) => i.id === saved.id)).toBeDefined();
     await unhideMaterial(db, ref.key);
+    expect((await loadSnapshot(db)).hidden).toHaveLength(0);
+
+    // Renaming another material onto a hidden one shows it again instead of hiding these prices too.
+    await addItems(db, DRAFT_IDS.audit, [{ ...cement, item_name: 'Cement 53', original_term: 'pp bag' }]);
+    await saveDraftToHistory(db, 'audit', meta);
+    await hideMaterial(db, ref);
+    await renameMaterial(db, materialKey('Cement 53', 'Bag'), { item_name: 'Cement', unit: 'Bag' });
     expect((await loadSnapshot(db)).hidden).toHaveLength(0);
   });
 

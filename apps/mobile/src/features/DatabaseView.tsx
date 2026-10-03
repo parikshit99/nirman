@@ -379,7 +379,7 @@ function PriceRow({ point: p }: { point: MaterialEntry['priceHistory'][number] }
 
 /** Rename a material, change its unit, merge it into a similar one, or hide it. */
 function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClose(): void }) {
-  const { actions, itemDatabase } = useAppState();
+  const { actions, itemDatabase, hiddenMaterials } = useAppState();
   const dialogs = useDialogs();
   useBackHandler(onClose);
   const [name, setName] = useState(material.name);
@@ -411,6 +411,14 @@ function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClos
     if (key === material.key && nextName === material.name && nextUnit === material.unit) return onClose();
     const existing = others.find((e) => e.key === key);
     if (existing) return mergeInto(existing);
+    const hidden = hiddenMaterials.find((h) => h.id === key);
+    if (hidden) {
+      const ok = await dialogs.confirm(`“${hidden.name}” per ${hidden.unit} is hidden`, {
+        message: 'Saving merges into it and shows it in Data again, with both price histories.',
+        confirmLabel: 'Merge and unhide',
+      });
+      if (!ok) return;
+    }
     await actions.renameMaterial(material.key, { item_name: nextName, unit: nextUnit });
     onClose();
   };

@@ -310,6 +310,9 @@ export interface MaterialRef {
   unit: string;
 }
 
+/** The word a row was read from; learned corrections are keyed by it. */
+const termOf = (row: { item_name: string; original_term?: string }) => normalizeTerm(row.original_term || row.item_name);
+
 /** Saved-list items (and the open purchase list) and added rates that make up the given materials. */
 async function materialRowsTx(tx: SqlExecutor, keys: Set<string>) {
   const learning = learningMap(await tx.all<LearnedTermRow>(selectAll('learned_terms', 'id')));
@@ -323,25 +326,39 @@ async function materialRowsTx(tx: SqlExecutor, keys: Set<string>) {
     [DRAFT_IDS.audit],
   );
   const rates = await tx.all<IndexedRateRow>(selectAll('indexed_rates', 'indexed_at'));
-  return { items: items.filter((i) => keys.has(keyOf(i))), rates: rates.filter((r) => keys.has(keyOf(r))) };
+  const inSet = (r: ItemRow | IndexedRateRow) => keys.has(keyOf(r));
+  // Words also used by rows outside these materials (any list, including BOQs), e.g. "cement" per kg vs per bag.
+  const everyItem = await tx.all<ItemRow>(selectAll('items', 'id'));
+  const selected = new Set<string>([...items.filter(inSet), ...rates.filter(inSet)].map((r) => r.id));
+  const sharedTerms = new Set(
+    [...everyItem, ...rates].filter((r) => !selected.has(r.id)).map(termOf),
+  );
+  return { items: items.filter(inSet), rates: rates.filter(inSet), learning, sharedTerms };
 }
 
 async function renameMaterialTx(tx: SqlExecutor, keys: Set<string>, to: { item_name: string; unit: string }) {
   const item_name = to.item_name.trim();
   const unit = to.unit.trim() || 'unit';
   if (!item_name) return;
-  const { items, rates } = await materialRowsTx(tx, keys);
+  const { items, rates, learning, sharedTerms } = await materialRowsTx(tx, keys);
+  // A learned word already shows all its rows as this material, so it must follow the rename. A new
+  // word is remembered only if nothing outside this material uses it; a learned word maps to one
+  // name and unit, so it would otherwise pull other lines in.
   const remember = async (term: string) => {
-    if (term) await touch(tx, 'learned_terms', { id: term, item_name, unit, updated_at: '' });
+    if (term && (learning[term] || !sharedTerms.has(term))) {
+      await touch(tx, 'learned_terms', { id: term, item_name, unit, updated_at: '' });
+    }
   };
   for (const item of items) {
     await touch(tx, 'items', { ...item, item_name, unit });
-    await remember(normalizeTerm(item.original_term || item.item_name));
+    await remember(termOf(item));
   }
   for (const rate of rates) {
     await writeRow(tx, 'indexed_rates', { ...rate, item_name, unit });
-    await remember(normalizeTerm(rate.item_name));
+    await remember(termOf(rate));
   }
+  // Renaming onto a hidden material shows it again rather than making these prices vanish too.
+  await tx.run('DELETE FROM hidden_materials WHERE id = ?', [materialKey(item_name, unit)]);
 }
 
 /**
