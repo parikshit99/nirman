@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildItemDatabase,
   type ExtractedMaterial,
@@ -14,6 +14,9 @@ import { DRAFT_IDS, type Job, type ListKind, type Snapshot } from '../data/repo.
 import type { Db } from '../data/sql.ts';
 import type { JobWorker, WorkerStatus } from '../jobs/worker.ts';
 import { settingsStore, type Settings } from '../lib/settings.ts';
+
+/** How long a deleted row can be undone. */
+export const UNDO_MS = 10_000;
 
 export interface HistoryRecord extends ListRow {
   items: ItemRow[];
@@ -35,8 +38,42 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
 
   const refresh = useCallback(async () => setSnapshot(await repo.loadSnapshot(db)), [db]);
 
+  // Deletes wait UNDO_MS so they can be undone; meanwhile the row shows struck through.
+  const pending = useRef(new Map<string, { timer: ReturnType<typeof setTimeout>; commit: () => Promise<void> }>());
+  const [pendingDeletes, setPendingDeletes] = useState<ReadonlySet<string>>(new Set());
+  const syncPending = useCallback(() => setPendingDeletes(new Set(pending.current.keys())), []);
+  const finishDelete = useCallback(
+    async (id: string) => {
+      const entry = pending.current.get(id);
+      if (!entry) return;
+      clearTimeout(entry.timer);
+      pending.current.delete(id);
+      syncPending();
+      await entry.commit();
+      await refresh();
+    },
+    [refresh, syncPending],
+  );
+  const deleteLater = useCallback(
+    (commit: (db: Db, id: string) => Promise<void>) => (id: string) => {
+      if (pending.current.has(id)) return;
+      const timer = setTimeout(() => void finishDelete(id), UNDO_MS);
+      pending.current.set(id, { timer, commit: () => commit(db, id) });
+      syncPending();
+    },
+    [db, finishDelete, syncPending],
+  );
+
   useEffect(() => onDataChanged(() => void refresh()), [onDataChanged, refresh]);
-  useEffect(() => worker.subscribe(() => setStatus(worker.status)), [worker]);
+  useEffect(
+    () =>
+      worker.subscribe(() => {
+        setStatus(worker.status);
+        // The worker may have switched to a replacement model during a run.
+        setSettings((prev) => (prev === settingsRef.current ? prev : settingsRef.current));
+      }),
+    [worker, settingsRef],
+  );
 
   /** Wrap a repository write so the UI refreshes afterwards. */
   const write = useCallback(
@@ -69,6 +106,19 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       addCategory: write(repo.addCategory),
       deleteCategory: write(repo.deleteCategory),
       deleteJob: write(repo.deleteJob),
+      /** Strike through now, delete after UNDO_MS unless undone (or sooner via flushDeletes). */
+      deleteItemLater: deleteLater(repo.deleteItem),
+      deleteQuoteLineLater: deleteLater(repo.deleteQuoteLine),
+      deleteIndexedRateLater: deleteLater(repo.deleteIndexedRate),
+      undoDelete(id: string) {
+        const entry = pending.current.get(id);
+        if (!entry) return;
+        clearTimeout(entry.timer);
+        pending.current.delete(id);
+        syncPending();
+      },
+      /** Carry out waiting deletes now, e.g. before saving, exporting or leaving a screen. */
+      flushDeletes: () => Promise.all([...pending.current.keys()].map(finishDelete)).then(() => undefined),
       updateQuote: write(repo.updateQuote),
       updateQuoteLine: write(repo.updateQuoteLine),
       deleteQuoteLine: write(repo.deleteQuoteLine),
@@ -106,7 +156,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
         await refresh();
       },
     }),
-    [db, worker, settingsRef, refresh, write],
+    [db, worker, settingsRef, refresh, write, deleteLater, finishDelete, syncPending],
   );
 
   const derived = useMemo(() => {
@@ -146,7 +196,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
     };
   }, [snapshot]);
 
-  return { snapshot, status, settings, actions, ...derived };
+  return { snapshot, status, settings, actions, pendingDeletes, ...derived };
 }
 
 export type AppState = ReturnType<typeof useAppStateValue>;

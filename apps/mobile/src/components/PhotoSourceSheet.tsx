@@ -1,7 +1,9 @@
 import { Camera, Image as ImageIcon } from 'lucide-react';
+import { useBackHandler } from '../lib/backButton.ts';
 
 /** Camera or gallery; the gallery allows picking several photos at once. */
 export function PhotoSourceSheet({ remaining, onPick, onClose }: { remaining: number; onPick(source: 'camera' | 'gallery'): void; onClose(): void }) {
+  useBackHandler(onClose);
   const option = 'w-full flex items-center gap-3 px-4 py-4 rounded-xl bg-gray-50 hover:bg-gray-100 text-sm font-bold text-gray-800';
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={onClose}>

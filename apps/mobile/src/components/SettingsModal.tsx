@@ -6,14 +6,17 @@ import { shareFile, textToBase64 } from '../lib/files.ts';
 import { testGeminiKey } from '../lib/gemini.ts';
 import { DEFAULT_MODEL } from '../lib/settings.ts';
 import { APP_VERSION } from '../lib/version.ts';
+import { describeLastBackup, recordBackup } from '../lib/backupReminder.ts';
 import { useAppState } from '../state/AppState.tsx';
 import { useDialogs } from './Dialogs.tsx';
+import { useBackHandler } from '../lib/backButton.ts';
 
 /**
  * API key, backup and storage info. On first launch it doubles as a short
  * welcome that asks for the key (skippable: typing items in works without one).
  */
 export function SettingsModal({ onClose, firstRun }: { onClose(): void; firstRun?: boolean }) {
+  useBackHandler(onClose);
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -80,8 +83,14 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
   const test = async () => {
     setState({ kind: 'testing' });
     try {
-      await testGeminiKey(key.trim(), model.trim() || DEFAULT_MODEL);
-      setState({ kind: 'ok', message: 'Key works' });
+      const requested = model.trim() || DEFAULT_MODEL;
+      const working = await testGeminiKey(key.trim(), requested);
+      if (working !== requested) {
+        setModel(working);
+        setState({ kind: 'ok', message: `Key works. Model “${requested}” is no longer available, so “${working}” will be used. Tap Save.` });
+      } else {
+        setState({ kind: 'ok', message: 'Key works' });
+      }
     } catch (err) {
       setState({ kind: 'error', message: (err as Error).message });
     }
@@ -160,12 +169,15 @@ function BackupSection() {
   const dialogs = useDialogs();
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [lastBackup, setLastBackup] = useState(describeLastBackup);
 
   const doExport = async () => {
     setBusy(true);
     try {
       const backup = await actions.exportBackup();
       await shareFile(backupFilename(), textToBase64(JSON.stringify(backup)), 'application/json');
+      recordBackup();
+      setLastBackup(describeLastBackup());
     } catch (err) {
       await dialogs.alert('Backup failed', (err as Error).message);
     } finally {
@@ -200,6 +212,7 @@ function BackupSection() {
       <p className="text-[11px] text-gray-500 leading-relaxed">
         Your data lives only on this phone. Save a backup file to Google Drive, WhatsApp or email now and then, so you can restore it on a new phone.
       </p>
+      <p className={`text-[11px] font-bold ${lastBackup === 'never' ? 'text-red-600' : 'text-gray-700'}`}>Last backup: {lastBackup}</p>
       <div className="flex gap-3">
         <button
           onClick={doExport}

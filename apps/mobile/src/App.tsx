@@ -1,9 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { Database, Download, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Save, Search, Trash2 } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { guessCategory, todayISO } from '@nirman/shared';
 import { useDialogs } from './components/Dialogs.tsx';
+import { useBackHandler } from './lib/backButton.ts';
+import { prefs } from './lib/prefs.ts';
+import { backupOverdue, describeLastBackup, snoozeBackupReminder } from './lib/backupReminder.ts';
 import { PdfPreviewModal } from './components/PdfPreviewModal.tsx';
 import { BoqPicker } from './features/BoqPicker.tsx';
 import { QuotesView } from './features/QuotesView.tsx';
@@ -37,33 +40,16 @@ interface SaveState {
   titlePrefix: string;
 }
 
-/** Small per-device UI preferences. Storage can be unavailable, so never rely on it. */
-const prefs = {
-  get<T>(key: string, fallback: T): T {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? (JSON.parse(raw) as T) : fallback;
-    } catch {
-      return fallback;
-    }
-  },
-  set(key: string, value: unknown) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch {
-      // ignore
-    }
-  },
-};
-
 const kindOf = (tab: AppTab): ListKind | null => (tab === 'auditor' ? 'audit' : tab === 'boq' ? 'boq' : null);
 
 export default function App() {
   const state = useAppState();
-  const { actions, history, itemDatabase, itemsFor, boqNotes, categoryNames, uniqueAddresses, settings } = state;
+  const { actions, history, itemDatabase, itemsFor, boqNotes, categoryNames, uniqueAddresses, settings, pendingDeletes } = state;
   const dialogs = useDialogs();
 
   const [activeTab, setActiveTab] = useState<AppTab>('auditor');
+  // On another tab, back returns to the Auditor tab before leaving the app.
+  useBackHandler(() => setActiveTab('auditor'), activeTab !== 'auditor');
   /** Vendor quotes screen: a saved BOQ's id, or 'pick' to choose the BOQ first. */
   const [quoteTarget, setQuoteTarget] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,8 +63,20 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(() => !settings.geminiApiKey && !prefs.get('nirmaan_onboarded', false));
   const [firstRun, setFirstRun] = useState(settingsOpen);
 
+  // Re-checked after Settings closes (a backup may have been made) or the reminder is snoozed.
+  const [reminderTick, setReminderTick] = useState(0);
+  const hasData = history.length > 0 || state.snapshot.items.length > 0;
+  const showBackupReminder = useMemo(() => backupOverdue(hasData), [hasData, reminderTick]);
+
   const kind = kindOf(activeTab);
-  const activeItems = kind ? itemsFor(kind) : [];
+  /** The draft as listed (rows waiting for undo still show, struck through). */
+  const listedItems = kind ? itemsFor(kind) : [];
+  /** The draft as it counts: totals, PDF and saving leave out deleted rows. */
+  const activeItems = useMemo(() => listedItems.filter((i) => !pendingDeletes.has(i.id)), [listedItems, pendingDeletes]);
+  // Switching tabs carries out deletes still waiting for undo.
+  useEffect(() => {
+    void actions.flushDeletes();
+  }, [activeTab, actions]);
 
   const linkRecord = (k: ListKind, id: string | null) => {
     setLinkedRecord((prev) => {
@@ -90,9 +88,9 @@ export default function App() {
 
   const search = searchQuery.trim();
   const filteredItems = useMemo(() => {
-    if (!search) return activeItems;
-    return new Fuse(activeItems, { keys: ['item_name', 'vendor', 'original_term'], threshold: 0.4 }).search(search).map((r) => r.item);
-  }, [activeItems, search]);
+    if (!search) return listedItems;
+    return new Fuse(listedItems, { keys: ['item_name', 'vendor', 'original_term'], threshold: 0.4 }).search(search).map((r) => r.item);
+  }, [listedItems, search]);
 
   const matchesFilters = (category: string[], address: string[]) =>
     (categoryFilter === 'All' || category.some((c) => c.toLowerCase() === categoryFilter.toLowerCase())) &&
@@ -110,7 +108,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemDatabase, search, categoryFilter, addressFilter]);
 
-  const totalSpent = kind === 'audit' ? filteredItems.reduce((acc, i) => acc + (i.total_amount || 0), 0) : 0;
+  const totalSpent = kind === 'audit' ? filteredItems.reduce((acc, i) => acc + (pendingDeletes.has(i.id) ? 0 : i.total_amount || 0), 0) : 0;
   const titlePrefix = (k: ListKind) => (k === 'audit' ? 'Audit' : 'BOQ');
 
   const openSave = () => {
@@ -143,6 +141,7 @@ export default function App() {
 
   const handleSave = async (meta: ListMeta, asNew: boolean) => {
     if (!saveState) return;
+    await actions.flushDeletes();
     const { kind: k, recordId } = saveState;
     setSaveState(null);
     if (!k) {
@@ -154,6 +153,7 @@ export default function App() {
   };
 
   const openRecord = async (record: HistoryRecord) => {
+    await actions.flushDeletes();
     if (itemsFor(record.kind).length > 0) {
       const ok = await dialogs.confirm(`Replace the current ${titlePrefix(record.kind)} draft?`, {
         message: `The draft will be replaced with the ${record.items.length} items from “${record.title}”.`,
@@ -197,6 +197,7 @@ export default function App() {
   };
 
   const closeSettings = () => {
+    setReminderTick((t) => t + 1);
     prefs.set('nirmaan_onboarded', true);
     setSettingsOpen(false);
     setFirstRun(false);
@@ -280,6 +281,28 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {showBackupReminder && (
+        <div role="status" className="mx-4 md:mx-6 mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl flex flex-wrap items-center gap-2 justify-between">
+          <p className="text-xs text-orange-900">
+            <b>Back up your data.</b> It is stored only on this phone. Last backup: {describeLastBackup()}.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                snoozeBackupReminder();
+                setReminderTick((t) => t + 1);
+              }}
+              className="px-3 py-2 text-xs font-bold text-orange-800"
+            >
+              Later
+            </button>
+            <button onClick={() => setSettingsOpen(true)} className="px-3 py-2 bg-orange-500 text-white rounded-lg text-xs font-bold">
+              Back up now
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden lg:h-[calc(100vh-73px)]">
         {activeTab !== 'database' && (

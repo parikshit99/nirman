@@ -41,7 +41,9 @@ export class JobWorker {
     private getSettings: () => Settings,
     /** Called whenever the queue or stored items changed. */
     private onDataChanged: () => void,
-    private makeExtractor: (apiKey: string, model: string) => Extractor = createGeminiExtractor,
+    private makeExtractor: (apiKey: string, model: string, onModelReplaced?: (model: string) => void) => Extractor = createGeminiExtractor,
+    /** Called when Gemini no longer knew the configured model and another was used. */
+    private onModelReplaced?: (model: string) => void,
   ) {}
 
   subscribe(fn: () => void): () => void {
@@ -99,7 +101,7 @@ export class JobWorker {
     if (!this.status.online) return;
 
     this.setStatus({ processing: true });
-    const extractor = this.makeExtractor(geminiApiKey, geminiModel);
+    const extractor = this.makeExtractor(geminiApiKey, geminiModel, this.onModelReplaced);
     try {
       for (const job of pending) await this.process(job, extractor);
       this.backoff = 0;

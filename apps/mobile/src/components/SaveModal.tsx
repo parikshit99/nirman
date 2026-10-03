@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { ClipboardCheck, Copy, MapPin, Save, X } from 'lucide-react';
 import type { ListMeta } from '../data/repo.ts';
+import { useBackHandler } from '../lib/backButton.ts';
 
 interface Props {
   initial: ListMeta;
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function SaveModal({ initial, categories, recentAddresses, editing, allowSaveAsNew, titlePrefix, onSave, onClose }: Props) {
+  useBackHandler(onClose);
   const [meta, setMeta] = useState(initial);
   const set = (field: keyof ListMeta) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setMeta((p) => ({ ...p, [field]: e.target.value }));

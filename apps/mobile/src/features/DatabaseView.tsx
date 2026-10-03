@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { Check, Database, Download, TrendingUp, Trash2, Truck, X } from 'lucide-react';
-import { materialDatabaseToCSV, todayISO, type MaterialEntry } from '@nirman/shared';
+import { materialDatabaseToCSV, parseAmount, todayISO, type MaterialEntry } from '@nirman/shared';
 import { FilterChips } from '../components/FilterChips.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
+import { UndoButton } from '../components/UndoButton.tsx';
 import { shareFile, textToBase64 } from '../lib/files.ts';
 import { useAppState } from '../state/AppState.tsx';
 
@@ -64,10 +65,15 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
 
   const applyBulk = async () => {
     if (selected.size === 0) return;
+    const price = bulk.price.trim() ? parseAmount(bulk.price) : undefined;
+    if (price === null) {
+      await dialogs.alert('Check the price', `“${bulk.price}” is not a number. Use digits, e.g. 1500 or 1,500.`);
+      return;
+    }
     await actions.bulkEditMaterials(selected, {
       unit: bulk.unit.trim() || undefined,
       vendor: bulk.vendor.trim() || undefined,
-      price: bulk.price ? parseFloat(bulk.price) : undefined,
+      price,
     });
     setSelected(new Set());
     setSelectMode(false);
@@ -262,8 +268,9 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
 }
 
 function IndexedLog() {
-  const { snapshot, actions } = useAppState();
+  const { snapshot, actions, pendingDeletes } = useAppState();
   const rates = snapshot.rates;
+  useEffect(() => () => void actions.flushDeletes(), [actions]);
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm w-full">
       <div className="overflow-x-auto">
@@ -282,7 +289,10 @@ function IndexedLog() {
               </div>
             ) : (
               rates.map((rate) => (
-                <div key={rate.id} className="grid grid-cols-[1.5fr_1fr_1fr_1fr_auto] px-6 py-4 items-center hover:bg-gray-50/80 transition-colors">
+                <div
+                  key={rate.id}
+                  className={`grid grid-cols-[1.5fr_1fr_1fr_1fr_auto] px-6 py-4 items-center hover:bg-gray-50/80 transition-colors ${pendingDeletes.has(rate.id) ? 'line-through opacity-60 bg-red-50/40' : ''}`}
+                >
                   <div>
                     <div className="font-bold text-sm text-gray-900">{rate.item_name}</div>
                     <div className="text-[10px] text-gray-400 font-mono uppercase tracking-tighter">Unit: {rate.unit}</div>
@@ -296,9 +306,13 @@ function IndexedLog() {
                     <div className="text-[8px] text-gray-400 font-mono">{new Date(rate.indexed_at).toLocaleString('en-GB')}</div>
                   </div>
                   <div className="pl-4">
-                    <button onClick={() => actions.deleteIndexedRate(rate.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" aria-label="Remove from index">
-                      <Trash2 size={16} />
-                    </button>
+                    {pendingDeletes.has(rate.id) ? (
+                      <UndoButton onUndo={() => actions.undoDelete(rate.id)} label={rate.item_name} />
+                    ) : (
+                      <button onClick={() => actions.deleteIndexedRateLater(rate.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" aria-label="Remove from index">
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
