@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { Eye, History, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Eye, History, Pencil, Plus, Trash2, Truck } from 'lucide-react';
 import { FilterChips } from '../components/FilterChips.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
@@ -36,15 +36,16 @@ interface Props {
   onAddress(a: string): void;
   onEdit(record: HistoryRecord): void;
   onOpen(record: HistoryRecord): void;
+  onQuotes(record: HistoryRecord): void;
 }
 
-export function HistoryView({ records, categoryFilter, onCategory, addressFilter, onAddress, onEdit, onOpen }: Props) {
-  const { actions, categoryNames, uniqueAddresses } = useAppState();
+export function HistoryView({ records, categoryFilter, onCategory, addressFilter, onAddress, onEdit, onOpen, onQuotes }: Props) {
+  const { actions, categoryNames, uniqueAddresses, quotesFor } = useAppState();
   const dialogs = useDialogs();
 
   const remove = async (record: HistoryRecord) => {
     const ok = await dialogs.confirm(`Delete “${record.title}”?`, {
-      message: `${record.items.length} items will be removed from every device.`,
+      message: `${record.items.length} items${quotesFor(record.id).length ? ` and ${quotesFor(record.id).length} vendor quotes` : ''} will be removed from this phone.`,
       confirmLabel: 'Delete',
       danger: true,
     });
@@ -127,12 +128,22 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
 
               {record.notes && <div className="mb-4 text-[9px] text-gray-400 italic line-clamp-1 border-l border-gray-200 pl-2">"{record.notes}"</div>}
 
-              <button
-                onClick={() => onOpen(record)}
-                className="w-full py-2 bg-gray-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
-              >
-                <Eye size={12} /> Open & Restore
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onOpen(record)}
+                  className="flex-1 py-2 bg-gray-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Eye size={12} /> Open & Restore
+                </button>
+                {record.kind === 'boq' && (
+                  <button
+                    onClick={() => onQuotes(record)}
+                    className="flex-1 py-2 bg-orange-50 text-orange-700 border border-orange-200 text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-orange-100 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Truck size={12} /> Quotes ({quotesFor(record.id).length})
+                  </button>
+                )}
+              </div>
             </motion.div>
           ))
         )}

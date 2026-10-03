@@ -13,9 +13,11 @@ import {
   Plus,
   RotateCcw,
   Trash2,
+  Truck,
   X,
 } from 'lucide-react';
 import { useDialogs } from '../components/Dialogs.tsx';
+import { PhotoSourceSheet } from '../components/PhotoSourceSheet.tsx';
 import { DRAFT_IDS, type Job, type ListKind } from '../data/repo.ts';
 import { chooseFromGallery, takePhoto } from '../lib/camera.ts';
 import { compressImage, dataUrlToBase64, readFileAsDataUrl } from '../lib/images.ts';
@@ -23,7 +25,7 @@ import { isNative } from '../lib/platform.ts';
 import { startDictation, type SpeechLanguage } from '../lib/speech.ts';
 import { useAppState } from '../state/AppState.tsx';
 
-export function CapturePanel({ kind }: { kind: ListKind }) {
+export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendorQuote?(): void }) {
   const { actions, status, settings, boqNotes, learningCount, categoryNames, jobsFor } = useAppState();
   const dialogs = useDialogs();
   const [inputText, setInputText] = useState('');
@@ -128,6 +130,21 @@ export function CapturePanel({ kind }: { kind: ListKind }) {
           )}
         </div>
       </div>
+
+      {kind === 'boq' && onVendorQuote && (
+        <button
+          onClick={onVendorQuote}
+          className="mb-6 w-full p-4 bg-white border-2 border-orange-200 rounded-xl flex items-center gap-3 text-left hover:border-orange-400 transition-colors"
+        >
+          <Truck size={20} className="text-orange-500 shrink-0" />
+          <span>
+            <span className="block text-xs font-bold text-gray-900">Vendor quote received</span>
+            <span className="block text-[10px] text-gray-500 leading-normal">
+              Scan a vendor's reply, in any format, and match it to a saved BOQ to compare prices.
+            </span>
+          </span>
+        </button>
+      )}
 
       <div className="mb-8">
         <h2 className="text-xs font-mono uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
@@ -278,39 +295,6 @@ export function CapturePanel({ kind }: { kind: ListKind }) {
       </div>
       {sourceMenu && <PhotoSourceSheet remaining={MAX_IMAGES - images.length} onPick={pickFrom} onClose={() => setSourceMenu(false)} />}
     </>
-  );
-}
-
-/** Camera or gallery; the gallery allows picking several photos at once. */
-function PhotoSourceSheet({ remaining, onPick, onClose }: { remaining: number; onPick(source: 'camera' | 'gallery'): void; onClose(): void }) {
-  const option = 'w-full flex items-center gap-3 px-4 py-4 rounded-xl bg-gray-50 hover:bg-gray-100 text-sm font-bold text-gray-800';
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Add bill or note"
-        className="bg-white w-full max-w-md rounded-t-2xl p-4 pb-6 space-y-2 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="text-[10px] font-mono uppercase tracking-widest text-gray-400 font-bold px-1 pb-1">Add bill or note</p>
-        <button className={option} onClick={() => onPick('camera')}>
-          <Camera size={20} className="text-orange-500" /> Take photo
-        </button>
-        <button className={option} onClick={() => onPick('gallery')}>
-          <ImageIcon size={20} className="text-orange-500" />
-          <span>
-            Choose from gallery
-            <span className="block text-[10px] font-normal text-gray-500">
-              Up to {remaining} photo{remaining === 1 ? '' : 's'}
-            </span>
-          </span>
-        </button>
-        <button onClick={onClose} className="w-full py-3 text-[10px] font-bold uppercase tracking-widest text-gray-500">
-          Cancel
-        </button>
-      </div>
-    </div>
   );
 }
 

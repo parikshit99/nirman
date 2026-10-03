@@ -1,4 +1,4 @@
-import type { ExtractedMaterial, IndexedRateRow, ItemRow, LearningMap, ListRow } from './schemas.ts';
+import type { ExtractedMaterial, IndexedRateRow, ItemRow, LearningMap, ListRow, QuoteLineRow, QuoteRow } from './schemas.ts';
 
 export const DEFAULT_CATEGORIES = ['Civil', 'Electrical', 'Plumbing', 'Carpenter', 'Hvac', 'Tile', 'Stone', 'Other'];
 
@@ -157,6 +157,178 @@ export function buildItemDatabase(
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// ---------------------------------------------------------------------------
+// Vendor quotes compared with each other and with past prices
+// ---------------------------------------------------------------------------
+
+/** Past prices of a BOQ item from the material database, excluding the quotes being compared. */
+export interface PriceHistory {
+  points: PricePoint[];
+  last: PricePoint | null;
+  min: number;
+  max: number;
+}
+
+export interface QuoteCell {
+  line: QuoteLineRow;
+  /** Vendor's rate; 0 when they listed the item without a price. */
+  price: number;
+  /** Quoted in a different unit than the BOQ, so prices can't be compared directly. */
+  unitDiffers: boolean;
+  /** Vendor's quantity differs from the BOQ quantity. */
+  qtyDiffers: boolean;
+  /** Change against the last price recorded before this quote (0.08 = +8%), when comparable. */
+  vsLast: number | null;
+  /** The last price that vsLast is measured against. */
+  lastPoint: PricePoint | null;
+  /** Lowest comparable price for this item among the quotes. */
+  cheapest: boolean;
+}
+
+export interface ComparisonRow {
+  sr: number;
+  item: ItemRow;
+  history: PriceHistory;
+  /** By quote id; missing when that vendor did not quote this item. */
+  cells: Record<string, QuoteCell | undefined>;
+}
+
+export interface VendorSummary {
+  quote: QuoteRow;
+  /** Σ BOQ quantity × vendor rate over items quoted in the BOQ's unit. */
+  total: number;
+  /** BOQ items with a price from this vendor. */
+  quoted: number;
+  /** BOQ items this vendor did not price. */
+  missing: ItemRow[];
+  /** Vendor lines that match no BOQ item. */
+  extras: QuoteLineRow[];
+  /** Lines quoted in a different unit than the BOQ (left out of the total). */
+  unitIssues: number;
+  /** Same items at their last recorded prices, and the change against that. */
+  lastTotal: number;
+  vsLast: number | null;
+  /** Total over only the items every vendor priced in the BOQ's unit: the fair like-for-like figure. */
+  commonTotal: number;
+}
+
+export interface QuoteComparison {
+  rows: ComparisonRow[];
+  vendors: VendorSummary[];
+  /** BOQ items every vendor priced comparably (what commonTotal covers). */
+  commonItems: number;
+}
+
+const sameUnit = (a: string, b: string) => normalizeTerm(a || 'unit') === normalizeTerm(b || 'unit');
+const fromQuote = (p: PricePoint, q: QuoteRow) => p.vendor === q.vendor && p.date === q.quote_date;
+
+function summarizeHistory(points: PricePoint[]): PriceHistory {
+  const prices = points.map((p) => p.price);
+  return {
+    points,
+    last: points.at(-1) ?? null,
+    min: prices.length ? Math.min(...prices) : 0,
+    max: prices.length ? Math.max(...prices) : 0,
+  };
+}
+
+/**
+ * Line up vendor quotes against the BOQ they answer (items in printed order,
+ * Sr. 1..n) and against past prices in the material database. Confirmed quotes
+ * are indexed into that database, so each quote's own prices are left out of
+ * the history it is measured against.
+ */
+export function compareQuotes(
+  boqItems: ItemRow[],
+  quotes: QuoteRow[],
+  lines: QuoteLineRow[],
+  database: MaterialEntry[],
+  learning: LearningMap,
+): QuoteComparison {
+  const byKey = new Map(database.map((e) => [e.key, e]));
+  const linesByQuote = new Map<string, QuoteLineRow[]>();
+  for (const l of [...lines].sort((a, b) => a.position - b.position)) {
+    const list = linesByQuote.get(l.quote_id);
+    if (list) list.push(l);
+    else linesByQuote.set(l.quote_id, [l]);
+  }
+
+  const rows: ComparisonRow[] = boqItems.map((item, i) => {
+    const { item_name, unit } = applyLearning(learning, item);
+    const allPoints = byKey.get(materialKey(item_name, unit))?.priceHistory ?? [];
+    const history = summarizeHistory(allPoints.filter((p) => !quotes.some((q) => fromQuote(p, q))));
+    const cells: ComparisonRow['cells'] = {};
+    for (const q of quotes) {
+      const line = (linesByQuote.get(q.id) ?? []).find((l) => l.boq_item_id === item.id);
+      if (!line) continue;
+      const unitDiffers = !sameUnit(line.unit, item.unit);
+      // Other vendors' quotes in this comparison are left out too, so the order of confirming doesn't matter.
+      const lastPoint = unitDiffers ? null : history.points.filter((p) => p.date <= q.quote_date).at(-1) ?? null;
+      cells[q.id] = {
+        line,
+        price: line.unit_price,
+        unitDiffers,
+        qtyDiffers: line.quantity > 0 && line.quantity !== item.quantity,
+        vsLast: lastPoint && line.unit_price > 0 ? (line.unit_price - lastPoint.price) / lastPoint.price : null,
+        lastPoint,
+        cheapest: false,
+      };
+    }
+    const comparable = Object.values(cells).filter((c): c is QuoteCell => !!c && c.price > 0 && !c.unitDiffers);
+    if (comparable.length > 1) {
+      const low = Math.min(...comparable.map((c) => c.price));
+      for (const c of comparable) c.cheapest = c.price === low;
+    }
+    return { sr: i + 1, item, history, cells };
+  });
+
+  const comparableIn = (row: ComparisonRow, q: QuoteRow) => {
+    const c = row.cells[q.id];
+    return !!c && c.price > 0 && !c.unitDiffers;
+  };
+  const common = rows.filter((row) => quotes.length > 0 && quotes.every((q) => comparableIn(row, q)));
+  const boqIds = new Set(boqItems.map((b) => b.id));
+  const vendors: VendorSummary[] = quotes.map((q) => {
+    let total = 0;
+    let lastTotal = 0;
+    let comparedTotal = 0;
+    let quoted = 0;
+    let unitIssues = 0;
+    const missing: ItemRow[] = [];
+    for (const row of rows) {
+      const cell = row.cells[q.id];
+      if (!cell || cell.price <= 0) {
+        missing.push(row.item);
+        continue;
+      }
+      quoted++;
+      if (cell.unitDiffers) {
+        unitIssues++;
+        continue;
+      }
+      total += row.item.quantity * cell.price;
+      if (cell.lastPoint) {
+        comparedTotal += row.item.quantity * cell.price;
+        lastTotal += row.item.quantity * cell.lastPoint.price;
+      }
+    }
+    const extras = (linesByQuote.get(q.id) ?? []).filter((l) => !l.boq_item_id || !boqIds.has(l.boq_item_id));
+    return {
+      quote: q,
+      total,
+      quoted,
+      missing,
+      extras,
+      unitIssues,
+      lastTotal,
+      vsLast: lastTotal > 0 ? (comparedTotal - lastTotal) / lastTotal : null,
+      commonTotal: common.reduce((sum, row) => sum + row.item.quantity * row.cells[q.id]!.price, 0),
+    };
+  });
+
+  return { rows, vendors, commonItems: common.length };
 }
 
 function csvCell(value: string | number): string {

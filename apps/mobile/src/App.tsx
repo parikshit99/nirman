@@ -5,6 +5,8 @@ import Fuse from 'fuse.js';
 import { guessCategory, todayISO } from '@nirman/shared';
 import { useDialogs } from './components/Dialogs.tsx';
 import { PdfPreviewModal } from './components/PdfPreviewModal.tsx';
+import { BoqPicker } from './features/BoqPicker.tsx';
+import { QuotesView } from './features/QuotesView.tsx';
 import { SaveModal } from './components/SaveModal.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
 import { StatusChip } from './components/StatusChip.tsx';
@@ -62,6 +64,8 @@ export default function App() {
   const dialogs = useDialogs();
 
   const [activeTab, setActiveTab] = useState<AppTab>('auditor');
+  /** Vendor quotes screen: a saved BOQ's id, or 'pick' to choose the BOQ first. */
+  const [quoteTarget, setQuoteTarget] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [addressFilter, setAddressFilter] = useState('All');
@@ -280,7 +284,7 @@ export default function App() {
       <main className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden lg:h-[calc(100vh-73px)]">
         {activeTab !== 'database' && (
           <section className="w-full lg:w-[400px] bg-white border-r border-[var(--color-brand-concrete)] flex flex-col p-4 md:p-6 lg:overflow-y-auto">
-            {kind ? <CapturePanel key={kind} kind={kind} /> : <HistorySidebar onNewBoq={() => setActiveTab('boq')} />}
+            {kind ? <CapturePanel key={kind} kind={kind} onVendorQuote={() => setQuoteTarget('pick')} /> : <HistorySidebar onNewBoq={() => setActiveTab('boq')} />}
           </section>
         )}
 
@@ -321,6 +325,7 @@ export default function App() {
                 onAddress={setAddressFilter}
                 onEdit={editRecordDetails}
                 onOpen={openRecord}
+                onQuotes={(record) => setQuoteTarget(record.id)}
               />
             ) : (
               <ItemLog kind={kind!} items={filteredItems} searching={!!search} />
@@ -354,6 +359,8 @@ export default function App() {
           />
         )}
         {settingsOpen && <SettingsModal key="settings" onClose={closeSettings} firstRun={firstRun} />}
+        {quoteTarget === 'pick' && <BoqPicker key="boq-picker" onPick={setQuoteTarget} onClose={() => setQuoteTarget(null)} />}
+        {quoteTarget && quoteTarget !== 'pick' && <QuotesView key="quotes" boqId={quoteTarget} onClose={() => setQuoteTarget(null)} />}
       </AnimatePresence>
     </div>
   );

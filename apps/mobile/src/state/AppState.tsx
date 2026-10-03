@@ -1,5 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { buildItemDatabase, type ExtractedMaterial, type ItemRow, type ListRow, type MaterialEntry } from '@nirman/shared';
+import {
+  buildItemDatabase,
+  type ExtractedMaterial,
+  type ItemRow,
+  type ListRow,
+  type MaterialEntry,
+  type QuoteLineRow,
+  type QuoteRow,
+} from '@nirman/shared';
 import { exportBackup, parseBackup, restoreBackup } from '../data/backup.ts';
 import * as repo from '../data/repo.ts';
 import { DRAFT_IDS, type Job, type ListKind, type Snapshot } from '../data/repo.ts';
@@ -61,6 +69,18 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       addCategory: write(repo.addCategory),
       deleteCategory: write(repo.deleteCategory),
       deleteJob: write(repo.deleteJob),
+      updateQuote: write(repo.updateQuote),
+      updateQuoteLine: write(repo.updateQuoteLine),
+      deleteQuoteLine: write(repo.deleteQuoteLine),
+      deleteQuote: write(repo.deleteQuote),
+      confirmQuote: write(repo.confirmQuote),
+      /** Queue a vendor quote for reading against its BOQ and try right away. */
+      async enqueueQuote(quote: repo.NewQuote) {
+        const id = await repo.enqueueQuote(db, quote);
+        await refresh();
+        worker.schedule();
+        return id;
+      },
       /** Queue text/photos for AI extraction and try to process right away. */
       async enqueueJob(job: repo.NewJob) {
         await repo.enqueueJob(db, job);
@@ -102,8 +122,20 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       .map((l) => ({ ...l, items: byList.get(l.id) ?? [] }));
     const learning = repo.learningMap(snapshot.learned);
     const itemDatabase: MaterialEntry[] = buildItemDatabase(snapshot.lists, snapshot.items, snapshot.rates, learning);
+    const linesByQuote = new Map<string, QuoteLineRow[]>();
+    for (const line of snapshot.quoteLines) {
+      const list = linesByQuote.get(line.quote_id);
+      if (list) list.push(line);
+      else linesByQuote.set(line.quote_id, [line]);
+    }
     return {
       itemsFor: (kind: ListKind) => byList.get(DRAFT_IDS[kind]) ?? [],
+      learning,
+      savedBoqs: history.filter((h) => h.kind === 'boq'),
+      quotesFor: (boqId: string): QuoteRow[] => snapshot.quotes.filter((q) => q.boq_id === boqId),
+      linesFor: (quoteId: string): QuoteLineRow[] => linesByQuote.get(quoteId) ?? [],
+      jobForQuote: (quoteId: string): Job | undefined => snapshot.jobs.find((j) => j.quote_id === quoteId),
+      knownVendors: [...new Set([...snapshot.quotes.map((q) => q.vendor), ...itemDatabase.flatMap((e) => e.vendors)].filter(Boolean))].sort(),
       boqNotes: draftList('boq')?.notes ?? '',
       history,
       itemDatabase,

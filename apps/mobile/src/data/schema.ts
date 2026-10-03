@@ -3,8 +3,9 @@ import type { Db, SqlExecutor } from './sql.ts';
 
 /**
  * The phone's database. `jobs` and `job_images` hold AI extractions queued
- * until the phone is online. Add new migrations to the end of the list; never
- * edit one that has shipped.
+ * until the phone is online; `quotes`/`quote_lines` hold vendor quotes for
+ * saved BOQs. Add new migrations to the end of the list; never edit one that
+ * has shipped.
  */
 const MIGRATIONS: string[] = [
   `
@@ -72,6 +73,34 @@ const MIGRATIONS: string[] = [
     data TEXT NOT NULL,
     PRIMARY KEY (job_id, idx)
   );
+  `,
+  // 2: vendor quotes for saved BOQs. A job with a quote_id reads that quote.
+  `
+  CREATE TABLE quotes (
+    id TEXT PRIMARY KEY,
+    boq_id TEXT NOT NULL,
+    vendor TEXT NOT NULL DEFAULT '',
+    quote_date TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX quotes_boq_idx ON quotes (boq_id);
+  CREATE TABLE quote_lines (
+    id TEXT PRIMARY KEY,
+    quote_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    boq_item_id TEXT,
+    original_term TEXT NOT NULL DEFAULT '',
+    item_name TEXT NOT NULL DEFAULT '',
+    quantity REAL NOT NULL DEFAULT 0,
+    unit TEXT NOT NULL DEFAULT '',
+    unit_price REAL NOT NULL DEFAULT 0,
+    total_amount REAL NOT NULL DEFAULT 0,
+    note TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX quote_lines_quote_idx ON quote_lines (quote_id);
+  ALTER TABLE jobs ADD COLUMN quote_id TEXT;
   `,
 ];
 

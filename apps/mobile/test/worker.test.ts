@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ExtractionRequest } from '@nirman/shared';
-import { DRAFT_IDS, enqueueJob, loadSnapshot, updateItem, addItems } from '../src/data/repo.ts';
+import type { ExtractedQuoteLine, ExtractionRequest, QuoteExtractionRequest } from '@nirman/shared';
+import { DRAFT_IDS, enqueueJob, enqueueQuote, loadSnapshot, saveDraftToHistory, updateItem, addItems } from '../src/data/repo.ts';
 import { ExtractionError, type Extractor } from '../src/lib/gemini.ts';
 import { JobWorker, NO_KEY_MESSAGE } from '../src/jobs/worker.ts';
 import { DEFAULT_SETTINGS, type Settings } from '../src/lib/settings.ts';
@@ -8,15 +8,27 @@ import { freshDb } from './helpers.ts';
 
 const cement = { item_name: 'Cement', original_term: 'bori', quantity: 15, unit: 'Bag', unit_price: 500, total_amount: 7500, vendor: '', date: '2026-09-30' };
 
-function setup(behaviour: (req: ExtractionRequest) => Promise<typeof cement[]>, settings: Settings = { ...DEFAULT_SETTINGS, geminiApiKey: 'AIza-test' }) {
+function setup(
+  behaviour: (req: ExtractionRequest) => Promise<typeof cement[]>,
+  settings: Settings = { ...DEFAULT_SETTINGS, geminiApiKey: 'AIza-test' },
+  quoteBehaviour: (req: QuoteExtractionRequest) => Promise<ExtractedQuoteLine[]> = async () => [],
+) {
   return freshDb().then((db) => {
     const calls: ExtractionRequest[] = [];
+    const quoteCalls: QuoteExtractionRequest[] = [];
     const keys: string[] = [];
-    const extractor: Extractor = { extract: (req) => (calls.push(req), behaviour(req)) };
+    const extractor: Extractor = {
+      extract: (req) => (calls.push(req), behaviour(req)),
+      extractQuote: (req) => (quoteCalls.push(req), quoteBehaviour(req)),
+    };
     const worker = new JobWorker(db, () => settings, () => {}, (key) => (keys.push(key), extractor));
-    return { db, worker, calls, keys, settings };
+    return { db, worker, calls, quoteCalls, keys, settings };
   });
 }
+
+const quoteLine = (over: Partial<ExtractedQuoteLine>): ExtractedQuoteLine => ({
+  boq_sr: null, original_term: '', item_name: '', quantity: 0, unit: 'Bag', unit_price: 0, total_amount: 0, note: '', ...over,
+});
 
 const queue = (db: Awaited<ReturnType<typeof freshDb>>, text = '15 bori cement') =>
   enqueueJob(db, { listId: DRAFT_IDS.audit, text, images: ['IMG'], category: 'Civil', captureDate: '2026-09-30' });
@@ -87,5 +99,41 @@ describe('JobWorker', () => {
 
   it('classifies errors', () => {
     expect(new ExtractionError('x', 'invalid').kind).toBe('invalid');
+  });
+
+  it('reads a vendor quote against the saved BOQ and maps Sr. numbers to its items', async () => {
+    const { db, worker, quoteCalls } = await setup(async () => [], undefined, async () => [
+      quoteLine({ boq_sr: 2, original_term: 'ACC bori', item_name: 'Cement', quantity: 15, unit_price: 380 }),
+      quoteLine({ boq_sr: null, original_term: 'bandhai taar', item_name: 'Binding wire', unit: 'kg', unit_price: 90 }),
+    ]);
+    await addItems(db, DRAFT_IDS.boq, [{ ...cement, item_name: 'Sand', unit: 'MT', unit_price: 0 }, { ...cement, unit_price: 0 }]);
+    const boqId = await saveDraftToHistory(db, 'boq', { title: 'Tower A', address: '', category: 'Civil', site_date: '' });
+    await enqueueQuote(db, { boqId, vendor: 'Sharma', quoteDate: '2026-10-03', text: '', images: ['IMG'] });
+
+    await worker.run();
+    const snap = await loadSnapshot(db);
+    const boqItems = snap.items.filter((i) => i.list_id === boqId);
+    expect(quoteCalls[0].boq).toEqual([
+      { sr: 1, item_name: 'Sand', quantity: 15, unit: 'MT' },
+      { sr: 2, item_name: 'Cement', quantity: 15, unit: 'Bag' },
+    ]);
+    expect(quoteCalls[0].images).toEqual(['IMG']);
+    expect(snap.jobs).toHaveLength(0);
+    expect(snap.quotes).toMatchObject([{ boq_id: boqId, vendor: 'Sharma', status: 'review' }]);
+    expect(snap.quoteLines.map((l) => [l.item_name, l.boq_item_id])).toEqual([
+      ['Cement', boqItems.find((i) => i.item_name === 'Cement')!.id],
+      ['Binding wire', null],
+    ]);
+  });
+
+  it('marks a quote reading failed when nothing was read', async () => {
+    const { db, worker } = await setup(async () => []);
+    await addItems(db, DRAFT_IDS.boq, [cement]);
+    const boqId = await saveDraftToHistory(db, 'boq', { title: 'Tower A', address: '', category: '', site_date: '' });
+    await enqueueQuote(db, { boqId, vendor: 'Sharma', quoteDate: '2026-10-03', text: 'blurry', images: [] });
+    await worker.run();
+    const snap = await loadSnapshot(db);
+    expect(snap.jobs).toMatchObject([{ status: 'failed', error: expect.stringMatching(/No quote lines/) }]);
+    expect(snap.quoteLines).toHaveLength(0);
   });
 });

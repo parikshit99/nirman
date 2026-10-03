@@ -7,10 +7,14 @@ import {
   bulkEditMaterials,
   clearListItems,
   completeJob,
+  completeQuoteJob,
+  confirmQuote,
+  deleteJob,
   deleteCategory,
   deleteItem,
   deleteList,
   enqueueJob,
+  enqueueQuote,
   getJobImages,
   indexRates,
   learningMap,
@@ -19,6 +23,7 @@ import {
   saveDraftToHistory,
   setListNotes,
   updateItem,
+  updateQuoteLine,
 } from '../src/data/repo.ts';
 import { migrateLocal } from '../src/data/schema.ts';
 import { freshDb } from './helpers.ts';
@@ -130,5 +135,76 @@ describe('local repository', () => {
     expect(snap.jobs).toHaveLength(0);
     expect(snap.items.map((i) => i.list_id)).toEqual([DRAFT_IDS.audit]);
     expect(await getJobImages(db, jobId)).toEqual([]);
+  });
+
+  describe('vendor quotes', () => {
+    const boqMeta = { title: 'Tower A', address: 'Sector 44', category: 'Civil', site_date: '2026-10-01' };
+    const line = (over: object) => ({ boq_sr: null, original_term: '', item_name: '', quantity: 0, unit: 'Bag', unit_price: 0, total_amount: 0, note: '', ...over });
+
+    /** A saved BOQ (Sand, Cement) with one quote read: Cement matched, a wire line unmatched. */
+    async function quoted() {
+      const db = await freshDb();
+      await addItems(db, DRAFT_IDS.boq, [{ ...sand, unit_price: 0 }, { ...cement, unit_price: 0 }]);
+      const boqId = await saveDraftToHistory(db, 'boq', boqMeta);
+      const quoteId = await enqueueQuote(db, { boqId, vendor: 'Gupta', quoteDate: '2026-10-03', text: '', images: ['IMG'] });
+      const snap = await loadSnapshot(db);
+      const boqItems = snap.items.filter((i) => i.list_id === boqId);
+      await completeQuoteJob(db, snap.jobs[0].id, [
+        line({ boq_sr: 2, original_term: 'ACC bori', item_name: 'ACC Cement', quantity: 15, unit_price: 380 }),
+        line({ original_term: 'bandhai taar', item_name: 'Binding wire', unit: 'kg', unit_price: 90 }),
+      ], boqItems.map((i) => i.id));
+      return { db, boqId, quoteId, boqItems };
+    }
+
+    it('confirming indexes prices under the BOQ names and learns the vendor wording', async () => {
+      const { db, quoteId } = await quoted();
+      await confirmQuote(db, quoteId);
+      const snap = await loadSnapshot(db);
+      expect(snap.quotes[0].status).toBe('confirmed');
+      expect(snap.rates.map((r) => [r.item_name, r.unit, r.price, r.vendor, r.date]).sort()).toEqual([
+        ['Binding wire', 'kg', 90, 'Gupta', '2026-10-03'],
+        ['Cement', 'Bag', 380, 'Gupta', '2026-10-03'],
+      ]);
+      expect(learningMap(snap.learned)['acc bori']).toEqual({ item_name: 'Cement', unit: 'Bag' });
+      const entry = buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned)).find((e) => e.key === materialKey('Cement', 'Bag'));
+      expect(entry?.latestPrice).toBe(380);
+    });
+
+    it('keeps the vendor unit when it differs from the BOQ, and does not learn it', async () => {
+      const { db, quoteId } = await quoted();
+      const cementLine = (await loadSnapshot(db)).quoteLines[0];
+      await updateQuoteLine(db, cementLine.id, { unit: 'kg', unit_price: 8 });
+      await confirmQuote(db, quoteId);
+      const snap = await loadSnapshot(db);
+      expect(snap.rates.find((r) => r.item_name === 'Cement')).toMatchObject({ unit: 'kg', price: 8 });
+      expect(snap.learned).toHaveLength(0);
+    });
+
+    it('re-saving the BOQ keeps matches; deleting it removes its quotes', async () => {
+      const { db, boqId } = await quoted();
+      await restoreToDraft(db, boqId);
+      await saveDraftToHistory(db, 'boq', boqMeta, boqId);
+      let snap = await loadSnapshot(db);
+      const cementId = snap.items.find((i) => i.list_id === boqId && i.item_name === 'Cement')!.id;
+      expect(snap.quoteLines[0].boq_item_id).toBe(cementId);
+
+      await deleteList(db, boqId);
+      snap = await loadSnapshot(db);
+      expect(snap.quotes).toHaveLength(0);
+      expect(snap.quoteLines).toHaveLength(0);
+    });
+
+    it('removing a quote reading from the queue removes the empty quote', async () => {
+      const db = await freshDb();
+      await addItems(db, DRAFT_IDS.boq, [cement]);
+      const boqId = await saveDraftToHistory(db, 'boq', boqMeta);
+      await enqueueQuote(db, { boqId, vendor: 'Gupta', quoteDate: '2026-10-03', text: 'x', images: ['IMG'] });
+      const [job] = (await loadSnapshot(db)).jobs;
+      expect(job.quote_id).toBeTruthy();
+      await deleteJob(db, job.id);
+      const snap = await loadSnapshot(db);
+      expect(snap.quotes).toHaveLength(0);
+      expect(await getJobImages(db, job.id)).toEqual([]);
+    });
   });
 });
