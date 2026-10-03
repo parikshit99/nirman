@@ -39,6 +39,8 @@ jobs:
           # The default list includes the long-removed 'tools' package, which makes sdkmanager fail.
           packages: platform-tools
       - run: npm ci
+      - name: Set the app version (major.minor from apps/mobile/package.json, then the build number)
+        run: echo "APP_VERSION=$(node -p "require('./apps/mobile/package.json').version.split('.').slice(0, 2).join('.')").${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
       - name: Build web bundle
         run: npm run build -w apps/mobile
       - run: npx cap sync android
@@ -66,10 +68,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk nirmaan-auditor-debug.apk
-          # Move the tag to this commit so the release always matches the APK.
+          # The fixed tag keeps the download link stable; the version tag records history.
           git tag -f latest-debug
-          git push -f origin refs/tags/latest-debug
-          gh release view latest-debug >/dev/null 2>&1 || gh release create latest-debug --prerelease \
-            --title "Latest debug APK" --notes "Built automatically from the latest commit on main."
-          gh release edit latest-debug --notes "Built automatically from main at ${GITHUB_SHA::7}."
+          git tag -f "v$APP_VERSION"
+          git push -f origin refs/tags/latest-debug "refs/tags/v$APP_VERSION"
+          NOTES="Version $APP_VERSION, built from main at ${GITHUB_SHA::7} on $(date -u +%Y-%m-%d).
+
+          Latest change: $(git log -1 --format=%s)"
+          gh release view latest-debug >/dev/null 2>&1 || gh release create latest-debug --title "Nirmaan Auditor v$APP_VERSION" --notes "$NOTES"
+          gh release edit latest-debug --title "Nirmaan Auditor v$APP_VERSION" --notes "$NOTES" --prerelease=false --latest
           gh release upload latest-debug nirmaan-auditor-debug.apk --clobber

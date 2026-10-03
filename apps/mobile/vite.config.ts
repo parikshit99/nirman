@@ -4,6 +4,8 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Set by CI ("1.1.<build>", same as the Android version name); "dev" otherwise.
+  define: { __APP_VERSION__: JSON.stringify(process.env.APP_VERSION || 'dev') },
   // Relative asset paths so the bundle also loads inside the Android WebView.
   base: './',
   build: {
