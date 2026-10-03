@@ -2,7 +2,7 @@
 
 An Android app for tracking construction materials on site. You photograph bills or handwritten notes, dictate (English or Hindi) or type what was bought. Google Gemini reads it and turns it into clean line items: Hindi/Hinglish terms become standard English names and units. The app keeps:
 
-- an **audit log** with rates, totals and vendors;
+- a **purchase log** with rates, totals and vendors;
 - **Bills of Quantities** for vendor quotes, with each vendor's reply matched back to the BOQ and compared;
 - **saved sessions** per site;
 - a **material price database** built from everything you record.
@@ -46,6 +46,10 @@ apps/mobile      React + Vite UI, packaged as an Android app with Capacitor
   src/jobs       queue worker that sends offline entries to Gemini
 packages/shared  types/validation, Gemini prompt + parsing, price-database logic
 ```
+
+### Data format
+
+All records are in a standard SQLite database, and backups are plain JSON. [docs/data-format.md](docs/data-format.md) describes every table and the backup file. It is written so the data can be carried over if the app is ever rebuilt with other tools (e.g. Kotlin or Swift). The rules that work on the data (price history, quote comparison, unit checks) are in `packages/shared`, with tests.
 
 ### Building the Android app
 
