@@ -1,4 +1,5 @@
 import {
+  applyLearning,
   materialKey,
   normalizeTerm,
   dataTables,
@@ -15,6 +16,7 @@ import {
   type QuoteLineRow,
   type QuoteRow,
   type DataTable,
+  type HiddenMaterialRow,
   type RowTypes,
 } from '@nirman/shared';
 import { seedCategories } from './schema.ts';
@@ -48,6 +50,7 @@ export interface Snapshot {
   jobs: Job[];
   quotes: QuoteRow[];
   quoteLines: QuoteLineRow[];
+  hidden: HiddenMaterialRow[];
 }
 
 export interface ListMeta {
@@ -105,7 +108,8 @@ export async function loadSnapshot(db: Db): Promise<Snapshot> {
     );
     const quotes = await tx.all<QuoteRow>(selectAll('quotes', 'created_at'));
     const quoteLines = await tx.all<QuoteLineRow>(selectAll('quote_lines', 'quote_id, position'));
-    return { lists, items, rates, learned, categories, jobs, quotes, quoteLines };
+    const hidden = await tx.all<HiddenMaterialRow>(selectAll('hidden_materials', 'hidden_at'));
+    return { lists, items, rates, learned, categories, jobs, quotes, quoteLines, hidden };
   });
 }
 
@@ -296,27 +300,111 @@ export async function restoreToDraft(db: Db, historyId: string): Promise<ListKin
   });
 }
 
+// ---------------------------------------------------------------------------
+// Materials (the Data tab groups items and added rates by name + unit)
+// ---------------------------------------------------------------------------
+
+export interface MaterialRef {
+  key: string;
+  name: string;
+  unit: string;
+}
+
+/** The word a row was read from; learned corrections are keyed by it. */
+const termOf = (row: { item_name: string; original_term?: string }) => normalizeTerm(row.original_term || row.item_name);
+
+/** Saved-list items (and the open purchase list) and added rates that make up the given materials. */
+async function materialRowsTx(tx: SqlExecutor, keys: Set<string>) {
+  const learning = learningMap(await tx.all<LearnedTermRow>(selectAll('learned_terms', 'id')));
+  const keyOf = (row: { item_name: string; unit: string; original_term?: string }) => {
+    const { item_name, unit } = applyLearning(learning, row);
+    return materialKey(item_name, unit);
+  };
+  const items = await tx.all<ItemRow>(
+    `SELECT ${tableColumns.items.join(', ')} FROM items
+     WHERE list_id IN (SELECT id FROM lists WHERE status = 'saved' OR id = ?)`,
+    [DRAFT_IDS.audit],
+  );
+  const rates = await tx.all<IndexedRateRow>(selectAll('indexed_rates', 'indexed_at'));
+  const inSet = (r: ItemRow | IndexedRateRow) => keys.has(keyOf(r));
+  // Words also used by rows outside these materials (any list, including BOQs), e.g. "cement" per kg vs per bag.
+  const everyItem = await tx.all<ItemRow>(selectAll('items', 'id'));
+  const selected = new Set<string>([...items.filter(inSet), ...rates.filter(inSet)].map((r) => r.id));
+  const sharedTerms = new Set(
+    [...everyItem, ...rates].filter((r) => !selected.has(r.id)).map(termOf),
+  );
+  return { items: items.filter(inSet), rates: rates.filter(inSet), learning, sharedTerms };
+}
+
+async function renameMaterialTx(tx: SqlExecutor, keys: Set<string>, to: { item_name: string; unit: string }) {
+  const item_name = to.item_name.trim();
+  const unit = to.unit.trim() || 'unit';
+  if (!item_name) return;
+  const { items, rates, learning, sharedTerms } = await materialRowsTx(tx, keys);
+  // A learned word already shows all its rows as this material, so it must follow the rename. A new
+  // word is remembered only if nothing outside this material uses it; a learned word maps to one
+  // name and unit, so it would otherwise pull other lines in.
+  const remember = async (term: string) => {
+    if (term && (learning[term] || !sharedTerms.has(term))) {
+      await touch(tx, 'learned_terms', { id: term, item_name, unit, updated_at: '' });
+    }
+  };
+  for (const item of items) {
+    await touch(tx, 'items', { ...item, item_name, unit });
+    await remember(termOf(item));
+  }
+  for (const rate of rates) {
+    await writeRow(tx, 'indexed_rates', { ...rate, item_name, unit });
+    await remember(termOf(rate));
+  }
+  // Renaming onto a hidden material shows it again rather than making these prices vanish too.
+  await tx.run('DELETE FROM hidden_materials WHERE id = ?', [materialKey(item_name, unit)]);
+}
+
 /**
- * Apply unit / vendor / price to every saved or audit-draft item whose
- * material key is selected (the database is derived from these items).
+ * Rename a material or change its unit everywhere it is used. Renaming to an
+ * existing material merges the two. The old names are remembered, so future
+ * readings of the same words get the new name too.
  */
-export async function bulkEditMaterials(db: Db, keys: Set<string>, patch: { unit?: string; vendor?: string; price?: number }) {
+export async function renameMaterial(db: Db, key: string, to: { item_name: string; unit: string }) {
+  await db.transaction((tx) => renameMaterialTx(tx, new Set([key]), to));
+}
+
+/**
+ * Several materials at once: change their unit, and/or record a new price dated
+ * today (with an optional vendor). Earlier prices are kept.
+ */
+export async function bulkEditMaterials(db: Db, materials: MaterialRef[], patch: { unit?: string; vendor?: string; price?: number }) {
   await db.transaction(async (tx) => {
-    const items = await tx.all<ItemRow>(
-      `SELECT ${tableColumns.items.join(', ')} FROM items
-       WHERE list_id IN (SELECT id FROM lists WHERE status = 'saved' OR id = ?)`,
-      [DRAFT_IDS.audit],
-    );
-    for (const item of items) {
-      if (!keys.has(materialKey(item.item_name, item.unit))) continue;
-      const unitPrice = patch.price ?? item.unit_price;
-      await touch(tx, 'items', {
-        ...item,
-        unit: patch.unit || item.unit,
-        vendor: patch.vendor || item.vendor,
-        unit_price: unitPrice,
-        total_amount: patch.price !== undefined ? unitPrice * item.quantity : item.total_amount,
-      });
+    const unit = patch.unit?.trim();
+    if (unit) for (const m of materials) await renameMaterialTx(tx, new Set([m.key]), { item_name: m.name, unit });
+    if (patch.price !== undefined && patch.price > 0) {
+      await indexRatesTx(
+        tx,
+        materials.map((m) => ({ item_name: m.name, unit: unit || m.unit, unit_price: patch.price!, vendor: patch.vendor?.trim() || '', date: todayISO() })),
+      );
+    }
+  });
+}
+
+/** Hide a material from the Data tab and price checks; saved lists are not changed. */
+export async function hideMaterial(db: Db, m: MaterialRef) {
+  await db.transaction((tx) => writeRow(tx, 'hidden_materials', { id: m.key, name: m.name, unit: m.unit, hidden_at: nowISO() }));
+}
+
+export async function unhideMaterial(db: Db, key: string) {
+  await db.run('DELETE FROM hidden_materials WHERE id = ?', [key]);
+}
+
+/** Correct one recorded price: a line in a saved list (its total follows) or an added rate. */
+export async function setPrice(db: Db, ref: { itemId?: string; rateId?: string }, price: number) {
+  await db.transaction(async (tx) => {
+    if (ref.itemId) {
+      const item = await getRow(tx, 'items', ref.itemId);
+      if (item) await touch(tx, 'items', { ...item, unit_price: price, total_amount: price * item.quantity });
+    } else if (ref.rateId) {
+      const rate = await getRow(tx, 'indexed_rates', ref.rateId);
+      if (rate) await writeRow(tx, 'indexed_rates', { ...rate, price });
     }
   });
 }

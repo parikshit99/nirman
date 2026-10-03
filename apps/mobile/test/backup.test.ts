@@ -7,6 +7,7 @@ import {
   completeQuoteJob,
   enqueueJob,
   enqueueQuote,
+  hideMaterial,
   indexRates,
   loadSnapshot,
   saveDraftToHistory,
@@ -26,6 +27,7 @@ async function populated() {
   await setListNotes(db, DRAFT_IDS.boq, 'Glossy');
   await indexRates(db, [cement]);
   await addCategory(db, 'Earthwork');
+  await hideMaterial(db, { key: '["sand","bag"]', name: 'Sand', unit: 'Bag' });
   // A BOQ with one read vendor quote, and one quote still waiting to be read.
   await addItems(db, DRAFT_IDS.boq, [{ ...cement, unit_price: 0 }]);
   const boqId = await saveDraftToHistory(db, 'boq', { title: 'Tower A', address: '', category: 'Civil', site_date: '' });
@@ -83,7 +85,7 @@ describe('backup', () => {
 
   it('still restores backups made before vendor quotes existed (version 1)', async () => {
     const db = await populated();
-    const { quotes: _q, quote_lines: _l, ...v1 } = await exportBackup(db);
+    const { quotes: _q, quote_lines: _l, hidden_materials: _h, ...v1 } = await exportBackup(db);
     const parsed = parseBackup(JSON.stringify({ ...v1, version: 1 }));
     expect(parsed.quotes).toEqual([]);
     const target = await freshDb();
@@ -91,5 +93,13 @@ describe('backup', () => {
     const snap = await loadSnapshot(target);
     expect(snap.quotes).toHaveLength(0);
     expect(snap.items.length).toBe((await loadSnapshot(db)).items.length);
+  });
+
+  it('still restores version 2 backups, which have no hidden materials', async () => {
+    const db = await populated();
+    const { hidden_materials: _h, ...v2 } = await exportBackup(db);
+    const parsed = parseBackup(JSON.stringify({ ...v2, version: 2 }));
+    expect(parsed.hidden_materials).toEqual([]);
+    expect(parsed.quotes).toHaveLength(1);
   });
 });

@@ -74,6 +74,8 @@ export interface PricePoint {
   timestamp: string;
   /** Title of the saved session the price came from; absent for a single added rate. */
   listTitle?: string;
+  /** Id of the saved-list line the price came from, so it can be edited or removed. */
+  itemId?: string;
   /** Id of the single added rate (Index rate, or a confirmed vendor quote), so it can be removed. */
   rateId?: string;
 }
@@ -137,6 +139,7 @@ export function buildItemDatabase(
         vendor: raw.vendor || 'Unknown',
         timestamp: list.created_at,
         listTitle: list.title || 'Untitled session',
+        itemId: raw.id,
       });
     }
   }

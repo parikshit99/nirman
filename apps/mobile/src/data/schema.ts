@@ -102,6 +102,15 @@ const MIGRATIONS: string[] = [
   CREATE INDEX quote_lines_quote_idx ON quote_lines (quote_id);
   ALTER TABLE jobs ADD COLUMN quote_id TEXT;
   `,
+  // 3: materials hidden from the price database; id is the material key.
+  `
+  CREATE TABLE hidden_materials (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    hidden_at TEXT NOT NULL
+  );
+  `,
 ];
 
 /** Default categories sort before anything the user adds. */
