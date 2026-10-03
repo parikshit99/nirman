@@ -39,7 +39,7 @@ export function PdfPreviewModal({ kind, items, notes, onDownload, onClose }: Pro
             </div>
             <div className="min-w-0">
               <h3 className="text-sm font-bold">Document Preview</h3>
-              <p className="text-[11px] text-gray-500 font-mono italic truncate">{isAudit ? 'Audit Report' : 'Bill of Quantities'}</p>
+              <p className="text-[11px] text-gray-500 font-mono italic truncate">{isAudit ? 'Purchase Report' : 'Bill of Quantities'}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -59,8 +59,8 @@ export function PdfPreviewModal({ kind, items, notes, onDownload, onClose }: Pro
           <div className="bg-white mx-auto max-w-[800px] shadow-2xl p-4 md:p-12 min-h-full rounded-sm flex flex-col gap-8 outline outline-1 outline-gray-200">
             <div className="flex justify-between items-start gap-4">
               <div>
-                <h1 className="text-xl md:text-3xl font-bold text-[var(--color-brand-primary)] mb-2">{isAudit ? 'AUDIT REPORT' : 'BILL OF QUANTITIES'}</h1>
-                <p className="text-xs text-gray-500">{isAudit ? 'Detailed purchase audit from site receipts/notes.' : 'Material inventory and price estimation report.'}</p>
+                <h1 className="text-xl md:text-3xl font-bold text-[var(--color-brand-primary)] mb-2">{isAudit ? 'PURCHASE REPORT' : 'BILL OF QUANTITIES'}</h1>
+                <p className="text-xs text-gray-500">{isAudit ? 'Purchases recorded from site bills and notes.' : 'Material inventory and price estimation report.'}</p>
               </div>
               <div className="text-right shrink-0">
                 <p className="text-xs font-bold text-gray-900 uppercase tracking-widest">Nirmaan Auditor</p>

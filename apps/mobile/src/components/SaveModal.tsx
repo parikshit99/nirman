@@ -67,7 +67,7 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
               value={meta.title}
               onChange={set('title')}
               onFocus={(e) => e.target.select()}
-              placeholder="e.g. BOQ Morning Audit, Site Visit"
+              placeholder="e.g. Cement order, Site visit"
               className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm"
             />
           </div>

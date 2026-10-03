@@ -137,7 +137,7 @@ export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendor
 
       <div className="mb-8">
         <h2 className="text-xs font-mono uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
-          <Plus size={12} /> New {kind === 'audit' ? 'Audit' : 'BOQ'} Entry
+          <Plus size={12} /> New {kind === 'audit' ? 'Purchase' : 'BOQ'} Entry
         </h2>
 
         <div className="space-y-4">

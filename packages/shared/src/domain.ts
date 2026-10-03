@@ -72,6 +72,10 @@ export interface PricePoint {
   price: number;
   vendor: string;
   timestamp: string;
+  /** Title of the saved session the price came from; absent for a single added rate. */
+  listTitle?: string;
+  /** Id of the single added rate (Index rate, or a confirmed vendor quote), so it can be removed. */
+  rateId?: string;
 }
 
 export interface MaterialEntry {
@@ -132,6 +136,7 @@ export function buildItemDatabase(
         price: raw.unit_price,
         vendor: raw.vendor || 'Unknown',
         timestamp: list.created_at,
+        listTitle: list.title || 'Untitled session',
       });
     }
   }
@@ -144,6 +149,7 @@ export function buildItemDatabase(
       price: rate.price,
       vendor: rate.vendor || 'Manual Index',
       timestamp: rate.indexed_at,
+      rateId: rate.id,
     });
     if (rate.vendor) e.vendors.add(rate.vendor);
   }
