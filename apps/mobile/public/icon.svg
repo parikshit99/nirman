@@ -1,4 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="100" fill="#f97316"/>
-  <path d="M256 128 L384 384 L128 384 Z" fill="white"/>
+  <rect width="512" height="512" rx="90" fill="#FF7A00"/>
+  <!-- lucide "hard-hat" (ISC licence), same as the in-app header logo -->
+  <svg x="101" y="95" width="310" height="310" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/>
+    <path d="M14 6a6 6 0 0 1 6 6v3"/>
+    <path d="M4 15v-3a6 6 0 0 1 6-6"/>
+    <rect x="2" y="15" width="20" height="4" rx="1"/>
+  </svg>
 </svg>
