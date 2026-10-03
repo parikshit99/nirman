@@ -75,6 +75,6 @@ jobs:
           NOTES="Version $APP_VERSION, built from main at ${GITHUB_SHA::7} on $(date -u +%Y-%m-%d).
 
           Latest change: $(git log -1 --format=%s)"
-          gh release view latest-debug >/dev/null 2>&1 || gh release create latest-debug --title "Nirmaan Auditor v$APP_VERSION" --notes "$NOTES"
-          gh release edit latest-debug --title "Nirmaan Auditor v$APP_VERSION" --notes "$NOTES" --prerelease=false --latest
+          gh release view latest-debug >/dev/null 2>&1 || gh release create latest-debug --title "Nirman v$APP_VERSION" --notes "$NOTES"
+          gh release edit latest-debug --title "Nirman v$APP_VERSION" --notes "$NOTES" --prerelease=false --latest
           gh release upload latest-debug nirmaan-auditor-debug.apk --clobber

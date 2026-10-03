@@ -215,7 +215,7 @@ export default function App() {
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold tracking-tight text-[var(--color-brand-dark)]">
-              NIRMĀṆ <span className="font-serif italic font-normal opacity-70">Auditor</span>
+              NIRMAN <span className="font-serif italic font-normal text-base opacity-70">by Akohsa</span>
             </h1>
             <p className="text-gray-500 font-mono uppercase tracking-widest leading-none mt-1 text-[11px]">Offline Material Management</p>
           </div>

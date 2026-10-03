@@ -63,7 +63,7 @@ export function PdfPreviewModal({ kind, items, notes, onDownload, onClose }: Pro
                 <p className="text-xs text-gray-500">{isAudit ? 'Purchases recorded from site bills and notes.' : 'Material inventory and price estimation report.'}</p>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-xs font-bold text-gray-900 uppercase tracking-widest">Nirmaan Auditor</p>
+                <p className="text-xs font-bold text-gray-900 uppercase tracking-widest">Nirman by Akohsa</p>
                 <p className="text-[11px] text-gray-500">{new Date().toLocaleDateString('en-IN')}</p>
               </div>
             </div>
