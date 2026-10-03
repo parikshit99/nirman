@@ -3,6 +3,7 @@ import { Download, FileCode, X } from 'lucide-react';
 import type { ItemRow } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
 import { useBackHandler } from '../lib/backButton.ts';
+import appIcon from '../lib/pdf-icon.png?inline';
 
 interface Props {
   kind: ListKind;
@@ -59,7 +60,10 @@ export function PdfPreviewModal({ kind, items, notes, onDownload, onClose }: Pro
           <div className="bg-white mx-auto max-w-[800px] shadow-2xl p-4 md:p-12 min-h-full rounded-sm flex flex-col gap-8 outline outline-1 outline-gray-200">
             <div className="flex justify-between items-start gap-4">
               <div>
-                <h1 className="text-xl md:text-3xl font-bold text-[var(--color-brand-primary)] mb-2">{isAudit ? 'PURCHASE REPORT' : 'BILL OF QUANTITIES'}</h1>
+                <h1 className="text-xl md:text-3xl font-bold text-[var(--color-brand-primary)] mb-2 flex items-center gap-2 md:gap-3">
+                  <img src={appIcon} alt="" className="w-8 h-8 md:w-11 md:h-11 shrink-0" />
+                  {isAudit ? 'PURCHASE REPORT' : 'BILL OF QUANTITIES'}
+                </h1>
                 <p className="text-xs text-gray-500">{isAudit ? 'Purchases recorded from site bills and notes.' : 'Material inventory and price estimation report.'}</p>
               </div>
               <div className="text-right shrink-0">

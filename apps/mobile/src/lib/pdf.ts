@@ -2,8 +2,17 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { ItemRow, ListRow, QuoteComparison } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
+import appIcon from './pdf-icon.png?inline';
 
 const rupees = (n: number) => `Rs. ${(n || 0).toLocaleString('en-IN')}`;
+
+/** The app icon at the top left, with the report title beside it. */
+function drawTitle(doc: jsPDF, title: string, size: number) {
+  doc.addImage(appIcon, 'PNG', 14, 10, 12, 12);
+  doc.setFontSize(size);
+  doc.setTextColor(255, 122, 0);
+  doc.text(title, 29, 19);
+}
 
 /**
  * Purchase report (with rates, totals and vendors) or Bill of Quantities (rate
@@ -13,9 +22,7 @@ export function buildPdf(kind: ListKind, items: ItemRow[], notes: string): jsPDF
   const isAudit = kind === 'audit';
   const doc = new jsPDF();
 
-  doc.setFontSize(22);
-  doc.setTextColor(255, 122, 0);
-  doc.text(isAudit ? 'PURCHASE REPORT' : 'BILL OF QUANTITIES', 14, 20);
+  drawTitle(doc, isAudit ? 'PURCHASE REPORT' : 'BILL OF QUANTITIES', 22);
 
   doc.setFontSize(10);
   doc.setTextColor(100);
@@ -99,13 +106,11 @@ const pctText = (x: number | null) => (x === null ? '' : `${x > 0 ? '+' : ''}${M
 /** Vendor comparison for a BOQ: rates per vendor, lowest marked, last recorded price and change. */
 export function buildQuoteComparisonPdf(boq: ListRow, comparison: QuoteComparison): jsPDF {
   const doc = new jsPDF({ orientation: comparison.vendors.length > 2 ? 'landscape' : 'portrait' });
-  doc.setFontSize(18);
-  doc.setTextColor(255, 122, 0);
-  doc.text('VENDOR QUOTE COMPARISON', 14, 18);
+  drawTitle(doc, 'VENDOR QUOTE COMPARISON', 18);
   doc.setFontSize(10);
   doc.setTextColor(100);
-  doc.text(`${boq.title || 'BOQ'}${boq.address ? ` - ${boq.address}` : ''}`, 14, 25);
-  doc.text(`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`, 14, 30);
+  doc.text(`${boq.title || 'BOQ'}${boq.address ? ` - ${boq.address}` : ''}`, 14, 28);
+  doc.text(`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`, 14, 33);
 
   const head = ['Sr.', 'Item', 'Qty', 'Last price', ...comparison.vendors.map((v) => v.quote.vendor)];
   const body: string[][] = comparison.rows.map((row) => [
@@ -133,7 +138,7 @@ export function buildQuoteComparisonPdf(boq: ListRow, comparison: QuoteCompariso
   autoTable(doc, {
     head: [head],
     body,
-    startY: 36,
+    startY: 40,
     theme: 'grid',
     styles: { fontSize: 8 },
     headStyles: { fillColor: [18, 18, 18], textColor: [255, 255, 255] },
