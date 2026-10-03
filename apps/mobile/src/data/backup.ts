@@ -4,13 +4,13 @@ import { clearAllData, ensureDraftRows, selectAll, writeRow } from './repo.ts';
 import type { Db } from './sql.ts';
 
 const APP_ID = 'nirmaan-auditor';
-/** 2 added vendor quotes; version 1 files (no quotes) still restore. */
-const VERSION = 2;
-const READABLE_VERSIONS: unknown[] = [1, 2];
+/** 2 added vendor quotes, 3 hidden materials; older files still restore. */
+const VERSION = 3;
+const READABLE_VERSIONS: unknown[] = [1, 2, 3];
 
 const backupSchema = z.object({
   app: z.literal(APP_ID),
-  version: z.union([z.literal(1), z.literal(2)]),
+  version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   exported_at: z.string().datetime({ offset: true }),
   lists: z.array(rowSchemas.lists),
   items: z.array(rowSchemas.items),
@@ -19,6 +19,7 @@ const backupSchema = z.object({
   categories: z.array(rowSchemas.categories),
   quotes: z.array(rowSchemas.quotes).default([]),
   quote_lines: z.array(rowSchemas.quote_lines).default([]),
+  hidden_materials: z.array(rowSchemas.hidden_materials).default([]),
 });
 export type Backup = z.infer<typeof backupSchema>;
 

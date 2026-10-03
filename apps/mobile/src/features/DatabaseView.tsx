@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
-import { Check, ChevronDown, Database, Download, TrendingUp, Trash2, Truck, X } from 'lucide-react';
-import { materialDatabaseToCSV, parseAmount, todayISO, type MaterialEntry } from '@nirman/shared';
+import { Check, ChevronDown, Database, Download, EyeOff, GitMerge, Pencil, TrendingUp, Trash2, Truck, X } from 'lucide-react';
+import Fuse from 'fuse.js';
+import { materialDatabaseToCSV, materialKey, parseAmount, todayISO, type MaterialEntry } from '@nirman/shared';
 import { FilterChips } from '../components/FilterChips.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
 import { shareFile, textToBase64 } from '../lib/files.ts';
 import { useAppState } from '../state/AppState.tsx';
+import { useBackHandler } from '../lib/backButton.ts';
 
 type SubTab = 'materials' | 'categories';
 
 const SUB_TABS: { id: SubTab; label: string; about: string }[] = [
-  { id: 'materials', label: 'Materials', about: 'One card per material. Tap Prices to see each price, where it came from, and remove a wrong one.' },
+  { id: 'materials', label: 'Materials', about: 'One card per material. Tap Prices to fix or remove a price, or Edit to rename, merge duplicates or hide a material.' },
   { id: 'categories', label: 'Categories', about: 'Types of work (e.g. Earthwork) you can tag a saved purchase list or BOQ with, to filter by later.' },
 ];
 
@@ -56,6 +58,7 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulk, setBulk] = useState({ unit: '', vendor: '', price: '' });
   const [open, setOpen] = useState<string | null>(null);
+  const [editing, setEditing] = useState<MaterialEntry | null>(null);
   // Leaving the tab carries out price removals still waiting for undo.
   useEffect(() => () => void actions.flushDeletes(), [actions]);
 
@@ -74,7 +77,12 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
       await dialogs.alert('Check the price', `“${bulk.price}” is not a number. Use digits, e.g. 1500 or 1,500.`);
       return;
     }
-    await actions.bulkEditMaterials(selected, {
+    if (!bulk.unit.trim() && !price) {
+      await dialogs.alert('Nothing to change', 'Enter a new unit, or a price to record for today.');
+      return;
+    }
+    const materials = itemDatabase.filter((e) => selected.has(e.key)).map((e) => ({ key: e.key, name: e.name, unit: e.unit }));
+    await actions.bulkEditMaterials(materials, {
       unit: bulk.unit.trim() || undefined,
       vendor: bulk.vendor.trim() || undefined,
       price,
@@ -148,20 +156,20 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
                 className="px-2 py-1 text-[11px] border border-gray-200 rounded w-16 outline-none focus:border-orange-300"
               />
               <input
-                placeholder="New Vendor"
+                placeholder="Vendor"
                 value={bulk.vendor}
                 onChange={(e) => setBulk((p) => ({ ...p, vendor: e.target.value }))}
                 className="px-2 py-1 text-[11px] border border-gray-200 rounded w-20 outline-none focus:border-orange-300"
               />
               <input
                 inputMode="decimal"
-                placeholder="New Price"
+                placeholder="Today's price"
                 value={bulk.price}
                 onChange={(e) => setBulk((p) => ({ ...p, price: e.target.value }))}
                 className="px-2 py-1 text-[11px] border border-gray-200 rounded w-16 outline-none focus:border-orange-300"
               />
               <button onClick={applyBulk} className="bg-orange-500 text-white px-3 py-1 rounded text-[11px] font-bold uppercase hover:bg-orange-600">
-                Apply to All
+                Apply
               </button>
             </motion.div>
           )}
@@ -256,13 +264,18 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
                       </div>
                     )}
                     {!selectMode && (
-                      <button
-                        onClick={() => setOpen(open === item.key ? null : item.key)}
-                        aria-expanded={open === item.key}
-                        className="text-xs font-bold text-orange-600 flex items-center gap-1 py-1"
-                      >
-                        <ChevronDown size={14} className={`transition-transform ${open === item.key ? 'rotate-180' : ''}`} /> Prices ({item.priceHistory.length})
-                      </button>
+                      <div className="flex gap-4">
+                        <button
+                          onClick={() => setOpen(open === item.key ? null : item.key)}
+                          aria-expanded={open === item.key}
+                          className="text-xs font-bold text-orange-600 flex items-center gap-1 py-1"
+                        >
+                          <ChevronDown size={14} className={`transition-transform ${open === item.key ? 'rotate-180' : ''}`} /> Prices ({item.priceHistory.length})
+                        </button>
+                        <button onClick={() => setEditing(item)} className="text-xs font-bold text-gray-600 flex items-center gap-1 py-1" aria-label={`Edit ${item.name}`}>
+                          <Pencil size={13} /> Edit
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -278,46 +291,196 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
         <div>
           <h4 className="text-xs font-bold text-gray-700">Where prices come from</h4>
           <p className="text-[11px] text-gray-500">
-            Saved purchase lists, single rates added with “Index rate”, and confirmed vendor quotes. To fix a price from a saved list, open it from History.
+            Saved purchase lists, single rates added with “Index rate”, and confirmed vendor quotes. Fixing or removing a price from a saved list changes that list too.
           </p>
         </div>
       </div>
+      <AnimatePresence>{editing && <MaterialEditor key={editing.key} material={editing} onClose={() => setEditing(null)} />}</AnimatePresence>
     </>
   );
 }
 
-/** Every price recorded for one material, newest first. Single added rates can be removed (with undo). */
+/** Every price recorded for one material, newest first. Each can be corrected or removed (with undo). */
 function PriceList({ points }: { points: MaterialEntry['priceHistory'] }) {
-  const { actions, pendingDeletes } = useAppState();
   return (
-    <ul className="basis-full mt-2 divide-y divide-gray-100 border border-gray-100 rounded-xl bg-gray-50/50">
-      {[...points].reverse().map((p, i) => {
-        const pendingDelete = !!p.rateId && pendingDeletes.has(p.rateId);
-        return (
-          <li key={p.rateId ?? `${p.timestamp}-${i}`} className={`px-3 py-2 flex items-center gap-2 ${pendingDelete ? 'bg-red-50/40' : ''}`}>
-            <div className={`flex-1 min-w-0 ${pendingDelete ? 'line-through opacity-60' : ''}`}>
-              <div className="flex justify-between gap-2 text-sm">
-                <span className="text-gray-700 truncate">{new Date(p.date).toLocaleDateString('en-IN')} · {p.vendor}</span>
-                <span className="font-mono font-bold shrink-0">₹{p.price.toLocaleString('en-IN')}</span>
-              </div>
-              <div className="text-xs text-gray-500 truncate">{p.listTitle ? `Saved list: ${p.listTitle}` : 'Added rate'}</div>
-            </div>
-            {p.rateId &&
-              (pendingDelete ? (
-                <UndoButton onUndo={() => actions.undoDelete(p.rateId!)} label={`₹${p.price}`} />
-              ) : (
-                <button
-                  onClick={() => actions.deleteIndexedRateLater(p.rateId!)}
-                  className="p-2 -mr-1 text-red-500 hover:bg-red-50 rounded-lg"
-                  aria-label={`Remove price ₹${p.price} from ${p.date}`}
-                >
-                  <Trash2 size={16} />
-                </button>
-              ))}
-          </li>
-        );
-      })}
+    <ul className="basis-full min-w-0 mt-2 divide-y divide-gray-100 border border-gray-100 rounded-xl bg-gray-50/50">
+      {[...points].reverse().map((p, i) => (
+        <PriceRow key={p.rateId ?? p.itemId ?? `${p.timestamp}-${i}`} point={p} />
+      ))}
     </ul>
+  );
+}
+
+function PriceRow({ point: p }: { point: MaterialEntry['priceHistory'][number] }) {
+  const { actions, pendingDeletes } = useAppState();
+  const dialogs = useDialogs();
+  const [draft, setDraft] = useState<string | null>(null);
+  const id = p.rateId ?? p.itemId;
+  const pendingDelete = !!id && pendingDeletes.has(id);
+  const label = `₹${p.price} from ${p.date}`;
+
+  const save = async () => {
+    if (draft === null) return;
+    const value = parseAmount(draft);
+    setDraft(null);
+    if (value === null || value <= 0) {
+      await dialogs.alert('Check the price', `“${draft}” is not a price. Use digits, e.g. 1500 or 1,500.`);
+      return;
+    }
+    if (value !== p.price) await actions.setPrice({ itemId: p.itemId, rateId: p.rateId }, value);
+  };
+  const remove = () => (p.rateId ? actions.deleteIndexedRateLater(p.rateId) : p.itemId && actions.deleteItemLater(p.itemId));
+
+  return (
+    <li className={`px-3 py-2 flex items-center gap-2 ${pendingDelete ? 'bg-red-50/40' : ''}`}>
+      <div className={`flex-1 min-w-0 ${pendingDelete ? 'line-through opacity-60' : ''}`}>
+        <div className="flex justify-between items-center gap-2 text-sm">
+          <span className="text-gray-700 truncate">
+            {new Date(p.date).toLocaleDateString('en-IN')} · {p.vendor}
+          </span>
+          {draft !== null ? (
+            <input
+              autoFocus
+              inputMode="decimal"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={save}
+              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+              aria-label={`New price for ${label}`}
+              className="w-24 px-2 py-1 border border-orange-300 rounded-lg font-mono text-sm text-right outline-none"
+            />
+          ) : (
+            <span className="font-mono font-bold shrink-0">₹{p.price.toLocaleString('en-IN')}</span>
+          )}
+        </div>
+        <div className="text-xs text-gray-500 truncate">
+          {p.listTitle ? `Saved list: ${p.listTitle}` : 'Added rate'}
+          {pendingDelete && p.itemId && ' (line removed from the list)'}
+        </div>
+      </div>
+      {id &&
+        (pendingDelete ? (
+          <UndoButton onUndo={() => actions.undoDelete(id)} label={label} />
+        ) : (
+          draft === null && (
+            <div className="flex shrink-0 -mr-1">
+              <button onClick={() => setDraft(String(p.price))} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg" aria-label={`Change price ${label}`}>
+                <Pencil size={15} />
+              </button>
+              <button onClick={remove} className="p-2 text-red-500 hover:bg-red-50 rounded-lg" aria-label={`Remove price ${label}`}>
+                <Trash2 size={16} />
+              </button>
+            </div>
+          )
+        ))}
+    </li>
+  );
+}
+
+/** Rename a material, change its unit, merge it into a similar one, or hide it. */
+function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClose(): void }) {
+  const { actions, itemDatabase } = useAppState();
+  const dialogs = useDialogs();
+  useBackHandler(onClose);
+  const [name, setName] = useState(material.name);
+  const [unit, setUnit] = useState(material.unit);
+  const others = itemDatabase.filter((e) => e.key !== material.key);
+  const similar = new Fuse(others, { keys: ['name'], threshold: 0.45, ignoreLocation: true })
+    .search(material.name)
+    .slice(0, 5)
+    .map((r) => r.item);
+
+  const mergeInto = async (target: MaterialEntry) => {
+    const sameUnit = target.unit.toLowerCase() === material.unit.toLowerCase();
+    const ok = await dialogs.confirm(`Merge into “${target.name}”?`, {
+      message: `“${material.name}” (${material.priceHistory.length} prices) becomes “${target.name}” per ${target.unit}, combining both price histories. Future readings of the same words use the new name.${
+        sameUnit ? '' : `\nThe units differ (${material.unit} vs ${target.unit}); the prices are not converted.`
+      }`,
+      confirmLabel: 'Merge',
+    });
+    if (!ok) return;
+    await actions.renameMaterial(material.key, { item_name: target.name, unit: target.unit });
+    onClose();
+  };
+
+  const save = async () => {
+    const nextName = name.trim();
+    const nextUnit = unit.trim() || 'unit';
+    if (!nextName) return;
+    const key = materialKey(nextName, nextUnit);
+    if (key === material.key && nextName === material.name && nextUnit === material.unit) return onClose();
+    const existing = others.find((e) => e.key === key);
+    if (existing) return mergeInto(existing);
+    await actions.renameMaterial(material.key, { item_name: nextName, unit: nextUnit });
+    onClose();
+  };
+
+  const hide = async () => {
+    await actions.hideMaterial({ key: material.key, name: material.name, unit: material.unit });
+    onClose();
+  };
+
+  const field = 'mt-1 w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500';
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div role="dialog" aria-modal="true" aria-labelledby="material-editor-title" className="bg-white w-full max-w-md rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto space-y-5">
+        <div className="flex justify-between items-start">
+          <h3 id="material-editor-title" className="font-bold text-gray-900 uppercase tracking-widest text-sm">Edit material</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-black" aria-label="Close">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <label className="block flex-1 min-w-0">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Name</span>
+              <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
+            </label>
+            <label className="block w-24">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Unit</span>
+              <input value={unit} onChange={(e) => setUnit(e.target.value)} className={field} />
+            </label>
+          </div>
+          <p className="text-[11px] text-gray-500">
+            Changes its {material.priceHistory.length === 1 ? 'price' : `${material.priceHistory.length} prices`} and the lines in saved lists. Using the name and unit of another material merges the two.
+          </p>
+          <button onClick={save} className="w-full h-11 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl text-xs uppercase tracking-widest">
+            Save
+          </button>
+        </div>
+
+        {similar.length > 0 && (
+          <section>
+            <h4 className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-2">Same thing under another name?</h4>
+            <ul className="space-y-1.5">
+              {similar.map((e) => (
+                <li key={e.key} className="flex items-center justify-between gap-2 p-2 border border-gray-200 rounded-xl">
+                  <span className="min-w-0 text-sm">
+                    <span className="font-bold block truncate">{e.name}</span>
+                    <span className="text-xs text-gray-500">
+                      per {e.unit} · {e.priceHistory.length} price{e.priceHistory.length === 1 ? '' : 's'}
+                    </span>
+                  </span>
+                  <button onClick={() => mergeInto(e)} className="shrink-0 px-3 py-2 text-xs font-bold text-orange-700 bg-orange-50 rounded-lg flex items-center gap-1">
+                    <GitMerge size={13} /> Merge into this
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <section className="pt-3 border-t border-gray-100">
+          <button onClick={hide} className="w-full py-2.5 text-xs font-bold text-gray-700 bg-gray-100 rounded-xl flex items-center justify-center gap-2">
+            <EyeOff size={14} /> Hide from Data
+          </button>
+          <p className="text-[11px] text-gray-500 mt-1.5">
+            Removes it from this list and from price checks. Your saved lists don't change. Unhide it in Settings.
+          </p>
+        </section>
+      </div>
+    </motion.div>
   );
 }
 

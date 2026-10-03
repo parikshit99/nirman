@@ -100,6 +100,10 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       deleteAllHistory: write(repo.deleteAllHistory),
       restoreToDraft: write(repo.restoreToDraft),
       bulkEditMaterials: write(repo.bulkEditMaterials),
+      renameMaterial: write(repo.renameMaterial),
+      hideMaterial: write(repo.hideMaterial),
+      unhideMaterial: write(repo.unhideMaterial),
+      setPrice: write(repo.setPrice),
       clearLearning: write(repo.clearLearning),
       indexRates: write(repo.indexRates),
       deleteIndexedRate: write(repo.deleteIndexedRate),
@@ -171,7 +175,9 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       .filter((l) => l.status === 'saved')
       .map((l) => ({ ...l, items: byList.get(l.id) ?? [] }));
     const learning = repo.learningMap(snapshot.learned);
-    const itemDatabase: MaterialEntry[] = buildItemDatabase(snapshot.lists, snapshot.items, snapshot.rates, learning);
+    // Hidden materials stay out of the Data tab and of every price check.
+    const hiddenKeys = new Set(snapshot.hidden.map((h) => h.id));
+    const itemDatabase: MaterialEntry[] = buildItemDatabase(snapshot.lists, snapshot.items, snapshot.rates, learning).filter((e) => !hiddenKeys.has(e.key));
     const linesByQuote = new Map<string, QuoteLineRow[]>();
     for (const line of snapshot.quoteLines) {
       const list = linesByQuote.get(line.quote_id);
@@ -190,6 +196,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       history,
       itemDatabase,
       learningCount: snapshot.learned.length,
+      hiddenMaterials: snapshot.hidden,
       categoryNames: snapshot.categories.map((c) => c.name),
       uniqueAddresses: [...new Set(history.map((h) => h.address).filter(Boolean))],
       jobsFor: (kind: ListKind) => snapshot.jobs.filter((j) => j.list_id === DRAFT_IDS[kind]),

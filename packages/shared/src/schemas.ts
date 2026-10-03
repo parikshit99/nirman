@@ -113,7 +113,16 @@ export const quoteLineRowSchema = z.object({
 });
 export type QuoteLineRow = z.infer<typeof quoteLineRowSchema>;
 
-export const dataTables = ['lists', 'items', 'indexed_rates', 'learned_terms', 'categories', 'quotes', 'quote_lines'] as const;
+/** A material hidden from the price database (Data tab and price checks); id is its materialKey. */
+export const hiddenMaterialRowSchema = z.object({
+  id: z.string().min(1).max(1200),
+  name: z.string().max(500),
+  unit: z.string().max(50),
+  hidden_at: isoTimestamp,
+});
+export type HiddenMaterialRow = z.infer<typeof hiddenMaterialRowSchema>;
+
+export const dataTables = ['lists', 'items', 'indexed_rates', 'learned_terms', 'categories', 'quotes', 'quote_lines', 'hidden_materials'] as const;
 export type DataTable = (typeof dataTables)[number];
 
 export const rowSchemas = {
@@ -124,6 +133,7 @@ export const rowSchemas = {
   categories: categoryRowSchema,
   quotes: quoteRowSchema,
   quote_lines: quoteLineRowSchema,
+  hidden_materials: hiddenMaterialRowSchema,
 } as const;
 
 /** Column names of each table, in schema order. */
@@ -139,6 +149,7 @@ export interface RowTypes {
   categories: CategoryRow;
   quotes: QuoteRow;
   quote_lines: QuoteLineRow;
+  hidden_materials: HiddenMaterialRow;
 }
 
 // ---------------------------------------------------------------------------

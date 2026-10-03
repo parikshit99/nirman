@@ -16,12 +16,16 @@ import {
   enqueueJob,
   enqueueQuote,
   getJobImages,
+  hideMaterial,
   indexRates,
   learningMap,
   loadSnapshot,
+  renameMaterial,
   restoreToDraft,
   saveDraftToHistory,
   setListNotes,
+  setPrice,
+  unhideMaterial,
   updateItem,
   updateQuoteLine,
 } from '../src/data/repo.ts';
@@ -95,7 +99,7 @@ describe('local repository', () => {
     expect(snap.items.filter((i) => i.list_id === id)).toHaveLength(0);
   });
 
-  it('indexes rates, replacing identical ones, and bulk-edits materials', async () => {
+  it('indexes rates, replacing identical ones, and bulk-edits materials without losing old prices', async () => {
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.audit, [cement]);
     await saveDraftToHistory(db, 'audit', meta);
@@ -104,12 +108,60 @@ describe('local repository', () => {
     let snap = await loadSnapshot(db);
     expect(snap.rates).toHaveLength(1);
 
-    await bulkEditMaterials(db, new Set([materialKey('Cement', 'Bag')]), { vendor: 'Gupta', price: 520 });
+    const ref = { key: materialKey('Cement', 'Bag'), name: 'Cement', unit: 'Bag' };
+    await bulkEditMaterials(db, [ref], { vendor: 'Gupta', price: 520 });
     snap = await loadSnapshot(db);
-    expect(snap.items.every((i) => i.vendor === 'Gupta' && i.unit_price === 520 && i.total_amount === 520 * 15)).toBe(true);
-    const [entry] = buildItemDatabase(snap.lists, snap.items, snap.rates, {});
-    expect(entry.priceHistory.map((p) => p.price).sort()).toEqual([500, 520]);
+    expect(snap.items.every((i) => i.unit_price === 500 && i.vendor === 'Sharma')).toBe(true);
+    let [entry] = buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned));
+    expect(entry.priceHistory.map((p) => p.price).sort()).toEqual([500, 500, 520]);
     expect(entry.vendors.sort()).toEqual(['Gupta', 'Sharma']);
+
+    await bulkEditMaterials(db, [ref], { unit: 'Bori' });
+    snap = await loadSnapshot(db);
+    [entry] = buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned));
+    expect(entry.unit).toBe('Bori');
+    expect(entry.priceHistory).toHaveLength(3);
+  });
+
+  it('renames a material everywhere, merging duplicates and remembering the old words', async () => {
+    const db = await freshDb();
+    await addItems(db, DRAFT_IDS.audit, [cement, { ...cement, item_name: 'OPC Cement', original_term: 'cement bag', unit_price: 510 }]);
+    await saveDraftToHistory(db, 'audit', meta);
+    await indexRates(db, [{ ...cement, unit_price: 505 }]);
+    let snap = await loadSnapshot(db);
+    expect(buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned))).toHaveLength(2);
+
+    await renameMaterial(db, materialKey('Cement', 'Bag'), { item_name: 'OPC Cement', unit: 'Bag' });
+    snap = await loadSnapshot(db);
+    const db2 = buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned));
+    expect(db2.map((e) => e.name)).toEqual(['OPC Cement']);
+    expect(db2[0].priceHistory.map((p) => p.price).sort()).toEqual([500, 505, 510]);
+    // The vendor's word "bori" now reads as OPC Cement in future extractions too.
+    expect(learningMap(snap.learned).bori).toEqual({ item_name: 'OPC Cement', unit: 'Bag' });
+  });
+
+  it('corrects one price in a saved list or an added rate, and hides materials', async () => {
+    const db = await freshDb();
+    await addItems(db, DRAFT_IDS.audit, [cement]);
+    const listId = await saveDraftToHistory(db, 'audit', meta);
+    await indexRates(db, [{ ...cement, unit_price: 505 }]);
+    let snap = await loadSnapshot(db);
+    const saved = snap.items.find((i) => i.list_id === listId)!;
+    await setPrice(db, { itemId: saved.id }, 480);
+    await setPrice(db, { rateId: snap.rates[0].id }, 490);
+    snap = await loadSnapshot(db);
+    expect(snap.items.find((i) => i.id === saved.id)).toMatchObject({ unit_price: 480, total_amount: 480 * 15 });
+    expect(snap.items.find((i) => i.list_id === DRAFT_IDS.audit)?.unit_price).toBe(500);
+    expect(snap.rates[0].price).toBe(490);
+
+    const ref = { key: materialKey('Cement', 'Bag'), name: 'Cement', unit: 'Bag' };
+    await hideMaterial(db, ref);
+    await hideMaterial(db, ref);
+    snap = await loadSnapshot(db);
+    expect(snap.hidden.map((h) => h.id)).toEqual([ref.key]);
+    expect(snap.items.find((i) => i.id === saved.id)).toBeDefined();
+    await unhideMaterial(db, ref.key);
+    expect((await loadSnapshot(db)).hidden).toHaveLength(0);
   });
 
   it('manages categories by name', async () => {

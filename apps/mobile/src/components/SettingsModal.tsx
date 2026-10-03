@@ -246,7 +246,7 @@ function BackupSection() {
 }
 
 function StorageSection() {
-  const { history, snapshot, learningCount, actions } = useAppState();
+  const { history, snapshot, learningCount, hiddenMaterials, actions } = useAppState();
   const dialogs = useDialogs();
   const resetLearning = async () => {
     const ok = await dialogs.confirm(`Forget ${learningCount} learned corrections?`, {
@@ -264,7 +264,7 @@ function StorageSection() {
         <dd className="font-bold text-right">{history.length}</dd>
         <dt className="text-gray-500">Items</dt>
         <dd className="font-bold text-right">{snapshot.items.length}</dd>
-        <dt className="text-gray-500">Indexed rates</dt>
+        <dt className="text-gray-500">Added rates</dt>
         <dd className="font-bold text-right">{snapshot.rates.length}</dd>
         <dt className="text-gray-500">Queued AI entries</dt>
         <dd className="font-bold text-right">{snapshot.jobs.length}</dd>
@@ -280,6 +280,23 @@ function StorageSection() {
         <dt className="text-gray-500">App version</dt>
         <dd className="font-bold text-right font-mono">{APP_VERSION}</dd>
       </dl>
+      {hiddenMaterials.length > 0 && (
+        <div className="pt-2">
+          <div className="text-[11px] text-gray-500 mb-1">Hidden from Data ({hiddenMaterials.length})</div>
+          <ul className="space-y-1">
+            {hiddenMaterials.map((m) => (
+              <li key={m.id} className="flex items-center justify-between gap-2 text-xs bg-gray-50 rounded-lg px-3 py-1.5">
+                <span className="truncate">
+                  {m.name} <span className="text-gray-500">· per {m.unit}</span>
+                </span>
+                <button onClick={() => actions.unhideMaterial(m.id)} className="text-blue-600 font-bold underline shrink-0">
+                  Unhide
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }
