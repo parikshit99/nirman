@@ -61,6 +61,12 @@ describe('buildItemDatabase', () => {
     expect(cement.latestPrice).toBe(450);
     expect(cement.addresses.sort()).toEqual(['Site A', 'Site B']);
     expect(cement.vendors.sort()).toEqual(['Gupta', 'Manual', 'Sharma']);
+    // Each price says where it came from; only single added rates carry an id to remove them by.
+    expect(cement.priceHistory.map((p) => [p.listTitle ?? null, p.rateId ?? null])).toEqual([
+      [lists[0].title || 'Untitled session', null],
+      [lists[2].title || 'Untitled session', null],
+      [null, 'r1'],
+    ]);
   });
 
   it('merges items through learned corrections', () => {

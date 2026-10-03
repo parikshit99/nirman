@@ -12,7 +12,7 @@ export function HistorySidebar({ onNewBoq }: { onNewBoq(): void }) {
         <h3 className="text-sm font-bold text-orange-900 flex items-center gap-2">
           <History size={16} /> Saved Sessions
         </h3>
-        <p className="text-[11px] text-orange-700 mt-1">Manage and restore your past audits and Bills of Quantities.</p>
+        <p className="text-[11px] text-orange-700 mt-1">Manage and restore your past purchase lists and Bills of Quantities.</p>
       </div>
       <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 flex justify-between items-center text-[11px] font-bold">
         <span>On this phone</span>
@@ -90,7 +90,7 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
                       {record.title}
                     </h3>
                     <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[11px] font-bold rounded uppercase shrink-0">{record.category || 'Civil'}</span>
-                    <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-[11px] font-bold rounded uppercase shrink-0">{record.kind === 'audit' ? 'Audit' : 'BOQ'}</span>
+                    <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-[11px] font-bold rounded uppercase shrink-0">{record.kind === 'audit' ? 'Purchases' : 'BOQ'}</span>
                   </div>
                   <div className="flex flex-col gap-0.5 mt-1">
                     <span className="text-[11px] font-mono text-gray-400">{new Date(record.created_at).toLocaleString('en-IN')}</span>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
-import { Check, Database, Download, TrendingUp, Trash2, Truck, X } from 'lucide-react';
+import { Check, ChevronDown, Database, Download, TrendingUp, Trash2, Truck, X } from 'lucide-react';
 import { materialDatabaseToCSV, parseAmount, todayISO, type MaterialEntry } from '@nirman/shared';
 import { FilterChips } from '../components/FilterChips.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
@@ -9,7 +9,12 @@ import { UndoButton } from '../components/UndoButton.tsx';
 import { shareFile, textToBase64 } from '../lib/files.ts';
 import { useAppState } from '../state/AppState.tsx';
 
-type SubTab = 'materials' | 'indexed' | 'categories';
+type SubTab = 'materials' | 'categories';
+
+const SUB_TABS: { id: SubTab; label: string; about: string }[] = [
+  { id: 'materials', label: 'Materials', about: 'One card per material. Tap Prices to see each price, where it came from, and remove a wrong one.' },
+  { id: 'categories', label: 'Categories', about: 'Types of work (e.g. Earthwork) you can tag a saved purchase list or BOQ with, to filter by later.' },
+];
 
 interface Props {
   entries: MaterialEntry[];
@@ -24,13 +29,7 @@ export function DatabaseView(props: Props) {
   return (
     <div className="space-y-6">
       <div className="flex border-b border-gray-200 overflow-x-auto no-scrollbar">
-        {(
-          [
-            ['materials', 'Materials'],
-            ['indexed', 'Indexed Log'],
-            ['categories', 'Categories'],
-          ] as const
-        ).map(([id, label]) => (
+        {SUB_TABS.map(({ id, label }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
@@ -41,8 +40,8 @@ export function DatabaseView(props: Props) {
           </button>
         ))}
       </div>
+      <p className="text-xs text-gray-600 leading-snug -mt-3">{SUB_TABS.find((t) => t.id === tab)!.about}</p>
       {tab === 'materials' && <Materials {...props} />}
-      {tab === 'indexed' && <IndexedLog />}
       {tab === 'categories' && <Categories />}
     </div>
   );
@@ -56,6 +55,9 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulk, setBulk] = useState({ unit: '', vendor: '', price: '' });
+  const [open, setOpen] = useState<string | null>(null);
+  // Leaving the tab carries out price removals still waiting for undo.
+  useEffect(() => () => void actions.flushDeletes(), [actions]);
 
   const toggle = (key: string) =>
     setSelected((prev) => {
@@ -176,8 +178,8 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
               <>
                 <p className="text-sm font-bold text-gray-600">No prices yet</p>
                 <p className="text-xs leading-relaxed max-w-sm mx-auto">
-                  Prices appear here when you save a session (Save button) or tap <b>Index rate</b> on an Audit item.
-                  {unsavedPriced > 0 && ` Your Audit list has ${unsavedPriced} priced item${unsavedPriced === 1 ? '' : 's'} not added yet.`}
+                  Prices appear here when you save a purchase list (Save button), tap <b>Index rate</b> on a purchase, or confirm a vendor quote.
+                  {unsavedPriced > 0 && ` Your purchase list has ${unsavedPriced} priced item${unsavedPriced === 1 ? '' : 's'} not added yet.`}
                 </p>
               </>
             )}
@@ -190,7 +192,7 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
               <div
                 key={item.key}
                 onClick={() => selectMode && toggle(item.key)}
-                className={`px-4 md:px-6 py-4 flex gap-3 transition-colors ${selectMode ? 'cursor-pointer' : ''} ${isSelected ? 'bg-orange-50/60' : ''}`}
+                className={`px-4 md:px-6 py-4 flex flex-wrap gap-3 transition-colors ${selectMode ? 'cursor-pointer' : ''} ${isSelected ? 'bg-orange-50/60' : ''}`}
               >
                 {selectMode && (
                   <div
@@ -253,8 +255,18 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
                         </ResponsiveContainer>
                       </div>
                     )}
+                    {!selectMode && (
+                      <button
+                        onClick={() => setOpen(open === item.key ? null : item.key)}
+                        aria-expanded={open === item.key}
+                        className="text-xs font-bold text-orange-600 flex items-center gap-1 py-1"
+                      >
+                        <ChevronDown size={14} className={`transition-transform ${open === item.key ? 'rotate-180' : ''}`} /> Prices ({item.priceHistory.length})
+                      </button>
+                    )}
                   </div>
                 </div>
+                {open === item.key && !selectMode && <PriceList points={item.priceHistory} />}
               </div>
             );
           })
@@ -264,53 +276,48 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
       <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl flex items-center gap-4">
         <TrendingUp className="text-orange-500 shrink-0" />
         <div>
-          <h4 className="text-xs font-bold text-gray-700">Database Indexing Active</h4>
-          <p className="text-[11px] text-gray-500">Every saved session and indexed rate adds to your material price history.</p>
+          <h4 className="text-xs font-bold text-gray-700">Where prices come from</h4>
+          <p className="text-[11px] text-gray-500">
+            Saved purchase lists, single rates added with “Index rate”, and confirmed vendor quotes. To fix a price from a saved list, open it from History.
+          </p>
         </div>
       </div>
     </>
   );
 }
 
-function IndexedLog() {
-  const { snapshot, actions, pendingDeletes } = useAppState();
-  const rates = snapshot.rates;
-  useEffect(() => () => void actions.flushDeletes(), [actions]);
+/** Every price recorded for one material, newest first. Single added rates can be removed (with undo). */
+function PriceList({ points }: { points: MaterialEntry['priceHistory'] }) {
+  const { actions, pendingDeletes } = useAppState();
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm w-full divide-y divide-gray-100">
-      {rates.length === 0 ? (
-        <div className="p-10 text-center text-gray-400 text-sm">No indexed rates yet. Tap “Index rate” on an Audit item to add one.</div>
-      ) : (
-        rates.map((rate) => {
-          const pendingDelete = pendingDeletes.has(rate.id);
-          return (
-            <div key={rate.id} className={`px-4 md:px-6 py-3 flex items-center gap-3 ${pendingDelete ? 'bg-red-50/40' : ''}`}>
-              <div className={`flex-1 min-w-0 ${pendingDelete ? 'line-through opacity-60' : ''}`}>
-                <div className="flex justify-between gap-2">
-                  <span className="font-bold text-sm text-gray-900 truncate">{rate.item_name}</span>
-                  <span className="font-mono font-bold text-sm shrink-0">
-                    ₹{rate.price.toLocaleString('en-IN')} <span className="text-xs font-normal text-gray-500">/ {rate.unit}</span>
-                  </span>
-                </div>
-                <div className="text-xs text-gray-500 flex flex-wrap gap-x-3">
-                  <span className="flex items-center gap-1">
-                    <Truck size={12} /> {rate.vendor}
-                  </span>
-                  <span>{rate.date}</span>
-                </div>
+    <ul className="basis-full mt-2 divide-y divide-gray-100 border border-gray-100 rounded-xl bg-gray-50/50">
+      {[...points].reverse().map((p, i) => {
+        const pendingDelete = !!p.rateId && pendingDeletes.has(p.rateId);
+        return (
+          <li key={p.rateId ?? `${p.timestamp}-${i}`} className={`px-3 py-2 flex items-center gap-2 ${pendingDelete ? 'bg-red-50/40' : ''}`}>
+            <div className={`flex-1 min-w-0 ${pendingDelete ? 'line-through opacity-60' : ''}`}>
+              <div className="flex justify-between gap-2 text-sm">
+                <span className="text-gray-700 truncate">{new Date(p.date).toLocaleDateString('en-IN')} · {p.vendor}</span>
+                <span className="font-mono font-bold shrink-0">₹{p.price.toLocaleString('en-IN')}</span>
               </div>
-              {pendingDelete ? (
-                <UndoButton onUndo={() => actions.undoDelete(rate.id)} label={rate.item_name} />
-              ) : (
-                <button onClick={() => actions.deleteIndexedRateLater(rate.id)} className="p-2 -mr-2 text-red-500 hover:bg-red-50 rounded-lg" aria-label={`Remove ${rate.item_name} from index`}>
-                  <Trash2 size={18} />
-                </button>
-              )}
+              <div className="text-xs text-gray-500 truncate">{p.listTitle ? `Saved list: ${p.listTitle}` : 'Added rate'}</div>
             </div>
-          );
-        })
-      )}
-    </div>
+            {p.rateId &&
+              (pendingDelete ? (
+                <UndoButton onUndo={() => actions.undoDelete(p.rateId!)} label={`₹${p.price}`} />
+              ) : (
+                <button
+                  onClick={() => actions.deleteIndexedRateLater(p.rateId!)}
+                  className="p-2 -mr-1 text-red-500 hover:bg-red-50 rounded-lg"
+                  aria-label={`Remove price ₹${p.price} from ${p.date}`}
+                >
+                  <Trash2 size={16} />
+                </button>
+              ))}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

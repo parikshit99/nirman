@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { Database, Download, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Save, Search, Trash2 } from 'lucide-react';
+import { Database, Download, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Save, ShoppingCart, Search, Trash2 } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { guessCategory, todayISO } from '@nirman/shared';
 import { useDialogs } from './components/Dialogs.tsx';
@@ -24,11 +24,12 @@ import { useAppState, type HistoryRecord } from './state/AppState.tsx';
 
 type AppTab = 'auditor' | 'boq' | 'history' | 'database';
 
-const TABS: { id: AppTab; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: 'auditor', label: 'Auditor', icon: LayoutDashboard },
-  { id: 'boq', label: 'BOQ', icon: FileCode },
-  { id: 'database', label: 'Data', icon: Database },
-  { id: 'history', label: 'History', icon: History },
+/** `about` is the one line shown under the tabs saying what the open tab does. */
+const TABS: { id: AppTab; label: string; icon: typeof LayoutDashboard; about: string }[] = [
+  { id: 'auditor', label: 'Purchases', icon: ShoppingCart, about: 'Photograph bills or type what was bought; get a spending log with the rate paid for each item.' },
+  { id: 'boq', label: 'BOQ', icon: FileCode, about: 'Photograph a drawing or list; get a blank BOQ (no rates) to send vendors, then compare their quotes.' },
+  { id: 'database', label: 'Data', icon: Database, about: 'Every price you have recorded, per material, to see how rates change over time.' },
+  { id: 'history', label: 'History', icon: History, about: 'Saved purchase lists and BOQs. Open one to edit it, export it, or add vendor quotes.' },
 ];
 
 interface SaveState {
@@ -48,7 +49,7 @@ export default function App() {
   const dialogs = useDialogs();
 
   const [activeTab, setActiveTab] = useState<AppTab>('auditor');
-  // On another tab, back returns to the Auditor tab before leaving the app.
+  // On another tab, back returns to the Purchases tab before leaving the app.
   useBackHandler(() => setActiveTab('auditor'), activeTab !== 'auditor');
   /** Vendor quotes screen: a saved BOQ's id, or 'pick' to choose the BOQ first. */
   const [quoteTarget, setQuoteTarget] = useState<string | null>(null);
@@ -109,7 +110,7 @@ export default function App() {
   }, [itemDatabase, search, categoryFilter, addressFilter]);
 
   const totalSpent = kind === 'audit' ? filteredItems.reduce((acc, i) => acc + (pendingDeletes.has(i.id) ? 0 : i.total_amount || 0), 0) : 0;
-  const titlePrefix = (k: ListKind) => (k === 'audit' ? 'Audit' : 'BOQ');
+  const titlePrefix = (k: ListKind) => (k === 'audit' ? 'Purchases' : 'BOQ');
 
   const openSave = () => {
     if (!kind || activeItems.length === 0) return;
@@ -214,7 +215,7 @@ export default function App() {
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold tracking-tight text-[var(--color-brand-dark)]">
-              NIRMĀṆ <span className="font-serif italic font-normal opacity-70">Auditor</span>
+              NIRMAN <span className="font-serif italic font-normal text-base opacity-70">by Akohsa</span>
             </h1>
             <p className="text-gray-500 font-mono uppercase tracking-widest leading-none mt-1 text-[11px]">Offline Material Management</p>
           </div>
@@ -282,6 +283,8 @@ export default function App() {
         </div>
       </header>
 
+      <p className="mx-4 md:mx-6 mt-3 text-xs text-gray-600 leading-snug">{TABS.find((t) => t.id === activeTab)!.about}</p>
+
       {showBackupReminder && (
         <div role="status" className="mx-4 md:mx-6 mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl flex flex-wrap items-center gap-2 justify-between">
           <p className="text-xs text-orange-900">
@@ -315,7 +318,7 @@ export default function App() {
           <div className="p-4 md:p-6 pb-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <h2 className="text-[11px] md:text-xs font-mono uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2">
               {activeTab === 'history' ? <History size={12} /> : activeTab === 'database' ? <Database size={12} /> : activeTab === 'auditor' ? <FileText size={12} /> : <FileCode size={12} />}
-              {activeTab === 'history' ? 'Saved Sessions' : activeTab === 'database' ? 'Material Database' : activeTab === 'auditor' ? 'Audit Log' : 'BOQ Draft'}
+              {activeTab === 'history' ? 'Saved Sessions' : activeTab === 'database' ? 'Material Database' : activeTab === 'auditor' ? 'Purchase Log' : 'BOQ Draft'}
             </h2>
             <div className="relative w-full md:w-auto">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />

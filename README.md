@@ -1,4 +1,4 @@
-# Nirmāṇ Auditor
+# Nirman
 
 An Android app for tracking construction materials on site. You photograph bills or handwritten notes, dictate (English or Hindi) or type what was bought. Google Gemini reads it and turns it into clean line items: Hindi/Hinglish terms become standard English names and units. The app keeps:
 

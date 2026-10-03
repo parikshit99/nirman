@@ -44,9 +44,9 @@ export function parseBackup(text: string): Backup {
   try {
     raw = JSON.parse(text);
   } catch {
-    throw new BackupError('This file is not a Nirmaan backup (it is not valid JSON).');
+    throw new BackupError('This file is not a Nirman backup (it is not valid JSON).');
   }
-  if ((raw as { app?: unknown })?.app !== APP_ID) throw new BackupError('This file is not a Nirmaan backup.');
+  if ((raw as { app?: unknown })?.app !== APP_ID) throw new BackupError('This file is not a Nirman backup.');
   if (!READABLE_VERSIONS.includes((raw as { version?: unknown }).version)) {
     throw new BackupError('This backup was made by a newer version of the app. Update the app and try again.');
   }
@@ -70,4 +70,4 @@ export async function restoreBackup(db: Db, backup: Backup): Promise<void> {
 }
 
 /** Named by the phone's local date (an IST backup at 1 AM is today's, not yesterday's UTC date). */
-export const backupFilename = (date = new Date()) => `nirmaan-backup-${todayISO(date)}.json`;
+export const backupFilename = (date = new Date()) => `nirman-backup-${todayISO(date)}.json`;
