@@ -26,7 +26,7 @@ import { startDictation, type SpeechLanguage } from '../lib/speech.ts';
 import { useAppState } from '../state/AppState.tsx';
 
 export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendorQuote?(): void }) {
-  const { actions, status, settings, boqNotes, learningCount, categoryNames, jobsFor } = useAppState();
+  const { actions, status, settings, boqNotes, categoryNames, jobsFor, itemsFor } = useAppState();
   const dialogs = useDialogs();
   const [inputText, setInputText] = useState('');
   const [images, setImages] = useState<string[]>([]);
@@ -103,33 +103,22 @@ export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendor
     setImages([]);
   };
 
-  const resetLearning = async () => {
-    const ok = await dialogs.confirm(`Forget ${learningCount} learned corrections?`, {
-      message: 'The AI will go back to its default interpretation of these terms.',
-      confirmLabel: 'Reset',
-      danger: true,
-    });
-    if (ok) await actions.clearLearning();
-  };
 
   return (
     <>
+      {itemsFor(kind).length === 0 && (
       <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-start gap-3">
         <Database size={18} className="text-blue-500 mt-0.5 shrink-0" />
         <div>
           <p className="text-xs font-bold text-blue-900 mb-1">Works offline</p>
-          <p className="text-[10px] text-blue-700 leading-normal">
+          <p className="text-[11px] text-blue-700 leading-normal">
             {kind === 'audit'
               ? 'Records are stored only on this phone and work offline. Notes and photos are sent to Google Gemini to be read; offline entries wait until you are online.'
               : 'Create a list for price quotation. Rate and total are left blank for vendor quotes.'}
           </p>
-          {learningCount > 0 && (
-            <button onClick={resetLearning} className="mt-2 text-[8px] font-bold text-blue-500 uppercase hover:underline">
-              Reset {learningCount} Learned Patterns
-            </button>
-          )}
         </div>
       </div>
+      )}
 
       {kind === 'boq' && onVendorQuote && (
         <button
@@ -139,7 +128,7 @@ export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendor
           <Truck size={20} className="text-orange-500 shrink-0" />
           <span>
             <span className="block text-xs font-bold text-gray-900">Vendor quote received</span>
-            <span className="block text-[10px] text-gray-500 leading-normal">
+            <span className="block text-[11px] text-gray-500 leading-normal">
               Scan a vendor's reply, in any format, and match it to a saved BOQ to compare prices.
             </span>
           </span>
@@ -153,7 +142,7 @@ export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendor
 
         <div className="space-y-4">
           <div
-            className={`relative border-2 border-dashed rounded-xl transition-all min-h-[12rem] flex flex-col items-center justify-center gap-4 p-4
+            className={`relative border-2 border-dashed rounded-xl transition-all min-h-[8rem] md:min-h-[12rem] flex flex-col items-center justify-center gap-4 p-4
               ${dragActive ? 'border-[var(--color-brand-primary)] bg-orange-50' : 'border-[var(--color-brand-concrete)] hover:border-gray-400'}
               ${images.length > 0 ? 'bg-gray-50 border-solid' : 'bg-transparent'}`}
             onDragOver={(e) => {
@@ -188,11 +177,11 @@ export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendor
                       className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-gray-500 hover:text-gray-500 transition-all bg-white/50"
                     >
                       <Plus size={20} />
-                      <span className="text-[8px] font-bold uppercase">Add More</span>
+                      <span className="text-[11px] font-bold uppercase">Add More</span>
                     </button>
                   )}
                 </div>
-                <p className="text-center text-[10px] font-mono text-orange-600 font-bold uppercase tracking-widest leading-none">
+                <p className="text-center text-[11px] font-mono text-orange-600 font-bold uppercase tracking-widest leading-none">
                   {images.length}/{MAX_IMAGES} Images Added
                 </p>
               </div>
@@ -202,7 +191,7 @@ export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendor
                   {isNative ? <Camera size={24} /> : <ImageIcon size={24} />}
                 </div>
                 <p className="text-sm font-medium text-gray-600">{isNative ? 'Take or Choose Photos' : 'Drop Bills or Choose Photos'}</p>
-                <p className="text-[10px] text-gray-400 uppercase tracking-wider font-mono">Up to {MAX_IMAGES} images for one entry</p>
+                <p className="text-[11px] text-gray-400 uppercase tracking-wider font-mono">Up to {MAX_IMAGES} images for one entry</p>
               </button>
             )}
             <input
@@ -227,7 +216,7 @@ export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendor
                 {inputText && (
                   <button
                     onClick={() => setInputText('')}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase bg-gray-100 text-gray-400 hover:text-red-500"
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-bold uppercase bg-gray-100 text-gray-400 hover:text-red-500"
                   >
                     <X size={10} /> Clear
                   </button>
@@ -235,14 +224,14 @@ export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendor
                 <button
                   onClick={() => setLanguage((l) => (l === 'en-IN' ? 'hi-IN' : 'en-IN'))}
                   disabled={listening}
-                  className="px-2 py-1 rounded-md text-[10px] font-bold uppercase bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-50"
+                  className="px-2 py-1 rounded-md text-[11px] font-bold uppercase bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-50"
                   title="Voice input language"
                 >
                   {language === 'en-IN' ? 'EN' : 'हिं'}
                 </button>
                 <button
                   onClick={toggleListening}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase transition-all
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-bold uppercase transition-all
                     ${listening ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
                 >
                   {listening ? <MicOff size={10} /> : <Mic size={10} />}
@@ -335,7 +324,7 @@ function BoqNotes({ notes, onChange }: { notes: string; onChange(n: string): voi
           General Specifications
         </label>
         {value && (
-          <button onClick={() => update('')} className="text-[9px] font-bold text-blue-400 hover:text-red-500 uppercase tracking-tighter">
+          <button onClick={() => update('')} className="text-[11px] font-bold text-blue-400 hover:text-red-500 uppercase tracking-tighter">
             Clear All
           </button>
         )}
@@ -367,7 +356,7 @@ function JobList({
   const waitingReason = !hasKey ? 'Add your Gemini API key in Settings' : offline ? 'Will be read when online' : 'Queued';
   return (
     <div className="space-y-2">
-      <div className="text-[10px] font-mono uppercase tracking-widest text-gray-400">Extraction Queue</div>
+      <div className="text-[11px] font-mono uppercase tracking-widest text-gray-400">Extraction Queue</div>
       {jobs.map((job) => {
         const label = job.text ? `“${job.text.slice(0, 60)}${job.text.length > 60 ? '…' : ''}”` : '';
         const photos = job.image_count ? `${job.image_count} photo${job.image_count > 1 ? 's' : ''}` : '';
@@ -388,7 +377,7 @@ function JobList({
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-bold text-gray-700 truncate">{[photos, label].filter(Boolean).join(' · ') || 'Entry'}</div>
-              <div className={`text-[10px] ${job.status === 'failed' ? 'text-red-600' : 'text-gray-500'}`}>
+              <div className={`text-[11px] ${job.status === 'failed' ? 'text-red-600' : 'text-gray-500'}`}>
                 {job.status === 'processing' ? 'Reading with AI…' : job.status === 'failed' ? job.error : waitingReason}
               </div>
             </div>

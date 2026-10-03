@@ -48,7 +48,7 @@ export function SettingsModal({ onClose, firstRun }: { onClose(): void; firstRun
         )}
         <ApiKeySection onSaved={firstRun ? onClose : undefined} />
         {firstRun ? (
-          <button onClick={onClose} className="w-full py-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[10px]">
+          <button onClick={onClose} className="w-full py-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[11px]">
             Skip for now
           </button>
         ) : (
@@ -63,7 +63,7 @@ export function SettingsModal({ onClose, firstRun }: { onClose(): void; firstRun
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h4 className="text-[10px] font-mono uppercase tracking-widest text-gray-400 font-bold">{children}</h4>;
+  return <h4 className="text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold">{children}</h4>;
 }
 
 function ApiKeySection({ onSaved }: { onSaved?(): void }) {
@@ -121,7 +121,7 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
             {show ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">
+        <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
           Get a free key at aistudio.google.com → “Get API key”. It is stored encrypted on this phone only.
         </p>
       </div>
@@ -148,14 +148,14 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
         <button
           onClick={test}
           disabled={!key.trim() || state.kind === 'testing'}
-          className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 disabled:opacity-50"
+          className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 disabled:opacity-50"
         >
           {state.kind === 'testing' && <Loader2 size={12} className="animate-spin" />} Test key
         </button>
         <button
           onClick={save}
           disabled={!dirty}
-          className="flex-1 py-3 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl uppercase tracking-widest text-[10px] disabled:opacity-50"
+          className="flex-1 py-3 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl uppercase tracking-widest text-[11px] disabled:opacity-50"
         >
           Save
         </button>
@@ -217,14 +217,14 @@ function BackupSection() {
         <button
           onClick={doExport}
           disabled={busy}
-          className="flex-1 py-3 bg-black text-white font-bold rounded-xl uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 disabled:opacity-50"
+          className="flex-1 py-3 bg-black text-white font-bold rounded-xl uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 disabled:opacity-50"
         >
           <Download size={14} /> Save backup
         </button>
         <button
           onClick={() => fileRef.current?.click()}
           disabled={busy}
-          className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 disabled:opacity-50"
+          className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 disabled:opacity-50"
         >
           <Upload size={14} /> Restore
         </button>
@@ -246,7 +246,16 @@ function BackupSection() {
 }
 
 function StorageSection() {
-  const { history, snapshot } = useAppState();
+  const { history, snapshot, learningCount, actions } = useAppState();
+  const dialogs = useDialogs();
+  const resetLearning = async () => {
+    const ok = await dialogs.confirm(`Forget ${learningCount} learned corrections?`, {
+      message: 'The AI will go back to its default reading of these terms.',
+      confirmLabel: 'Forget',
+      danger: true,
+    });
+    if (ok) await actions.clearLearning();
+  };
   return (
     <section className="space-y-2">
       <SectionTitle>On this phone</SectionTitle>
@@ -259,6 +268,15 @@ function StorageSection() {
         <dd className="font-bold text-right">{snapshot.rates.length}</dd>
         <dt className="text-gray-500">Queued AI entries</dt>
         <dd className="font-bold text-right">{snapshot.jobs.length}</dd>
+        <dt className="text-gray-500">Learned corrections</dt>
+        <dd className="font-bold text-right">
+          {learningCount}
+          {learningCount > 0 && (
+            <button onClick={resetLearning} className="ml-2 text-blue-600 font-bold underline">
+              Reset
+            </button>
+          )}
+        </dd>
         <dt className="text-gray-500">App version</dt>
         <dd className="font-bold text-right font-mono">{APP_VERSION}</dd>
       </dl>

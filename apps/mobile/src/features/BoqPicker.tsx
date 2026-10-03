@@ -61,8 +61,8 @@ export function BoqPicker({ onPick, onClose }: { onPick(boqId: string): void; on
                   <FileCode size={18} className="text-orange-500 mt-0.5 shrink-0" />
                   <span className="min-w-0 flex-1">
                     <span className="block font-bold text-sm text-gray-900 truncate">{b.title || 'Untitled BOQ'}</span>
-                    {b.address && <span className="block text-[10px] text-gray-500 truncate">📍 {b.address}</span>}
-                    <span className="block text-[10px] font-mono text-gray-400 mt-0.5">
+                    {b.address && <span className="block text-[11px] text-gray-500 truncate">📍 {b.address}</span>}
+                    <span className="block text-[11px] font-mono text-gray-400 mt-0.5">
                       {new Date(b.created_at).toLocaleDateString('en-IN')} · {b.items.length} items
                       {quotes > 0 && ` · ${quotes} quote${quotes === 1 ? '' : 's'}`}
                     </span>

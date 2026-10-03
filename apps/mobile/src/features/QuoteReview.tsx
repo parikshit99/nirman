@@ -48,7 +48,7 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
     <div className="space-y-5">
       <div className="flex flex-wrap gap-3 items-end">
         <label className="block flex-1 min-w-[10rem]">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Vendor</span>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Vendor</span>
           <input
             defaultValue={quote.vendor}
             disabled={readOnly}
@@ -57,7 +57,7 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
           />
         </label>
         <label className="block">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Date</span>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Date</span>
           <input
             type="date"
             defaultValue={quote.quote_date}
@@ -79,7 +79,7 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
 
       {summary.missing.length > 0 && (
         <section>
-          <h4 className="text-[10px] font-bold uppercase tracking-widest text-red-600 mb-2">Missing from this quote</h4>
+          <h4 className="text-[11px] font-bold uppercase tracking-widest text-red-600 mb-2">Missing from this quote</h4>
           <ul className="space-y-1">
             {summary.missing.map((item) => (
               <li key={item.id} className="text-xs flex justify-between gap-2 px-3 py-2 bg-red-50/60 rounded-lg">
@@ -93,12 +93,12 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
               </li>
             ))}
           </ul>
-          {!readOnly && <p className="text-[10px] text-gray-500 mt-1">Ask the vendor for these, or match one of their lines below to the right item.</p>}
+          {!readOnly && <p className="text-[11px] text-gray-500 mt-1">Ask the vendor for these, or match one of their lines below to the right item.</p>}
         </section>
       )}
 
       <section>
-        <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">What the vendor wrote ({lines.length} lines)</h4>
+        <h4 className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-2">What the vendor wrote ({lines.length} lines)</h4>
         <div className="space-y-2">
           {allLines.map((line) => {
             if (pendingDeletes.has(line.id)) {
@@ -162,7 +162,7 @@ function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDel
       <div className="flex justify-between gap-2">
         <div className="min-w-0">
           <div className="text-sm font-bold text-gray-900">“{line.original_term || line.item_name}”</div>
-          <div className="text-[10px] text-gray-500">
+          <div className="text-[11px] text-gray-500">
             {line.item_name !== line.original_term && line.original_term ? `${line.item_name} · ` : ''}
             {line.quantity > 0 && `${line.quantity} ${line.unit}`}
           </div>
@@ -239,7 +239,7 @@ function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDel
 function Flag({ tone, children }: { tone: 'red' | 'orange' | 'gray'; children: React.ReactNode }) {
   const cls = { red: 'bg-red-50 text-red-600', orange: 'bg-orange-50 text-orange-700', gray: 'bg-gray-100 text-gray-600' }[tone];
   return (
-    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${cls}`}>
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-bold ${cls}`}>
       {tone !== 'gray' && <AlertTriangle size={9} />}
       {children}
     </span>

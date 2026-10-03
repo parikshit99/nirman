@@ -26,7 +26,7 @@ export function StatusChip({ onClick }: { onClick(): void }) {
     <button
       onClick={onClick}
       title={status.lastError ?? undefined}
-      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[var(--color-brand-concrete)] rounded-full text-[9px] md:text-[10px] uppercase font-mono tracking-widest text-gray-500 shadow-sm whitespace-nowrap"
+      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[var(--color-brand-concrete)] rounded-full text-[11px] md:text-[11px] uppercase font-mono tracking-widest text-gray-500 shadow-sm whitespace-nowrap"
       aria-label={`Settings. Status: ${label}`}
     >
       {icon} {label}

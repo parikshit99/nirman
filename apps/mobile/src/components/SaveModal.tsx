@@ -59,7 +59,7 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
 
         <div className="space-y-4 pt-2">
           <div>
-            <label htmlFor="save-name" className="text-[10px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1">
+            <label htmlFor="save-name" className="text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1">
               Session Title
             </label>
             <input
@@ -73,7 +73,7 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
           </div>
 
           <div>
-            <label htmlFor="save-address" className="text-[10px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1">
+            <label htmlFor="save-address" className="text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1">
               Address / Location
             </label>
             <div className="relative">
@@ -92,7 +92,7 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
                   <button
                     key={addr}
                     onClick={() => setMeta((p) => ({ ...p, address: addr }))}
-                    className="px-2 py-1 bg-gray-100 hover:bg-orange-100 text-[10px] text-gray-600 rounded-md transition-colors border border-gray-200 flex items-center gap-1"
+                    className="px-2 py-1 bg-gray-100 hover:bg-orange-100 text-[11px] text-gray-600 rounded-md transition-colors border border-gray-200 flex items-center gap-1"
                   >
                     <MapPin size={8} /> {addr}
                   </button>
@@ -103,7 +103,7 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="save-category" className="text-[10px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1">
+              <label htmlFor="save-category" className="text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1">
                 Work Category
               </label>
               <select
@@ -120,7 +120,7 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
               </select>
             </div>
             <div>
-              <label htmlFor="save-date" className="text-[10px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1">
+              <label htmlFor="save-date" className="text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1">
                 Site Date
               </label>
               <input
@@ -136,12 +136,12 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
 
         <div className="pt-4 flex flex-col gap-3">
           <div className="flex gap-3">
-            <button onClick={onClose} className="flex-1 py-3 bg-gray-100 text-gray-500 font-bold rounded-xl uppercase tracking-widest text-[10px] hover:bg-gray-200 transition-all">
+            <button onClick={onClose} className="flex-1 py-3 bg-gray-100 text-gray-500 font-bold rounded-xl uppercase tracking-widest text-[11px] hover:bg-gray-200 transition-all">
               Cancel
             </button>
             <button
               onClick={() => submit(false)}
-              className="flex-[2] py-3 bg-black text-white font-bold rounded-xl uppercase tracking-widest text-[10px] hover:shadow-lg transition-all flex items-center justify-center gap-2"
+              className="flex-[2] py-3 bg-black text-white font-bold rounded-xl uppercase tracking-widest text-[11px] hover:shadow-lg transition-all flex items-center justify-center gap-2"
             >
               <Save size={14} /> {editing ? 'Update Existing Record' : 'Confirm Save'}
             </button>
@@ -149,7 +149,7 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
           {allowSaveAsNew && (
             <button
               onClick={() => submit(true)}
-              className="w-full py-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[10px] hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[11px] hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
             >
               <Copy size={14} /> Save as New Record
             </button>

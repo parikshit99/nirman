@@ -216,7 +216,7 @@ export default function App() {
             <h1 className="text-xl font-bold tracking-tight text-[var(--color-brand-dark)]">
               NIRMĀṆ <span className="font-serif italic font-normal opacity-70">Auditor</span>
             </h1>
-            <p className="text-gray-500 font-mono uppercase tracking-widest leading-none mt-1 text-[10px]">Offline Material Management</p>
+            <p className="text-gray-500 font-mono uppercase tracking-widest leading-none mt-1 text-[11px]">Offline Material Management</p>
           </div>
           <div className="md:hidden">
             <StatusChip onClick={() => setSettingsOpen(true)} />
@@ -229,7 +229,7 @@ export default function App() {
               key={id}
               onClick={() => setActiveTab(id)}
               aria-current={activeTab === id ? 'page' : undefined}
-              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap
+              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2 rounded-md text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap
                 ${activeTab === id ? 'bg-white text-[var(--color-brand-dark)] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
             >
               <Icon size={14} /> {label}
@@ -243,7 +243,7 @@ export default function App() {
           </div>
           {kind && (
             <div className="text-right pr-3 border-r border-gray-100 leading-tight">
-              <div className="text-[8px] md:text-[9px] uppercase tracking-widest text-gray-400 font-mono">{kind === 'audit' ? 'Total Spent' : 'Items'}</div>
+              <div className="text-[11px] md:text-[11px] uppercase tracking-widest text-gray-400 font-mono">{kind === 'audit' ? 'Total Spent' : 'Items'}</div>
               <div className="text-xs md:text-sm font-mono font-bold">
                 {kind === 'audit' ? `₹${totalSpent.toLocaleString('en-IN')}` : `${filteredItems.length} Recs`}
               </div>
@@ -255,19 +255,19 @@ export default function App() {
               <>
                 <button
                   onClick={openSave}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 bg-blue-600 text-white text-[9px] md:text-[10px] font-bold uppercase tracking-wider rounded-lg shadow-md hover:bg-blue-700 transition-colors whitespace-nowrap"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 bg-blue-600 text-white text-[11px] md:text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-md hover:bg-blue-700 transition-colors whitespace-nowrap"
                 >
                   <Save size={14} /> <span>Save</span>
                 </button>
                 <button
                   onClick={() => setPreviewOpen(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 bg-white border border-gray-200 text-[var(--color-brand-dark)] text-[9px] md:text-[10px] font-bold uppercase tracking-wider rounded-lg shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 bg-white border border-gray-200 text-[var(--color-brand-dark)] text-[11px] md:text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap"
                 >
                   <Eye size={14} /> <span>Preview</span>
                 </button>
                 <button
                   onClick={downloadPdf}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 bg-[var(--color-brand-primary)] text-white text-[9px] md:text-[10px] font-bold uppercase tracking-wider rounded-lg shadow-md hover:brightness-110 transition-colors whitespace-nowrap"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 bg-[var(--color-brand-primary)] text-white text-[11px] md:text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-md hover:brightness-110 transition-colors whitespace-nowrap"
                 >
                   <Download size={14} /> <span>PDF</span>
                 </button>
@@ -313,7 +313,7 @@ export default function App() {
 
         <section className="flex-1 flex flex-col technical-grid lg:overflow-hidden bg-white mt-4 lg:mt-0">
           <div className="p-4 md:p-6 pb-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <h2 className="text-[10px] md:text-xs font-mono uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2">
+            <h2 className="text-[11px] md:text-xs font-mono uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2">
               {activeTab === 'history' ? <History size={12} /> : activeTab === 'database' ? <Database size={12} /> : activeTab === 'auditor' ? <FileText size={12} /> : <FileCode size={12} />}
               {activeTab === 'history' ? 'Saved Sessions' : activeTab === 'database' ? 'Material Database' : activeTab === 'auditor' ? 'Audit Log' : 'BOQ Draft'}
             </h2>

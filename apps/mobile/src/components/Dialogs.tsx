@@ -100,7 +100,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
                 {current.kind !== 'alert' && (
                   <button
                     onClick={() => close(current.kind === 'confirm' ? false : null)}
-                    className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[10px] hover:bg-gray-200"
+                    className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[11px] hover:bg-gray-200"
                   >
                     Cancel
                   </button>
@@ -108,7 +108,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
                 <button
                   autoFocus={current.kind !== 'prompt'}
                   onClick={() => close(current.kind === 'prompt' ? input : true)}
-                  className={`flex-1 py-3 text-white font-bold rounded-xl uppercase tracking-widest text-[10px] ${current.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-black hover:bg-gray-800'}`}
+                  className={`flex-1 py-3 text-white font-bold rounded-xl uppercase tracking-widest text-[11px] ${current.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-black hover:bg-gray-800'}`}
                 >
                   {current.confirmLabel ?? 'OK'}
                 </button>
