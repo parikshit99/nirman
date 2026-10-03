@@ -5,6 +5,7 @@ import { backupFilename, BackupError } from '../data/backup.ts';
 import { shareFile, textToBase64 } from '../lib/files.ts';
 import { testGeminiKey } from '../lib/gemini.ts';
 import { DEFAULT_MODEL } from '../lib/settings.ts';
+import { APP_VERSION } from '../lib/version.ts';
 import { useAppState } from '../state/AppState.tsx';
 import { useDialogs } from './Dialogs.tsx';
 
@@ -245,6 +246,8 @@ function StorageSection() {
         <dd className="font-bold text-right">{snapshot.rates.length}</dd>
         <dt className="text-gray-500">Queued AI entries</dt>
         <dd className="font-bold text-right">{snapshot.jobs.length}</dd>
+        <dt className="text-gray-500">App version</dt>
+        <dd className="font-bold text-right font-mono">{APP_VERSION}</dd>
       </dl>
     </section>
   );

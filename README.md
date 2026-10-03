@@ -57,4 +57,8 @@ npx cap open android            # build/run from Android Studio, or:
 cd android && ./gradlew assembleDebug
 ```
 
+### Versions
+
+Every build is numbered `1.1.<build>` (e.g. `1.1.20`). The build number comes from CI and goes up with every build, so each APK installs over the previous one as an update. To start a new series (e.g. `1.2`), change `version` in `apps/mobile/package.json`; only the first two numbers are used. The version shows in *Settings → On this phone*, in Android's App info, in the release title, and as a `v1.1.<build>` tag on the commit it was built from. Local builds show `dev`.
+
 CI (`.github/workflows/ci.yml`) type-checks, runs the tests and builds a debug APK on every push. Builds of `main` are published to the [`latest-debug` release](https://github.com/parikshit99/nirman/releases/tag/latest-debug), which is where the download link above points; builds of a pull request are under that workflow run's *Artifacts*. For a Play Store release, add a signing config and run `./gradlew bundleRelease`.
