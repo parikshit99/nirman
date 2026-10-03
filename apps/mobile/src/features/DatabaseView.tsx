@@ -11,6 +11,12 @@ import { useAppState } from '../state/AppState.tsx';
 
 type SubTab = 'materials' | 'indexed' | 'categories';
 
+const SUB_TABS: { id: SubTab; label: string; about: string }[] = [
+  { id: 'materials', label: 'Materials', about: 'One card per material with all its prices: from saved audits, indexed rates and confirmed vendor quotes.' },
+  { id: 'indexed', label: 'Indexed Log', about: 'Single rates added on their own: “Index rate” on an audit item, or a confirmed vendor quote. Each one also shows under Materials.' },
+  { id: 'categories', label: 'Categories', about: 'Types of work (e.g. Earthwork) you can tag a saved audit or BOQ with, to filter by later.' },
+];
+
 interface Props {
   entries: MaterialEntry[];
   categoryFilter: string;
@@ -24,13 +30,7 @@ export function DatabaseView(props: Props) {
   return (
     <div className="space-y-6">
       <div className="flex border-b border-gray-200 overflow-x-auto no-scrollbar">
-        {(
-          [
-            ['materials', 'Materials'],
-            ['indexed', 'Indexed Log'],
-            ['categories', 'Categories'],
-          ] as const
-        ).map(([id, label]) => (
+        {SUB_TABS.map(({ id, label }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
@@ -41,6 +41,7 @@ export function DatabaseView(props: Props) {
           </button>
         ))}
       </div>
+      <p className="text-xs text-gray-600 leading-snug -mt-3">{SUB_TABS.find((t) => t.id === tab)!.about}</p>
       {tab === 'materials' && <Materials {...props} />}
       {tab === 'indexed' && <IndexedLog />}
       {tab === 'categories' && <Categories />}

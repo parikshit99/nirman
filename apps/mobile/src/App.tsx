@@ -24,11 +24,12 @@ import { useAppState, type HistoryRecord } from './state/AppState.tsx';
 
 type AppTab = 'auditor' | 'boq' | 'history' | 'database';
 
-const TABS: { id: AppTab; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: 'auditor', label: 'Auditor', icon: LayoutDashboard },
-  { id: 'boq', label: 'BOQ', icon: FileCode },
-  { id: 'database', label: 'Data', icon: Database },
-  { id: 'history', label: 'History', icon: History },
+/** `about` is the one line shown under the tabs saying what the open tab does. */
+const TABS: { id: AppTab; label: string; icon: typeof LayoutDashboard; about: string }[] = [
+  { id: 'auditor', label: 'Auditor', icon: LayoutDashboard, about: 'Photograph bills or type what was bought; get a spending log with the rate paid for each item.' },
+  { id: 'boq', label: 'BOQ', icon: FileCode, about: 'Photograph a drawing or list; get a blank BOQ (no rates) to send vendors, then compare their quotes.' },
+  { id: 'database', label: 'Data', icon: Database, about: 'Every price you have recorded, per material, to see how rates change over time.' },
+  { id: 'history', label: 'History', icon: History, about: 'Saved audits and BOQs. Open one to edit it, export it, or add vendor quotes.' },
 ];
 
 interface SaveState {
@@ -281,6 +282,8 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      <p className="mx-4 md:mx-6 mt-3 text-xs text-gray-600 leading-snug">{TABS.find((t) => t.id === activeTab)!.about}</p>
 
       {showBackupReminder && (
         <div role="status" className="mx-4 md:mx-6 mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl flex flex-wrap items-center gap-2 justify-between">
