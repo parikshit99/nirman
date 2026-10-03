@@ -1,5 +1,5 @@
 import { todayISO, type LearnedTermRow } from '@nirman/shared';
-import { completeJob, getJobImages, learningMap, setJobStatus, type Job } from '../data/repo.ts';
+import { completeJob, completeQuoteJob, getJobImages, learningMap, listItems, setJobStatus, type Job } from '../data/repo.ts';
 import type { Db } from '../data/sql.ts';
 import { classifyError, createGeminiExtractor, type Extractor } from '../lib/gemini.ts';
 import type { Settings } from '../lib/settings.ts';
@@ -117,13 +117,29 @@ export class JobWorker {
     this.onDataChanged();
     try {
       const images = await getJobImages(this.db, job.id);
-      const learned = await this.db.all<LearnedTermRow>('SELECT * FROM learned_terms');
+      const learning = learningMap(await this.db.all<LearnedTermRow>('SELECT * FROM learned_terms'));
+      if (job.quote_id) {
+        // Sr. numbers are the BOQ's printed order; remember which item each one was.
+        const boq = await listItems(this.db, job.list_id);
+        const lines = await extractor.extractQuote({
+          boq: boq.map((b, i) => ({ sr: i + 1, item_name: b.item_name, quantity: b.quantity, unit: b.unit })),
+          text: job.text,
+          images,
+          learning,
+        });
+        if (lines.length === 0) {
+          await setJobStatus(this.db, job.id, 'failed', 'No quote lines detected. Make sure the photo or text is clear, then retry.');
+        } else {
+          await completeQuoteJob(this.db, job.id, lines, boq.map((b) => b.id));
+        }
+        return;
+      }
       const items = await extractor.extract({
         text: job.text,
         images,
         category: job.category || undefined,
         capture_date: job.capture_date || todayISO(),
-        learning: learningMap(learned),
+        learning,
       });
       if (items.length === 0) {
         await setJobStatus(this.db, job.id, 'failed', 'No items detected. Make sure the photo or text is clear, then retry.');

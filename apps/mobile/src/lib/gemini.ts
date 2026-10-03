@@ -1,15 +1,23 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import {
   IMAGE_INSTRUCTION,
+  QUOTE_IMAGE_INSTRUCTION,
+  QUOTE_TEXT_INSTRUCTION,
   TEXT_INSTRUCTION,
+  buildQuoteInstruction,
   buildSystemInstruction,
   parseExtractionOutput,
+  parseQuoteOutput,
   type ExtractedMaterial,
+  type ExtractedQuoteLine,
   type ExtractionRequest,
+  type QuoteExtractionRequest,
 } from '@nirman/shared';
 
 export interface Extractor {
   extract(req: ExtractionRequest): Promise<ExtractedMaterial[]>;
+  /** Read a vendor's quote and match its lines to the BOQ. */
+  extractQuote(req: QuoteExtractionRequest): Promise<ExtractedQuoteLine[]>;
 }
 
 /**
@@ -41,7 +49,35 @@ const RESPONSE_SCHEMA = {
   },
 };
 
+const QUOTE_SCHEMA = {
+  type: Type.ARRAY,
+  items: {
+    type: Type.OBJECT,
+    properties: {
+      boq_sr: { type: Type.INTEGER, nullable: true },
+      original_term: { type: Type.STRING },
+      item_name: { type: Type.STRING },
+      quantity: { type: Type.NUMBER },
+      unit: { type: Type.STRING },
+      unit_price: { type: Type.NUMBER },
+      total_amount: { type: Type.NUMBER },
+      note: { type: Type.STRING },
+    },
+    required: ['boq_sr', 'original_term', 'item_name', 'quantity', 'unit', 'unit_price'],
+  },
+};
+
 const TIMEOUT_MS = 60_000;
+
+type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
+
+function contentParts(text: string, images: string[], imageInstruction: string, textInstruction: string): Part[] {
+  const parts: Part[] = [];
+  if (text.trim()) parts.push({ text: `Manual context provided: ${text}` });
+  for (const data of images) parts.push({ inlineData: { mimeType: 'image/jpeg', data } });
+  parts.push({ text: images.length > 0 ? imageInstruction : textInstruction });
+  return parts;
+}
 
 export function classifyError(err: unknown): ExtractionError {
   if (err instanceof ExtractionError) return err;
@@ -59,27 +95,39 @@ export function classifyError(err: unknown): ExtractionError {
 
 export function createGeminiExtractor(apiKey: string, model: string): Extractor {
   const ai = new GoogleGenAI({ apiKey });
+  const generate = async (parts: Part[], systemInstruction: string, responseSchema: object): Promise<string> => {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: { parts },
+        config: {
+          systemInstruction,
+          responseMimeType: 'application/json',
+          responseSchema,
+          abortSignal: AbortSignal.timeout(TIMEOUT_MS),
+        },
+      });
+      return response.text ?? '[]';
+    } catch (err) {
+      throw classifyError(err);
+    }
+  };
   return {
     async extract(req) {
-      const parts: ({ text: string } | { inlineData: { mimeType: string; data: string } })[] = [];
-      if (req.text.trim()) parts.push({ text: `Manual context provided: ${req.text}` });
-      for (const data of req.images) parts.push({ inlineData: { mimeType: 'image/jpeg', data } });
-      parts.push({ text: req.images.length > 0 ? IMAGE_INSTRUCTION : TEXT_INSTRUCTION });
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: { parts },
-          config: {
-            systemInstruction: buildSystemInstruction({ learning: req.learning, category: req.category, captureDate: req.capture_date }),
-            responseMimeType: 'application/json',
-            responseSchema: RESPONSE_SCHEMA,
-            abortSignal: AbortSignal.timeout(TIMEOUT_MS),
-          },
-        });
-        return parseExtractionOutput(response.text ?? '[]');
-      } catch (err) {
-        throw classifyError(err);
-      }
+      const output = await generate(
+        contentParts(req.text, req.images, IMAGE_INSTRUCTION, TEXT_INSTRUCTION),
+        buildSystemInstruction({ learning: req.learning, category: req.category, captureDate: req.capture_date }),
+        RESPONSE_SCHEMA,
+      );
+      return parseExtractionOutput(output);
+    },
+    async extractQuote(req) {
+      const output = await generate(
+        contentParts(req.text, req.images, QUOTE_IMAGE_INSTRUCTION, QUOTE_TEXT_INSTRUCTION),
+        buildQuoteInstruction({ boq: req.boq, learning: req.learning }),
+        QUOTE_SCHEMA,
+      );
+      return parseQuoteOutput(output, req.boq.length);
     },
   };
 }

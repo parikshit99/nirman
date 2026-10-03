@@ -83,7 +83,37 @@ export const categoryRowSchema = z.object({
 });
 export type CategoryRow = z.infer<typeof categoryRowSchema>;
 
-export const dataTables = ['lists', 'items', 'indexed_rates', 'learned_terms', 'categories'] as const;
+export const quoteStatuses = ['review', 'confirmed'] as const;
+
+/** A vendor's price quote for a saved BOQ, read from their own (often handwritten) list. */
+export const quoteRowSchema = z.object({
+  id,
+  boq_id: id,
+  vendor: z.string().max(200),
+  quote_date: isoDate,
+  status: z.enum(quoteStatuses),
+  created_at: isoTimestamp,
+  updated_at: isoTimestamp,
+});
+export type QuoteRow = z.infer<typeof quoteRowSchema>;
+
+/** One line of a vendor's quote; boq_item_id is the BOQ item it was matched to, if any. */
+export const quoteLineRowSchema = z.object({
+  id,
+  quote_id: id,
+  position: z.number().int(),
+  boq_item_id: id.nullable(),
+  original_term: z.string().max(500),
+  item_name: z.string().max(500),
+  quantity: z.number(),
+  unit: z.string().max(50),
+  unit_price: z.number(),
+  total_amount: z.number(),
+  note: z.string().max(500),
+});
+export type QuoteLineRow = z.infer<typeof quoteLineRowSchema>;
+
+export const dataTables = ['lists', 'items', 'indexed_rates', 'learned_terms', 'categories', 'quotes', 'quote_lines'] as const;
 export type DataTable = (typeof dataTables)[number];
 
 export const rowSchemas = {
@@ -92,6 +122,8 @@ export const rowSchemas = {
   indexed_rates: indexedRateRowSchema,
   learned_terms: learnedTermRowSchema,
   categories: categoryRowSchema,
+  quotes: quoteRowSchema,
+  quote_lines: quoteLineRowSchema,
 } as const;
 
 /** Column names of each table, in schema order. */
@@ -105,6 +137,8 @@ export interface RowTypes {
   indexed_rates: IndexedRateRow;
   learned_terms: LearnedTermRow;
   categories: CategoryRow;
+  quotes: QuoteRow;
+  quote_lines: QuoteLineRow;
 }
 
 // ---------------------------------------------------------------------------
@@ -126,5 +160,34 @@ export interface ExtractionRequest {
   category?: string;
   /** YYYY-MM-DD, used when the source has no date. */
   capture_date: string;
+  learning: LearningMap;
+}
+
+/** One line of a vendor quote as read by the AI. boq_sr is the matched BOQ Sr. number (1-based) or null. */
+export const extractedQuoteLineSchema = z.object({
+  boq_sr: z.coerce.number().int().nullable().catch(null),
+  original_term: z.string().catch(''),
+  item_name: z.string().catch(''),
+  quantity: z.coerce.number().catch(0),
+  unit: z.string().catch(''),
+  unit_price: z.coerce.number().catch(0),
+  total_amount: z.coerce.number().catch(0),
+  note: z.string().catch(''),
+});
+export type ExtractedQuoteLine = z.infer<typeof extractedQuoteLineSchema>;
+
+export interface QuoteBoqItem {
+  /** 1-based Sr. number, as printed on the BOQ PDF. */
+  sr: number;
+  item_name: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface QuoteExtractionRequest {
+  boq: QuoteBoqItem[];
+  text: string;
+  /** Base64 JPEGs without the data: prefix. */
+  images: string[];
   learning: LearningMap;
 }

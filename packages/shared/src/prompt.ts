@@ -1,5 +1,11 @@
-import { z } from 'zod';
-import { extractedMaterialSchema, type ExtractedMaterial, type LearningMap } from './schemas.ts';
+import {
+  extractedMaterialSchema,
+  extractedQuoteLineSchema,
+  type ExtractedMaterial,
+  type ExtractedQuoteLine,
+  type LearningMap,
+  type QuoteBoqItem,
+} from './schemas.ts';
 
 export interface PromptOptions {
   learning?: LearningMap;
@@ -9,12 +15,6 @@ export interface PromptOptions {
 }
 
 export function buildSystemInstruction({ learning, category, captureDate }: PromptOptions): string {
-  const learningEntries = Object.entries(learning ?? {});
-  const learningContext = learningEntries.length > 0
-    ? `\n\nUSER PREFERENCES (Follow these rules strictly based on user's past corrections):
-       ${learningEntries.map(([term, pref]) => `- When you see "${term}", always use name: "${pref.item_name}" and unit: "${pref.unit}"`).join('\n')}`
-    : '';
-
   const categoryContext = category
     ? `\n\nWORK CATEGORY CONTEXT: The materials are for a "${category}" task. Please interpret generic terms accordingly. For example, if task is "Electrical", "tape" means "PVC Electrical Tape". If "Plumbing", it means "Teflon Tape". If "Painter", it means "Masking Tape". Make sure to include the specific type in the item_name based on this category.`
     : '';
@@ -30,7 +30,7 @@ export function buildSystemInstruction({ learning, category, captureDate }: Prom
     3. Literal Extraction: The "original_term" field MUST be the exact word found in the source text.
     4. Data Cleaning: Strip currency symbols (₹, Rs) and ensure numbers are clean floats.
     5. Context: Use ${captureDate} as the default date if not found. Dates must be YYYY-MM-DD.
-    ${learningContext}
+    ${learningContext(learning)}
     ${categoryContext}
 
     IMPORTANT: Return a JSON array of objects conforming to the provided schema.
@@ -41,11 +41,53 @@ export const IMAGE_INSTRUCTION =
   'Extract every material item and quantity from all these images. Combine findings into a single list. Be precise with handwritten numbers across all pages.';
 export const TEXT_INSTRUCTION = 'Extract material items from the text provided.';
 
+function learningContext(learning?: LearningMap): string {
+  const entries = Object.entries(learning ?? {});
+  return entries.length > 0
+    ? `\n\nUSER PREFERENCES (Follow these rules strictly based on user's past corrections):
+       ${entries.map(([term, pref]) => `- When you see "${term}", always use name: "${pref.item_name}" and unit: "${pref.unit}"`).join('\n')}`
+    : '';
+}
+
 /**
- * Parse the model's JSON output into clean material rows. Tolerates stray text
- * around the array, fills in missing fields and computes missing totals.
+ * Instructions for reading a vendor's quote (usually their own handwritten list,
+ * not our BOQ sheet) and matching each line to the BOQ it answers.
  */
-export function parseExtractionOutput(text: string): ExtractedMaterial[] {
+export function buildQuoteInstruction({ boq, learning }: { boq: QuoteBoqItem[]; learning?: LearningMap }): string {
+  const boqList = boq.map((b) => `${b.sr}. ${b.item_name} | qty ${b.quantity} ${b.unit}`).join('\n');
+  return `
+    You are an expert Construction Material Auditor in India.
+    We sent a vendor the Bill of Quantities (BOQ) below and asked for rates. The vendor replied with
+    their own list instead (often handwritten, in their own words, order and units). Read their reply
+    and match every line to the BOQ item it prices.
+
+    BOQ (Sr. | item | quantity and unit):
+    ${boqList}
+
+    Rules:
+    1. Return one object per line the vendor wrote. Do not add lines that are not in their reply.
+    2. boq_sr: the Sr. number of the BOQ item this line prices. Match by meaning, not spelling: Hindi/Hinglish
+       ('sariya' = TMT steel bar, 'reti' = sand, 'eent' = bricks), brand names (ACC, UltraTech = cement),
+       sizes and grades must agree. Use null if the line is not in the BOQ. Never match two lines to the
+       same Sr. unless the vendor clearly split one item.
+    3. original_term: the vendor's own words for the item, exactly as written.
+    4. item_name: a clean professional English name for what the vendor quoted.
+    5. quantity, unit, unit_price: as the vendor wrote them. Keep the vendor's unit even if it differs
+       from the BOQ. Never invent or convert a price; use 0 if no rate is written. Strip ₹/Rs.
+    6. total_amount: the vendor's line total if written, else 0.
+    7. note: a few words when something needs checking, e.g. "unit differs: quoted per kg, BOQ in MT",
+       "brand differs", "rate unclear". Empty otherwise.
+    ${learningContext(learning)}
+
+    IMPORTANT: Return a JSON array of objects conforming to the provided schema.
+  `;
+}
+
+export const QUOTE_IMAGE_INSTRUCTION =
+  "Read every line of the vendor's quote across all these images and match each line to the BOQ. Be precise with handwritten numbers.";
+export const QUOTE_TEXT_INSTRUCTION = "Read every line of the vendor's quote in the text provided and match each line to the BOQ.";
+
+function parseJsonArray(text: string): unknown[] {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -58,11 +100,39 @@ export function parseExtractionOutput(text: string): ExtractedMaterial[] {
       return [];
     }
   }
-  const parsed = z.array(z.unknown()).safeParse(raw);
-  if (!parsed.success) return [];
+  return Array.isArray(raw) ? raw : [];
+}
 
+/**
+ * Parse the model's quote output. Drops empty lines and turns Sr. numbers that
+ * are not in the BOQ (1..boqSize) into null.
+ */
+export function parseQuoteOutput(text: string, boqSize: number): ExtractedQuoteLine[] {
+  const lines: ExtractedQuoteLine[] = [];
+  for (const entry of parseJsonArray(text)) {
+    const parsed = extractedQuoteLineSchema.safeParse(entry);
+    if (!parsed.success) continue;
+    const l = parsed.data;
+    if (!l.item_name.trim() && !l.original_term.trim()) continue;
+    const sr = l.boq_sr !== null && l.boq_sr >= 1 && l.boq_sr <= boqSize ? l.boq_sr : null;
+    lines.push({
+      ...l,
+      boq_sr: sr,
+      item_name: l.item_name.trim() || l.original_term.trim(),
+      unit: l.unit.trim() || 'unit',
+      total_amount: l.total_amount || l.quantity * l.unit_price,
+    });
+  }
+  return lines;
+}
+
+/**
+ * Parse the model's JSON output into clean material rows. Tolerates stray text
+ * around the array, fills in missing fields and computes missing totals.
+ */
+export function parseExtractionOutput(text: string): ExtractedMaterial[] {
   const items: ExtractedMaterial[] = [];
-  for (const entry of parsed.data) {
+  for (const entry of parseJsonArray(text)) {
     const item = extractedMaterialSchema.safeParse(entry);
     if (!item.success || !item.data.item_name.trim()) continue;
     const m = item.data;

@@ -1,0 +1,216 @@
+import { Download, Plus, Trophy } from 'lucide-react';
+import { compareQuotes, type QuoteCell, type QuoteRow } from '@nirman/shared';
+import { useDialogs } from '../components/Dialogs.tsx';
+import { Sparkline, VsLastBadge, pct, rupees, shortDate } from '../components/PriceBadges.tsx';
+import { shareFile } from '../lib/files.ts';
+import { buildQuoteComparisonPdf, pdfToBase64 } from '../lib/pdf.ts';
+import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
+
+/**
+ * Confirmed quotes side by side: BOQ items as rows, vendors as columns, the
+ * cheapest rate highlighted, and every rate checked against the item's past
+ * prices in the material database.
+ */
+export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quotes: QuoteRow[]; onAdd(): void }) {
+  const { linesFor, itemDatabase, learning } = useAppState();
+  const dialogs = useDialogs();
+  const lines = quotes.flatMap((q) => linesFor(q.id));
+  const comparison = compareQuotes(boq.items, quotes, lines, itemDatabase, learning);
+
+  if (quotes.length === 0) {
+    return (
+      <div className="text-center p-8 space-y-4">
+        <p className="text-sm text-gray-500">No confirmed quotes yet. Add a vendor's quote and confirm it to compare prices here.</p>
+        <button onClick={onAdd} className="px-5 py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-xs font-bold uppercase tracking-widest inline-flex items-center gap-2">
+          <Plus size={14} /> Add vendor quote
+        </button>
+      </div>
+    );
+  }
+
+  const exportPdf = async () => {
+    try {
+      const doc = buildQuoteComparisonPdf(boq, comparison);
+      await shareFile(`${(boq.title || 'BOQ').replace(/[^\w-]+/g, '_')}_quotes.pdf`, pdfToBase64(doc), 'application/pdf');
+    } catch (err) {
+      await dialogs.alert('Export failed', (err as Error).message);
+    }
+  };
+
+  // Cheapest on the items every vendor priced; totals over different item sets aren't comparable.
+  const multi = comparison.vendors.length > 1 && comparison.commonItems > 0;
+  const ranked = [...comparison.vendors].sort((a, b) => a.commonTotal - b.commonTotal);
+  const best = multi && ranked[0].commonTotal < ranked[1].commonTotal ? ranked[0] : undefined;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {comparison.vendors.map((v) => (
+          <div key={v.quote.id} className={`p-3 rounded-xl border ${v === best ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}>
+            <div className="flex justify-between items-center gap-2">
+              <span className="font-bold text-sm truncate">{v.quote.vendor}</span>
+              {v === best && (
+                <span className="text-[9px] font-bold text-green-700 flex items-center gap-1 shrink-0">
+                  <Trophy size={10} /> Cheapest overall
+                </span>
+              )}
+            </div>
+            <div className="text-lg font-mono font-bold">{rupees(Math.round(v.total))}</div>
+            <div className="text-[10px] text-gray-500 space-x-1">
+              <span>{shortDate(v.quote.quote_date)}</span>
+              <span>· {v.quoted}/{boq.items.length} quoted</span>
+              {v.missing.length > 0 && <b className="text-red-600">· {v.missing.length} missing</b>}
+              {v.unitIssues > 0 && <span className="text-orange-700">· {v.unitIssues} other unit</span>}
+            </div>
+            {multi && comparison.commonItems < boq.items.length && (
+              <div className="text-[10px] text-gray-600 mt-1">
+                {rupees(Math.round(v.commonTotal))} on the {comparison.commonItems} item{comparison.commonItems === 1 ? '' : 's'} all vendors quoted
+              </div>
+            )}
+            {v.vsLast !== null && (
+              <div className={`text-[10px] font-bold mt-1 ${v.vsLast > 0.005 ? 'text-red-600' : v.vsLast < -0.005 ? 'text-green-700' : 'text-gray-500'}`}>
+                {pct(v.vsLast)} vs last prices for the same items ({rupees(Math.round(v.lastTotal))})
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="md:hidden space-y-2">
+        {comparison.rows.map((row) => (
+          <div key={row.item.id} className="border border-gray-200 rounded-xl p-3">
+            <div className="flex justify-between gap-2">
+              <div className="min-w-0">
+                <span className="font-mono text-gray-400 mr-1 text-xs">{row.sr}.</span>
+                <span className="font-bold text-sm">{row.item.item_name}</span>
+              </div>
+              <span className="text-[10px] text-gray-500 font-mono shrink-0">
+                {row.item.quantity} {row.item.unit}
+              </span>
+            </div>
+            <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-2">
+              {row.history.last ? (
+                <>
+                  <span>
+                    Last {rupees(row.history.last.price)} · {shortDate(row.history.last.date)} · {row.history.last.vendor}
+                  </span>
+                  <Sparkline points={row.history.points} width={48} height={14} />
+                </>
+              ) : (
+                <span className="italic">No past price</span>
+              )}
+            </div>
+            <div className="mt-2 divide-y divide-gray-100">
+              {comparison.vendors.map((v) => (
+                <div key={v.quote.id} className="flex justify-between items-start gap-2 py-1.5">
+                  <span className="text-xs text-gray-700 truncate">{v.quote.vendor}</span>
+                  <PriceCell cell={row.cells[v.quote.id]} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-xl">
+        <table className="w-full text-xs min-w-[640px]">
+          <thead className="bg-gray-50 text-[9px] uppercase tracking-wider text-gray-500">
+            <tr>
+              <th className="text-left p-2 font-bold">Item (BOQ qty)</th>
+              <th className="text-left p-2 font-bold">Past prices</th>
+              {comparison.vendors.map((v) => (
+                <th key={v.quote.id} className="text-right p-2 font-bold">
+                  {v.quote.vendor}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {comparison.rows.map((row) => (
+              <tr key={row.item.id} className="border-t border-gray-100 align-top">
+                <td className="p-2">
+                  <span className="font-mono text-gray-400 mr-1">{row.sr}.</span>
+                  <span className="font-bold">{row.item.item_name}</span>
+                  <div className="text-[10px] text-gray-500">
+                    {row.item.quantity} {row.item.unit}
+                  </div>
+                </td>
+                <td className="p-2">
+                  {row.history.last ? (
+                    <div className="space-y-0.5">
+                      <div className="font-mono">{rupees(row.history.last.price)}</div>
+                      <div className="text-[9px] text-gray-500">
+                        {shortDate(row.history.last.date)} · {row.history.last.vendor}
+                      </div>
+                      {row.history.points.length > 1 && (
+                        <div className="flex items-center gap-1 text-[9px] text-gray-400">
+                          <Sparkline points={row.history.points} />
+                          {rupees(row.history.min)}–{rupees(row.history.max)}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-gray-400 italic">No past price</span>
+                  )}
+                </td>
+                {comparison.vendors.map((v) => (
+                  <td key={v.quote.id} className={`p-2 text-right ${row.cells[v.quote.id]?.cheapest ? 'bg-green-50' : ''}`}>
+                    <PriceCell cell={row.cells[v.quote.id]} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {comparison.vendors.some((v) => v.extras.length > 0) && (
+        <section>
+          <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Also quoted (not in the BOQ)</h4>
+          <ul className="text-xs space-y-1">
+            {comparison.vendors.flatMap((v) =>
+              v.extras.map((l) => (
+                <li key={l.id} className="flex justify-between gap-2 px-3 py-1.5 bg-gray-50 rounded-lg">
+                  <span>
+                    {l.item_name} <span className="text-gray-400">· {v.quote.vendor}</span>
+                  </span>
+                  <span className="font-mono shrink-0">
+                    {l.unit_price > 0 ? `${rupees(l.unit_price)}/${l.unit}` : 'no rate'}
+                  </span>
+                </li>
+              )),
+            )}
+          </ul>
+        </section>
+      )}
+
+      <div className="flex gap-2">
+        <button onClick={onAdd} className="flex-1 py-3 bg-white border border-gray-200 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+          <Plus size={14} /> Add vendor quote
+        </button>
+        <button onClick={exportPdf} className="flex-1 py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+          <Download size={14} /> Comparison PDF
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** One vendor's rate for one item: lowest marker, change against the last price, unit/quantity notes. */
+function PriceCell({ cell }: { cell?: QuoteCell }) {
+  if (!cell || cell.price <= 0) return <span className="text-[10px] text-red-500 italic">not quoted</span>;
+  return (
+    <div className="text-right">
+      <div className={`font-mono font-bold text-xs ${cell.cheapest ? 'text-green-700' : ''}`}>
+        {rupees(cell.price)}
+        {cell.unitDiffers && <span className="text-orange-600 font-normal">/{cell.line.unit}</span>}
+        {cell.cheapest && <span className="ml-1 text-[9px] font-bold">· Lowest</span>}
+      </div>
+      <div className="mt-0.5">
+        <VsLastBadge vsLast={cell.vsLast} last={cell.lastPoint} />
+      </div>
+      {cell.unitDiffers && <div className="text-[9px] text-orange-700">different unit, not compared</div>}
+      {cell.qtyDiffers && <div className="text-[9px] text-gray-500">quoted for {cell.line.quantity}</div>}
+    </div>
+  );
+}
