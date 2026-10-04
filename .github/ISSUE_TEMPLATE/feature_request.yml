@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest an idea or improvement for Nirman
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the situation on site or in the app that is hard today.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to see?
+      description: Describe the feature as you imagine it.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've tried
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Purchase log
+        - Bills of Quantities / vendor quotes
+        - Saved sessions
+        - Price database
+        - AI reading (photo / voice / text)
+        - Backup / restore
+        - Other
+    validations:
+      required: false
