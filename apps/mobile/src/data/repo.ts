@@ -396,9 +396,19 @@ export async function bulkEditMaterials(db: Db, materials: MaterialRef[], patch:
   });
 }
 
-/** Hide a material from the Data tab and price checks; saved lists are not changed. */
+/**
+ * Delete a material from the Data tab and price checks: everything recorded for it up to now is left
+ * out, saved lists are not changed, and later purchases show again. Undone by unhideMaterial.
+ */
 export async function hideMaterial(db: Db, m: MaterialRef) {
-  await db.transaction((tx) => writeRow(tx, 'hidden_materials', { id: m.key, name: m.name, unit: m.unit, hidden_at: nowISO() }));
+  await hideMaterials(db, [m]);
+}
+
+export async function hideMaterials(db: Db, materials: MaterialRef[]) {
+  await db.transaction(async (tx) => {
+    const at = nowISO();
+    for (const m of materials) await writeRow(tx, 'hidden_materials', { id: m.key, name: m.name, unit: m.unit, hidden_at: at });
+  });
 }
 
 export async function unhideMaterial(db: Db, key: string) {

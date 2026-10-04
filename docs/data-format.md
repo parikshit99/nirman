@@ -29,7 +29,7 @@ The `nirmaan` names are the original internal ids. They stay unchanged so existi
 | `categories` | type of work (Civil, Electrical, …) | `name`; the built-in ones use the lower-cased name as `id` |
 | `quotes` | vendor's reply to a saved BOQ | `boq_id` (a `lists` id); `vendor`, `quote_date`; `status`: `review` or `confirmed` |
 | `quote_lines` | line in a vendor quote | `quote_id`, `position`; `boq_item_id`, the BOQ `items` row it was matched to (empty = not in the BOQ); plus `original_term`, `item_name`, `quantity`, `unit`, `unit_price`, `total_amount`, `note` |
-| `hidden_materials` | material hidden from the Data tab and price checks | `id` is the material's key (see Conventions); `name`, `unit`, `hidden_at`. Saved lists are not changed. |
+| `hidden_materials` | material deleted from the Data tab and price checks | `id` is the material's key (see Conventions); `name`, `unit`, `hidden_at`. Prices recorded up to `hidden_at` are left out; later ones show again. Saved lists are not changed; removing the row restores it. |
 | `jobs`, `job_images` | entry waiting to be read by Gemini (with its photos as base64) | temporary; deleted once read |
 | `schema_version` | — | number of migrations applied |
 
@@ -43,7 +43,7 @@ There is no separate price table. The Data tab is computed on the fly (`buildIte
 - every item with a price in a `saved` list (dated by the item's `date`, or else the list's creation date);
 - every row in `indexed_rates`.
 
-Names and units are first passed through `learned_terms`, and materials listed in `hidden_materials` are left out. Within a material, prices are also grouped by variant (the four variant fields, compared lower-cased). A price check for a line that names a brand, model, spec or colour only uses past prices with the same values for the fields it names; blank fields match anything.
+Names and units are first passed through `learned_terms`, and for materials listed in `hidden_materials`, rows recorded up to `hidden_at` are left out (saved-list items by the list's `created_at`, rates by `indexed_at`). Within a material, prices are also grouped by variant (the four variant fields, compared lower-cased). A price check for a line that names a brand, model, spec or colour only uses past prices with the same values for the fields it names; blank fields match anything.
 
 Renaming a material in the app rewrites `item_name` and `unit` on all of its items and rates, and records each original word in `learned_terms`. Renaming to the name and unit of another material therefore merges the two.
 

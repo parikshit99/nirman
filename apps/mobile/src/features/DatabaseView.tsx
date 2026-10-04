@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
-import { Check, ChevronDown, Database, Download, EyeOff, GitMerge, Pencil, TrendingUp, Trash2, Truck, X } from 'lucide-react';
+import { Check, ChevronDown, Database, Download, GitMerge, Pencil, TrendingUp, Trash2, Truck, X } from 'lucide-react';
 import { materialDatabaseToCSV, materialKey, parseAmount, similarMaterials, todayISO, variantLabel, type MaterialEntry } from '@nirman/shared';
 import { FilterChips } from '../components/FilterChips.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
@@ -13,7 +13,7 @@ import { useBackHandler } from '../lib/backButton.ts';
 type SubTab = 'materials' | 'categories';
 
 const SUB_TABS: { id: SubTab; label: string; about: string }[] = [
-  { id: 'materials', label: 'Materials', about: 'One card per material. Tap Prices to fix or remove a price, or Edit to rename, merge duplicates or hide a material.' },
+  { id: 'materials', label: 'Materials', about: 'One card per material. Tap Prices to fix or remove a price, Edit to rename or merge duplicates, or 🗑 to delete it from Data.' },
   { id: 'categories', label: 'Categories', about: 'Types of work (e.g. Earthwork) you can tag a saved purchase list or BOQ with, to filter by later.' },
 ];
 
@@ -92,6 +92,20 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
     setBulk({ unit: '', vendor: '', price: '' });
   };
 
+  /** Delete materials from Data after confirming; true when done. */
+  const deleteFromData = async (materials: MaterialEntry[]) => {
+    if (materials.length === 0) return false;
+    const ok = await dialogs.confirm(materials.length === 1 ? `Delete “${materials[0].name}” from Data?` : `Delete ${materials.length} materials from Data?`, {
+      message:
+        'Their prices leave Data and price checks. Saved purchase lists and BOQs in History stay as they are, and new purchases show up again. Restore from Settings → On this phone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return false;
+    await actions.hideMaterials(materials.map((m) => ({ key: m.key, name: m.name, unit: m.unit })));
+    return true;
+  };
+
   const exportCsv = async () => {
     if (entries.length === 0) {
       await dialogs.alert('Nothing to export', 'No materials match the current filters.');
@@ -139,6 +153,14 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
           >
             <Download size={12} /> Export CSV
           </button>
+          {!selectMode && entries.length > 0 && (
+            <button
+              onClick={() => deleteFromData(entries)}
+              className="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all border bg-white text-red-600 border-red-200 hover:border-red-400 hover:bg-red-50 flex items-center gap-1.5"
+            >
+              <Trash2 size={12} /> {entries.length === totalMaterials ? 'Delete all' : `Delete ${entries.length} shown`}
+            </button>
+          )}
         </div>
 
         <AnimatePresence>
@@ -171,6 +193,17 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
               <button onClick={applyBulk} className="bg-orange-500 text-white px-3 py-1 rounded text-[11px] font-bold uppercase hover:bg-orange-600">
                 Apply
               </button>
+              <button
+                onClick={async () => {
+                  if (await deleteFromData(itemDatabase.filter((e) => selected.has(e.key)))) {
+                    setSelected(new Set());
+                    setSelectMode(false);
+                  }
+                }}
+                className="bg-white text-red-600 border border-red-200 px-3 py-1 rounded text-[11px] font-bold uppercase hover:bg-red-50 flex items-center gap-1"
+              >
+                <Trash2 size={11} /> Delete
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -196,6 +229,20 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
           entries.map((item, idx) => {
             const points = item.priceHistory.filter((h) => h.price > 0);
             const isSelected = selected.has(item.key);
+            if (pendingDeletes.has(item.key)) {
+              return (
+                <div key={item.key} className="px-4 md:px-6 py-3 flex items-center gap-3 bg-red-50/40">
+                  <div className="flex-1 min-w-0 opacity-60">
+                    <div className="font-bold text-sm line-through truncate">{item.name}</div>
+                    <div className="text-xs line-through">
+                      per {item.unit} · {item.priceHistory.length} price{item.priceHistory.length === 1 ? '' : 's'}
+                    </div>
+                  </div>
+                  <span className="text-xs text-red-600 shrink-0">Deleted</span>
+                  <UndoButton onUndo={() => actions.undoDelete(item.key)} label={item.name} />
+                </div>
+              );
+            }
             return (
               <div
                 key={item.key}
@@ -274,6 +321,13 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
                         )}
                         <button onClick={() => setEditing(item)} className="text-xs font-bold text-gray-600 flex items-center gap-1 py-1" aria-label={`Edit ${item.name}`}>
                           <Pencil size={13} /> Edit
+                        </button>
+                        <button
+                          onClick={() => actions.deleteMaterialLater({ key: item.key, name: item.name, unit: item.unit })}
+                          className="ml-auto p-1 -mr-1 text-red-500 hover:bg-red-50 rounded-lg"
+                          aria-label={`Delete ${item.name}`}
+                        >
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     )}
@@ -534,11 +588,11 @@ function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClos
         )}
 
         <section className="pt-3 border-t border-gray-100">
-          <button onClick={hide} className="w-full py-2.5 text-xs font-bold text-gray-700 bg-gray-100 rounded-xl flex items-center justify-center gap-2">
-            <EyeOff size={14} /> Hide from Data
+          <button onClick={hide} className="w-full py-2.5 text-xs font-bold text-red-600 bg-red-50 rounded-xl flex items-center justify-center gap-2">
+            <Trash2 size={14} /> Delete from Data
           </button>
           <p className="text-[11px] text-gray-500 mt-1.5">
-            Removes it from this list and from price checks. Your saved lists don't change. Unhide it in Settings.
+            Removes its prices from Data and price checks. Saved lists in History don't change, and new purchases show up again. Restore it in Settings.
           </p>
         </section>
       </div>

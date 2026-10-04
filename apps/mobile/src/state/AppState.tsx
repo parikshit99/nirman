@@ -102,6 +102,9 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       bulkEditMaterials: write(repo.bulkEditMaterials),
       renameMaterial: write(repo.renameMaterial),
       hideMaterial: write(repo.hideMaterial),
+      hideMaterials: write(repo.hideMaterials),
+      /** Delete from Data after the undo window; the card shows struck through until then. */
+      deleteMaterialLater: (m: repo.MaterialRef) => deleteLater((d) => repo.hideMaterial(d, m))(m.key),
       unhideMaterial: write(repo.unhideMaterial),
       setPrice: write(repo.setPrice),
       clearLearning: write(repo.clearLearning),
@@ -175,9 +178,9 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       .filter((l) => l.status === 'saved')
       .map((l) => ({ ...l, items: byList.get(l.id) ?? [] }));
     const learning = repo.learningMap(snapshot.learned);
-    // Hidden materials stay out of the Data tab and of every price check.
-    const hiddenKeys = new Set(snapshot.hidden.map((h) => h.id));
-    const itemDatabase: MaterialEntry[] = buildItemDatabase(snapshot.lists, snapshot.items, snapshot.rates, learning).filter((e) => !hiddenKeys.has(e.key));
+    // Materials deleted from Data leave out everything recorded up to then, in the Data tab and in every price check.
+    const deleted = Object.fromEntries(snapshot.hidden.map((h) => [h.id, h.hidden_at]));
+    const itemDatabase: MaterialEntry[] = buildItemDatabase(snapshot.lists, snapshot.items, snapshot.rates, learning, deleted);
     const linesByQuote = new Map<string, QuoteLineRow[]>();
     for (const line of snapshot.quoteLines) {
       const list = linesByQuote.get(line.quote_id);

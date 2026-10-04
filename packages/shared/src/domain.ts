@@ -157,14 +157,21 @@ const priceStats = (priceHistory: PricePoint[]) => {
 
 /**
  * Build the material price database from saved sessions and manually indexed
- * rates. Draft lists are ignored.
+ * rates. Draft lists are ignored. `deleted` maps a material key to when it was
+ * deleted from the database: everything recorded up to then is left out (saved
+ * lists themselves are untouched), and anything recorded later shows again.
  */
 export function buildItemDatabase(
   lists: ListRow[],
   items: ItemRow[],
   rates: IndexedRateRow[],
   learning: LearningMap,
+  deleted: Record<string, string> = {},
 ): MaterialEntry[] {
+  const isDeleted = (name: string, unit: string, recordedAt: string) => {
+    const cutoff = deleted[materialKey(name, unit)];
+    return !!cutoff && recordedAt <= cutoff;
+  };
   type Acc = Omit<MaterialEntry, 'vendors' | 'categories' | 'addresses' | 'minPrice' | 'maxPrice' | 'avgPrice' | 'latestPrice' | 'variants'> & {
     vendors: Set<string>;
     categories: Set<string>;
@@ -191,6 +198,7 @@ export function buildItemDatabase(
     if (!list) continue;
 
     const { item_name, unit } = applyLearning(learning, raw);
+    if (isDeleted(item_name, unit, list.created_at)) continue;
     const e = entry(item_name, unit);
     const variant = variantOf(raw);
     if (!e.variants.has(variantKey(variant))) e.variants.set(variantKey(variant), variant);
@@ -212,6 +220,7 @@ export function buildItemDatabase(
 
   for (const rate of rates) {
     const { item_name, unit } = applyLearning(learning, rate);
+    if (isDeleted(item_name, unit, rate.indexed_at)) continue;
     const e = entry(item_name, unit);
     const variant = variantOf(rate);
     if (!e.variants.has(variantKey(variant))) e.variants.set(variantKey(variant), variant);

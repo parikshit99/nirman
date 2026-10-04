@@ -160,3 +160,18 @@ describe('similarMaterials', () => {
     expect(similarMaterials(typo, [kg, bag]).map((e) => `${e.name}/${e.unit}`)).toEqual(['Cement/Bag', 'Cement/kg']);
   });
 });
+
+describe('deleting a material from the database', () => {
+  it('leaves out what was recorded up to the deletion, and shows later purchases again', () => {
+    const lists = [list('old', { created_at: ts('2026-02-01') }), list('new', { created_at: ts('2026-04-01') })];
+    const items = [item('a', 'old', { unit_price: 400 }), item('b', 'new', { unit_price: 420 })];
+    const rates: IndexedRateRow[] = [{
+      id: 'r', item_name: 'Cement', unit: 'Bag', date: '2026-02-02', price: 410, vendor: 'X', brand: '', model: '', spec: '', color: '',
+      indexed_at: ts('2026-02-02'),
+    }];
+    const key = materialKey('Cement', 'Bag');
+    expect(buildItemDatabase(lists, items, rates, {}, { [key]: ts('2026-05-01') })).toEqual([]);
+    const [cement] = buildItemDatabase(lists, items, rates, {}, { [key]: ts('2026-03-01') });
+    expect(cement.priceHistory.map((p) => p.price)).toEqual([420]);
+  });
+});
