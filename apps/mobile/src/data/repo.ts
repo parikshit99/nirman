@@ -1,13 +1,20 @@
 import {
+  VARIANT_FIELDS,
   applyLearning,
+  extractedMaterialSchema,
+  extractedQuoteLineSchema,
   materialKey,
+  variantKey,
+  variantOf,
   normalizeTerm,
   dataTables,
   tableColumns,
   todayISO,
   type CategoryRow,
-  type ExtractedMaterial,
-  type ExtractedQuoteLine,
+  type MaterialInput,
+  type QuoteLineInput,
+  type Variant,
+  type VariantField,
   type IndexedRateRow,
   type ItemRow,
   type LearnedTermRow,
@@ -142,7 +149,8 @@ async function ensureDraftRows(tx: SqlExecutor) {
  * (lists are shown newest first).
  */
 let lastInsertMs = 0;
-async function insertMaterials(tx: SqlExecutor, listId: string, materials: ExtractedMaterial[]) {
+async function insertMaterials(tx: SqlExecutor, listId: string, input: MaterialInput[]) {
+  const materials = input.map((m) => extractedMaterialSchema.parse(m));
   const n = materials.length;
   // Strictly increasing so a batch added right after another still sorts above it.
   const base = Math.max(Date.now(), lastInsertMs + 1);
@@ -162,17 +170,18 @@ async function insertMaterials(tx: SqlExecutor, listId: string, materials: Extra
       total_amount: Number(m.total_amount) || quantity * unitPrice,
       vendor: m.vendor || '',
       date: m.date || '',
+      ...variantOf(m),
       created_at: ts,
       updated_at: ts,
     });
   }
 }
 
-export async function addItems(db: Db, listId: string, materials: ExtractedMaterial[]) {
+export async function addItems(db: Db, listId: string, materials: MaterialInput[]) {
   await db.transaction((tx) => insertMaterials(tx, listId, materials));
 }
 
-export type ItemPatch = Partial<Pick<ItemRow, 'item_name' | 'quantity' | 'unit' | 'unit_price' | 'vendor' | 'date'>>;
+export type ItemPatch = Partial<Pick<ItemRow, 'item_name' | 'quantity' | 'unit' | 'unit_price' | 'vendor' | 'date' | VariantField>>;
 
 /**
  * Save an edited item. When the name or unit changed, remember the correction
@@ -418,7 +427,7 @@ export async function clearLearning(db: Db) {
 }
 
 /** Index item rates; an identical rate (same material, date and price) is replaced. */
-type RateInput = Pick<ItemRow, 'item_name' | 'unit' | 'unit_price' | 'vendor' | 'date'>;
+type RateInput = Pick<ItemRow, 'item_name' | 'unit' | 'unit_price' | 'vendor' | 'date'> & Partial<Variant>;
 
 export async function indexRates(db: Db, items: RateInput[]) {
   await db.transaction((tx) => indexRatesTx(tx, items));
@@ -431,7 +440,8 @@ async function indexRatesTx(tx: SqlExecutor, items: RateInput[]) {
     if (!item.item_name) continue;
     const date = item.date || todayISO();
     const key = materialKey(item.item_name, item.unit);
-    const same = (r: IndexedRateRow) => materialKey(r.item_name, r.unit) === key && r.date === date && r.price === item.unit_price;
+    const same = (r: IndexedRateRow) =>
+      materialKey(r.item_name, r.unit) === key && variantKey(r) === variantKey(item) && r.date === date && r.price === item.unit_price;
     for (const r of existing.filter(same)) await tx.run('DELETE FROM indexed_rates WHERE id = ?', [r.id]);
     existing = existing.filter((r) => !same(r));
     await writeRow(tx, 'indexed_rates', {
@@ -441,6 +451,7 @@ async function indexRatesTx(tx: SqlExecutor, items: RateInput[]) {
       date,
       price: item.unit_price || 0,
       vendor: item.vendor || 'Unknown',
+      ...variantOf(item),
       indexed_at: indexedAt,
     });
   }
@@ -508,7 +519,7 @@ export async function setJobStatus(db: Db, jobId: string, status: JobStatus, err
 }
 
 /** Store the extracted items and drop the job in one step. */
-export async function completeJob(db: Db, jobId: string, materials: ExtractedMaterial[]) {
+export async function completeJob(db: Db, jobId: string, materials: MaterialInput[]) {
   await db.transaction(async (tx) => {
     const [job] = await tx.all<Job>('SELECT * FROM jobs WHERE id = ?', [jobId]);
     if (!job) return;
@@ -591,7 +602,8 @@ export async function enqueueQuote(db: Db, quote: NewQuote): Promise<string> {
  * Store the lines read from a vendor quote and drop the job. `boqItemIds[i]` is
  * the item printed as Sr. i+1 when the job was read.
  */
-export async function completeQuoteJob(db: Db, jobId: string, lines: ExtractedQuoteLine[], boqItemIds: string[]) {
+export async function completeQuoteJob(db: Db, jobId: string, input: QuoteLineInput[], boqItemIds: string[]) {
+  const lines = input.map((l) => extractedQuoteLineSchema.parse(l));
   await db.transaction(async (tx) => {
     const [job] = await tx.all<Job>('SELECT * FROM jobs WHERE id = ?', [jobId]);
     if (!job?.quote_id) return;
@@ -609,6 +621,7 @@ export async function completeQuoteJob(db: Db, jobId: string, lines: ExtractedQu
         unit_price: l.unit_price,
         total_amount: l.total_amount,
         note: l.note,
+        ...variantOf(l),
       });
     }
     await tx.run('DELETE FROM job_images WHERE job_id = ?', [jobId]);
@@ -623,7 +636,7 @@ export async function updateQuote(db: Db, id: string, patch: Partial<Pick<QuoteR
   });
 }
 
-export type QuoteLinePatch = Partial<Pick<QuoteLineRow, 'boq_item_id' | 'item_name' | 'quantity' | 'unit' | 'unit_price'>>;
+export type QuoteLinePatch = Partial<Pick<QuoteLineRow, 'boq_item_id' | 'item_name' | 'quantity' | 'unit' | 'unit_price' | VariantField>>;
 
 export async function updateQuoteLine(db: Db, id: string, patch: QuoteLinePatch) {
   await db.transaction(async (tx) => {
@@ -669,6 +682,8 @@ export async function confirmQuote(db: Db, id: string) {
         unit_price: line.unit_price,
         vendor: quote.vendor || 'Unknown',
         date: quote.quote_date,
+        // What the vendor priced: their brand/model/spec/colour where written, else what the BOQ asked for.
+        ...Object.fromEntries(VARIANT_FIELDS.map((f) => [f, line[f] || item?.[f] || ''])),
       });
       const term = normalizeTerm(line.original_term);
       if (item && unitMatches && term && term !== normalizeTerm(item.item_name)) {

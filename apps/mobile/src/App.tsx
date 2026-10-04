@@ -26,7 +26,7 @@ type AppTab = 'auditor' | 'boq' | 'history' | 'database';
 
 /** `about` is the one line shown under the tabs saying what the open tab does. */
 const TABS: { id: AppTab; label: string; icon: typeof LayoutDashboard; about: string }[] = [
-  { id: 'auditor', label: 'Purchases', icon: ShoppingCart, about: 'Photograph bills or type what was bought; get a spending log with the rate paid for each item.' },
+  { id: 'auditor', label: 'Spend', icon: ShoppingCart, about: 'Photograph bills or type what was bought; get a spending log with the rate paid for each item.' },
   { id: 'boq', label: 'BOQ', icon: FileCode, about: 'Photograph a drawing or list; get a blank BOQ (no rates) to send vendors, then compare their quotes.' },
   { id: 'database', label: 'Data', icon: Database, about: 'Every price you have recorded, per material, to see how rates change over time.' },
   { id: 'history', label: 'History', icon: History, about: 'Saved purchase lists and BOQs. Open one to edit it, export it, or add vendor quotes.' },
@@ -90,7 +90,7 @@ export default function App() {
   const search = searchQuery.trim();
   const filteredItems = useMemo(() => {
     if (!search) return listedItems;
-    return new Fuse(listedItems, { keys: ['item_name', 'vendor', 'original_term'], threshold: 0.4 }).search(search).map((r) => r.item);
+    return new Fuse(listedItems, { keys: ['item_name', 'vendor', 'original_term', 'brand', 'model', 'spec', 'color'], threshold: 0.4 }).search(search).map((r) => r.item);
   }, [listedItems, search]);
 
   const matchesFilters = (category: string[], address: string[]) =>
@@ -104,7 +104,7 @@ export default function App() {
   }, [history, search, categoryFilter, addressFilter]);
 
   const filteredDatabase = useMemo(() => {
-    const base = search ? new Fuse(itemDatabase, { keys: ['name'], threshold: 0.4 }).search(search).map((r) => r.item) : itemDatabase;
+    const base = search ? new Fuse(itemDatabase, { keys: ['name', 'variants.label'], threshold: 0.4 }).search(search).map((r) => r.item) : itemDatabase;
     return base.filter((e) => matchesFilters(e.categories, e.addresses));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemDatabase, search, categoryFilter, addressFilter]);
@@ -230,7 +230,7 @@ export default function App() {
               key={id}
               onClick={() => setActiveTab(id)}
               aria-current={activeTab === id ? 'page' : undefined}
-              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2 rounded-md text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap
+              className={`flex-1 md:flex-none flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-3 md:px-4 py-2 rounded-md text-[11px] font-bold uppercase tracking-wide sm:tracking-wider transition-all whitespace-nowrap
                 ${activeTab === id ? 'bg-white text-[var(--color-brand-dark)] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
             >
               <Icon size={14} /> {label}

@@ -14,6 +14,7 @@ The `nirmaan` names are the original internal ids. They stay unchanged so existi
 
 - Ids are text (random UUIDs), except where noted below.
 - Dates are text: `YYYY-MM-DD` for calendar dates and ISO 8601 UTC (`2026-10-03T19:13:38.586Z`) for timestamps.
+- **Variant fields** `brand`, `model` (model number or item code), `spec` (size, thickness, grade or rating, e.g. "2.5 sq mm") and `color` are optional text on items, indexed rates and quote lines; blank means not recorded. Rows saved before they existed read as blank.
 - Money is a plain number in rupees, with no currency symbol or commas. Quantities are plain numbers.
 - A **material** is identified by its name plus unit, compared lower-cased and trimmed (`materialKey` in `packages/shared/src/domain.ts`). "OPC Cement / Bag" and "opc cement / bag" are the same material.
 
@@ -42,7 +43,7 @@ There is no separate price table. The Data tab is computed on the fly (`buildIte
 - every item with a price in a `saved` list (dated by the item's `date`, or else the list's creation date);
 - every row in `indexed_rates`.
 
-Names and units are first passed through `learned_terms`, and materials listed in `hidden_materials` are left out.
+Names and units are first passed through `learned_terms`, and materials listed in `hidden_materials` are left out. Within a material, prices are also grouped by variant (the four variant fields, compared lower-cased). A price check for a line that names a brand, model, spec or colour only uses past prices with the same values for the fields it names; blank fields match anything.
 
 Renaming a material in the app rewrites `item_name` and `unit` on all of its items and rates, and records each original word in `learned_terms`. Renaming to the name and unit of another material therefore merges the two.
 
@@ -57,7 +58,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
 ```json
 {
   "app": "nirmaan-auditor",
-  "version": 3,
+  "version": 4,
   "exported_at": "2026-10-03T19:13:38.586Z",
   "lists": [], "items": [], "indexed_rates": [], "learned_terms": [],
   "categories": [], "quotes": [], "quote_lines": [], "hidden_materials": []
@@ -68,6 +69,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
 - `jobs` and `job_images` are left out, so are quotes still waiting to be read.
 - Older files still restore:
   - version 1 (before vendor quotes) has no `quotes` or `quote_lines`;
-  - version 2 (before hidden materials) has no `hidden_materials`.
+  - version 2 (before hidden materials) has no `hidden_materials`;
+  - version 3 (before variant fields) has rows without `brand`, `model`, `spec`, `color`.
 - Restoring replaces everything on the phone.
 - Any reimplementation should read this format, so old backups keep working.

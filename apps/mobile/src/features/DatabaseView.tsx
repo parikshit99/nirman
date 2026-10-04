@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { Check, ChevronDown, Database, Download, EyeOff, GitMerge, Pencil, TrendingUp, Trash2, Truck, X } from 'lucide-react';
 import Fuse from 'fuse.js';
-import { materialDatabaseToCSV, materialKey, parseAmount, todayISO, type MaterialEntry } from '@nirman/shared';
+import { materialDatabaseToCSV, materialKey, parseAmount, todayISO, variantLabel, type MaterialEntry } from '@nirman/shared';
 import { FilterChips } from '../components/FilterChips.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
@@ -58,6 +58,7 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulk, setBulk] = useState({ unit: '', vendor: '', price: '' });
   const [open, setOpen] = useState<string | null>(null);
+  const [openVariants, setOpenVariants] = useState<string | null>(null);
   const [editing, setEditing] = useState<MaterialEntry | null>(null);
   // Leaving the tab carries out price removals still waiting for undo.
   useEffect(() => () => void actions.flushDeletes(), [actions]);
@@ -215,23 +216,14 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
                     <div className="min-w-0">
                       <div className="font-bold text-sm text-gray-900">{item.name}</div>
                       <div className="text-xs text-gray-500">per {item.unit}</div>
+                      {item.variants.length === 1 && item.variants[0].label && <div className="text-xs font-bold text-gray-700">{item.variants[0].label}</div>}
                     </div>
                     <div className="text-right md:hidden shrink-0">
-                      <div className="font-mono font-bold text-sm">₹{Math.round(item.latestPrice).toLocaleString('en-IN')}</div>
-                      {item.minPrice !== item.maxPrice && (
-                        <div className="text-xs text-gray-500 font-mono">
-                          ₹{item.minPrice.toLocaleString('en-IN')}–₹{item.maxPrice.toLocaleString('en-IN')}
-                        </div>
-                      )}
+                      <PriceSummary item={item} />
                     </div>
                   </div>
                   <div className="hidden md:block">
-                    <div className="font-mono font-bold text-sm">₹{Math.round(item.latestPrice).toLocaleString('en-IN')}</div>
-                    {item.minPrice !== item.maxPrice && (
-                      <div className="text-xs text-gray-500 font-mono">
-                        Range ₹{item.minPrice.toLocaleString('en-IN')}–₹{item.maxPrice.toLocaleString('en-IN')}
-                      </div>
-                    )}
+                    <PriceSummary item={item} />
                   </div>
                   <div className="mt-2 md:mt-0 space-y-2">
                     <div className="flex flex-wrap gap-1">
@@ -242,7 +234,7 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
                       ))}
                       {item.vendors.length === 0 && <span className="text-xs text-gray-400 italic">No vendor yet</span>}
                     </div>
-                    {points.length > 1 && (
+                    {points.length > 1 && item.variants.length <= 1 && (
                       <div className="h-12 w-full">
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={points}>
@@ -272,6 +264,15 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
                         >
                           <ChevronDown size={14} className={`transition-transform ${open === item.key ? 'rotate-180' : ''}`} /> Prices ({item.priceHistory.length})
                         </button>
+                        {item.variants.length > 1 && (
+                          <button
+                            onClick={() => setOpenVariants(openVariants === item.key ? null : item.key)}
+                            aria-expanded={openVariants === item.key}
+                            className="text-xs font-bold text-orange-600 flex items-center gap-1 py-1"
+                          >
+                            <ChevronDown size={14} className={`transition-transform ${openVariants === item.key ? 'rotate-180' : ''}`} /> Variants ({item.variants.length})
+                          </button>
+                        )}
                         <button onClick={() => setEditing(item)} className="text-xs font-bold text-gray-600 flex items-center gap-1 py-1" aria-label={`Edit ${item.name}`}>
                           <Pencil size={13} /> Edit
                         </button>
@@ -279,6 +280,7 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
                     )}
                   </div>
                 </div>
+                {openVariants === item.key && !selectMode && <VariantList material={item} />}
                 {open === item.key && !selectMode && <PriceList points={item.priceHistory} />}
               </div>
             );
@@ -297,6 +299,56 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
       </div>
       <AnimatePresence>{editing && <MaterialEditor key={editing.key} material={editing} onClose={() => setEditing(null)} />}</AnimatePresence>
     </>
+  );
+}
+
+const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
+
+/** Latest price and range; with several brands/models, only the range (one brand's latest says little about another's). */
+function PriceSummary({ item }: { item: MaterialEntry }) {
+  if (item.variants.length > 1) {
+    return (
+      <>
+        <div className="font-mono font-bold text-sm">{item.minPrice === item.maxPrice ? inr(item.minPrice) : `${inr(item.minPrice)}–${inr(item.maxPrice)}`}</div>
+        <div className="text-xs text-gray-500">{item.variants.length} variants</div>
+      </>
+    );
+  }
+  return (
+    <>
+      <div className="font-mono font-bold text-sm">{inr(item.latestPrice)}</div>
+      {item.minPrice !== item.maxPrice && (
+        <div className="text-xs text-gray-500 font-mono">
+          {inr(item.minPrice)}–{inr(item.maxPrice)}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Each brand/model/spec/colour of a material with its latest price and range. */
+function VariantList({ material }: { material: MaterialEntry }) {
+  return (
+    <ul className="basis-full min-w-0 mt-2 divide-y divide-gray-100 border border-gray-100 rounded-xl bg-gray-50/50">
+      {material.variants.map((v) => (
+        <li key={v.key} className="px-3 py-2 flex justify-between items-center gap-2 text-sm">
+          <span className="min-w-0">
+            <span className="font-bold block truncate">{v.label || 'No brand / model given'}</span>
+            <span className="text-xs text-gray-500">
+              {v.priceHistory.length} price{v.priceHistory.length === 1 ? '' : 's'}
+            </span>
+          </span>
+          <span className="text-right shrink-0">
+            <span className="font-mono font-bold block">{v.priceHistory.length ? `₹${v.latestPrice.toLocaleString('en-IN')}` : '—'}</span>
+            {v.minPrice !== v.maxPrice && (
+              <span className="text-xs text-gray-500 font-mono">
+                ₹{v.minPrice.toLocaleString('en-IN')}–₹{v.maxPrice.toLocaleString('en-IN')}
+              </span>
+            )}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -353,6 +405,7 @@ function PriceRow({ point: p }: { point: MaterialEntry['priceHistory'][number] }
             <span className="font-mono font-bold shrink-0">₹{p.price.toLocaleString('en-IN')}</span>
           )}
         </div>
+        {variantLabel(p.variant) && <div className="text-xs font-bold text-gray-700 truncate">{variantLabel(p.variant)}</div>}
         <div className="text-xs text-gray-500 truncate">
           {p.listTitle ? `Saved list: ${p.listTitle}` : 'Added rate'}
           {pendingDelete && p.itemId && ' (line removed from the list)'}

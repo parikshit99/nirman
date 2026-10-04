@@ -6,6 +6,7 @@ import {
   type LearningMap,
   type QuoteBoqItem,
 } from './schemas.ts';
+import { variantOf } from './domain.ts';
 
 export interface PromptOptions {
   learning?: LearningMap;
@@ -30,6 +31,10 @@ export function buildSystemInstruction({ learning, category, captureDate }: Prom
     3. Literal Extraction: The "original_term" field MUST be the exact word found in the source text.
     4. Data Cleaning: Strip currency symbols (₹, Rs) and ensure numbers are clean floats.
     5. Context: Use ${captureDate} as the default date if not found. Dates must be YYYY-MM-DD.
+    6. Brand, model, spec, color: fill each only if the source shows it, else "". brand = maker
+       (Jaquar, Havells, Polycab, UltraTech); model = model number or item code (e.g. "CON-WHT-101");
+       spec = size, thickness, grade or rating (e.g. "2.5 sq mm", "53 grade", "6A", "15 mm"); color as written.
+       Keep item_name generic and without these (e.g. item_name "Wash basin", brand "Jaquar").
     ${learningContext(learning)}
     ${categoryContext}
 
@@ -54,14 +59,14 @@ function learningContext(learning?: LearningMap): string {
  * not our BOQ sheet) and matching each line to the BOQ it answers.
  */
 export function buildQuoteInstruction({ boq, learning }: { boq: QuoteBoqItem[]; learning?: LearningMap }): string {
-  const boqList = boq.map((b) => `${b.sr}. ${b.item_name} | qty ${b.quantity} ${b.unit}`).join('\n');
+  const boqList = boq.map((b) => `${b.sr}. ${b.item_name}${b.variant ? ` (${b.variant})` : ''} | qty ${b.quantity} ${b.unit}`).join('\n');
   return `
     You are an expert Construction Material Auditor in India.
     We sent a vendor the Bill of Quantities (BOQ) below and asked for rates. The vendor replied with
     their own list instead (often handwritten, in their own words, order and units). Read their reply
     and match every line to the BOQ item it prices.
 
-    BOQ (Sr. | item | quantity and unit):
+    BOQ (Sr. | item (brand · model · size/spec · colour, where asked) | quantity and unit):
     ${boqList}
 
     Rules:
@@ -69,14 +74,17 @@ export function buildQuoteInstruction({ boq, learning }: { boq: QuoteBoqItem[]; 
     2. boq_sr: the Sr. number of the BOQ item this line prices. Match by meaning, not spelling: Hindi/Hinglish
        ('sariya' = TMT steel bar, 'reti' = sand, 'eent' = bricks), brand names (ACC, UltraTech = cement),
        sizes and grades must agree. Use null if the line is not in the BOQ. Never match two lines to the
-       same Sr. unless the vendor clearly split one item.
+       same Sr. unless the vendor clearly split one item. A different brand, model or colour still matches
+       the item it prices.
+    8. brand, model, spec, color: what the vendor wrote for this line, each "" if not written
+       (spec = size, thickness, grade or rating). Do not copy them from the BOQ.
     3. original_term: the vendor's own words for the item, exactly as written.
     4. item_name: a clean professional English name for what the vendor quoted.
     5. quantity, unit, unit_price: as the vendor wrote them. Keep the vendor's unit even if it differs
        from the BOQ. Never invent or convert a price; use 0 if no rate is written. Strip ₹/Rs.
     6. total_amount: the vendor's line total if written, else 0.
     7. note: a few words when something needs checking, e.g. "unit differs: quoted per kg, BOQ in MT",
-       "brand differs", "rate unclear". Empty otherwise.
+       "rate unclear". Empty otherwise.
     ${learningContext(learning)}
 
     IMPORTANT: Return a JSON array of objects conforming to the provided schema.
@@ -121,6 +129,7 @@ export function parseQuoteOutput(text: string, boqSize: number): ExtractedQuoteL
       item_name: l.item_name.trim() || l.original_term.trim(),
       unit: l.unit.trim() || 'unit',
       total_amount: l.total_amount || l.quantity * l.unit_price,
+      ...variantOf(l),
     });
   }
   return lines;
@@ -140,6 +149,7 @@ export function parseExtractionOutput(text: string): ExtractedMaterial[] {
       ...m,
       unit: m.unit || 'unit',
       total_amount: m.total_amount || m.quantity * m.unit_price,
+      ...variantOf(m),
     });
   }
   return items;

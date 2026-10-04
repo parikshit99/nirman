@@ -12,10 +12,10 @@ import {
 
 const ts = (d: string) => `${d}T10:00:00.000Z`;
 
-function boqItem(id: string, item_name: string, quantity: number, unit: string): ItemRow {
+function boqItem(id: string, item_name: string, quantity: number, unit: string, over: Partial<ItemRow> = {}): ItemRow {
   return {
     id, list_id: 'boq', item_name, original_term: '', quantity, unit, unit_price: 0, total_amount: 0,
-    vendor: '', date: '', created_at: ts('2026-10-01'), updated_at: ts('2026-10-01'),
+    vendor: '', date: '', brand: '', model: '', spec: '', color: '', created_at: ts('2026-10-01'), updated_at: ts('2026-10-01'), ...over,
   };
 }
 const quote = (id: string, vendor: string, quote_date = '2026-10-03'): QuoteRow => ({
@@ -24,10 +24,10 @@ const quote = (id: string, vendor: string, quote_date = '2026-10-03'): QuoteRow 
 let pos = 0;
 const line = (quote_id: string, boq_item_id: string | null, unit_price: number, over: Partial<QuoteLineRow> = {}): QuoteLineRow => ({
   id: `l${pos}`, quote_id, position: pos++, boq_item_id, original_term: '', item_name: 'x', quantity: 0, unit: 'Bag',
-  unit_price, total_amount: 0, note: '', ...over,
+  unit_price, total_amount: 0, note: '', brand: '', model: '', spec: '', color: '', ...over,
 });
-const rate = (item_name: string, unit: string, price: number, date: string, vendor: string): IndexedRateRow => ({
-  id: `${item_name}${date}${vendor}`, item_name, unit, price, date, vendor, indexed_at: ts(date),
+const rate = (item_name: string, unit: string, price: number, date: string, vendor: string, over: Partial<IndexedRateRow> = {}): IndexedRateRow => ({
+  id: `${item_name}${date}${vendor}`, item_name, unit, price, date, vendor, brand: '', model: '', spec: '', color: '', indexed_at: ts(date), ...over,
 });
 
 describe('parseQuoteOutput', () => {
@@ -39,8 +39,8 @@ describe('parseQuoteOutput', () => {
       3,
     );
     expect(out).toEqual([
-      { boq_sr: 2, original_term: 'ACC bori', item_name: 'Cement', quantity: 15, unit: 'Bag', unit_price: 380, total_amount: 5700, note: '' },
-      { boq_sr: null, original_term: 'taar', item_name: 'taar', quantity: 0, unit: 'unit', unit_price: 90, total_amount: 0, note: '' },
+      { boq_sr: 2, original_term: 'ACC bori', item_name: 'Cement', quantity: 15, unit: 'Bag', unit_price: 380, total_amount: 5700, note: '', brand: '', model: '', spec: '', color: '' },
+      { boq_sr: null, original_term: 'taar', item_name: 'taar', quantity: 0, unit: 'unit', unit_price: 90, total_amount: 0, note: '', brand: '', model: '', spec: '', color: '' },
     ]);
     expect(parseQuoteOutput('nonsense', 3)).toEqual([]);
   });
@@ -114,5 +114,37 @@ describe('compareQuotes', () => {
     // Cement is the only item both priced in the BOQ unit.
     expect(result.commonItems).toBe(1);
     expect(result.vendors.map((v) => v.commonTotal)).toEqual([50 * 380, 50 * 370]);
+  });
+});
+
+describe('compareQuotes with brand / model / spec / colour', () => {
+  const wc = boqItem('w', 'Wall-hung WC', 2, 'piece', { brand: 'Jaquar', model: 'CNS-WHT-101', color: 'White' });
+  const plain = boqItem('p', 'PVC pipe', 10, 'piece');
+  const db = buildItemDatabase([], [], [
+    rate('Wall-hung WC', 'piece', 15000, '2026-09-01', 'Old', { brand: 'Jaquar', model: 'CNS-WHT-101', color: 'White' }),
+    rate('Wall-hung WC', 'piece', 9000, '2026-09-02', 'Old', { brand: 'Hindware' }),
+    rate('PVC pipe', 'piece', 300, '2026-09-01', 'Old', { brand: 'Supreme', spec: '1 inch' }),
+  ], {});
+
+  it('measures each BOQ line only against prices for what it asks for', () => {
+    const q = quote('a', 'A');
+    const { rows } = compareQuotes([wc, plain], [q], [line('a', 'w', 16000, { unit: 'piece', brand: 'jaquar' }), line('a', 'p', 330, { unit: 'piece' })], db, {});
+    expect(rows[0].history.points.map((p) => p.price)).toEqual([15000]);
+    expect(rows[0].cells.a!.vsLast).toBeCloseTo(16000 / 15000 - 1);
+    // A BOQ line that names no brand accepts any brand's past price.
+    expect(rows[1].history.points.map((p) => p.price)).toEqual([300]);
+  });
+
+  it('flags a different brand and leaves it out of the ranking', () => {
+    const a = quote('a', 'A');
+    const b = quote('b', 'B');
+    const { rows, vendors } = compareQuotes([wc], [a, b], [
+      line('a', 'w', 16000, { unit: 'piece', brand: 'Jaquar' }),
+      line('b', 'w', 8000, { unit: 'piece', brand: 'Hindware' }),
+    ], db, {});
+    expect(rows[0].cells.b!.variantDiffers).toEqual(['brand']);
+    expect(rows[0].cells.b!.cheapest).toBe(false);
+    expect(rows[0].cells.b!.vsLast).toBeNull();
+    expect(vendors[1].variantIssues).toBe(1);
   });
 });

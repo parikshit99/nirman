@@ -37,6 +37,16 @@ const sand = { item_name: 'Sand', original_term: 'reti', quantity: 2, unit: 'MT'
 const meta = { title: 'Morning audit', address: 'Sector 44', category: 'Civil', site_date: '2026-09-30' };
 
 describe('local repository', () => {
+  it('reads rows written without brand / model / spec / colour as blank', async () => {
+    const db = await freshDb();
+    await db.run(
+      `INSERT INTO items (id, list_id, item_name, original_term, quantity, unit, unit_price, total_amount, vendor, date, created_at, updated_at)
+       VALUES ('old', ?, 'Cement', '', 1, 'Bag', 400, 400, '', '', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`,
+      [DRAFT_IDS.audit],
+    );
+    expect((await loadSnapshot(db)).items.find((i) => i.id === 'old')).toMatchObject({ brand: '', model: '', spec: '', color: '' });
+  });
+
   it('seeds categories and drafts, and migrations are idempotent', async () => {
     const db = await freshDb();
     await migrateLocal(db);
@@ -243,6 +253,29 @@ describe('local repository', () => {
       expect(learningMap(snap.learned)['acc bori']).toEqual({ item_name: 'Cement', unit: 'Bag' });
       const entry = buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned)).find((e) => e.key === materialKey('Cement', 'Bag'));
       expect(entry?.latestPrice).toBe(380);
+    });
+
+    it('records what the vendor priced: their brand where written, else what the BOQ asked for', async () => {
+      const db = await freshDb();
+      await addItems(db, DRAFT_IDS.boq, [
+        { ...cement, unit_price: 0, brand: 'UltraTech', spec: '53 grade' },
+        { ...sand, unit_price: 0, brand: 'Any' },
+      ]);
+      const boqId = await saveDraftToHistory(db, 'boq', boqMeta);
+      const quoteId = await enqueueQuote(db, { boqId, vendor: 'Gupta', quoteDate: '2026-10-03', text: '', images: ['IMG'] });
+      let snap = await loadSnapshot(db);
+      const boqItems = snap.items.filter((i) => i.list_id === boqId);
+      const sr = (name: string) => boqItems.findIndex((i) => i.item_name === name) + 1;
+      await completeQuoteJob(db, snap.jobs[0].id, [
+        line({ boq_sr: sr('Cement'), item_name: 'Cement', quantity: 15, unit_price: 380 }),
+        line({ boq_sr: sr('Sand'), item_name: 'Sand', unit: 'MT', unit_price: 1400, brand: 'Local' }),
+      ], boqItems.map((i) => i.id));
+      await confirmQuote(db, quoteId);
+      snap = await loadSnapshot(db);
+      expect(snap.rates.map((r) => [r.item_name, r.brand, r.spec]).sort()).toEqual([
+        ['Cement', 'UltraTech', '53 grade'],
+        ['Sand', 'Local', ''],
+      ]);
     });
 
     it('keeps the vendor unit when it differs from the BOQ, and does not learn it', async () => {

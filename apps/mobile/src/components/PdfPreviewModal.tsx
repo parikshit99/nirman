@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { Download, FileCode, X } from 'lucide-react';
-import type { ItemRow } from '@nirman/shared';
+import { variantLabel, type ItemRow } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
 import { useBackHandler } from '../lib/backButton.ts';
 import appIcon from '../lib/pdf-icon.png?inline';
@@ -89,7 +89,10 @@ export function PdfPreviewModal({ kind, items, notes, onDownload, onClose }: Pro
                   {items.map((item, index) => (
                     <tr key={item.id} className="text-xs border-b border-gray-300">
                       <td className="border border-gray-300 p-2 text-center">{index + 1}</td>
-                      <td className="border border-gray-300 p-2 font-medium">{item.item_name}</td>
+                      <td className="border border-gray-300 p-2 font-medium">
+                        {item.item_name}
+                        {variantLabel(item) && <div className="text-[11px] font-normal text-gray-600">{variantLabel(item)}</div>}
+                      </td>
                       <td className="border border-gray-300 p-2 text-center font-mono">{item.quantity}</td>
                       <td className="border border-gray-300 p-2 text-center">{item.unit}</td>
                       <td className="border border-gray-300 p-2 text-right font-mono bg-gray-50/50">{isAudit ? item.unit_price.toLocaleString('en-IN') : ''}</td>

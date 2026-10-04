@@ -20,7 +20,7 @@ const cement = { item_name: 'Cement', original_term: 'bori', quantity: 15, unit:
 
 async function populated() {
   const db = await freshDb();
-  await addItems(db, DRAFT_IDS.audit, [cement, { ...cement, item_name: 'Sand', original_term: 'reti' }]);
+  await addItems(db, DRAFT_IDS.audit, [cement, { ...cement, item_name: 'Sand', original_term: 'reti', brand: 'Local', spec: 'Fine' }]);
   const [item] = (await loadSnapshot(db)).items;
   await updateItem(db, item.id, { item_name: 'OPC Cement' });
   await saveDraftToHistory(db, 'audit', { title: 'Day 1', address: 'Sector 44', category: 'Civil', site_date: '2026-09-30' });
@@ -93,6 +93,18 @@ describe('backup', () => {
     const snap = await loadSnapshot(target);
     expect(snap.quotes).toHaveLength(0);
     expect(snap.items.length).toBe((await loadSnapshot(db)).items.length);
+  });
+
+  it('still restores version 3 backups, whose rows have no brand / model / spec / colour', async () => {
+    const db = await populated();
+    const backup = await exportBackup(db);
+    const strip = (rows: object[]) => rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !['brand', 'model', 'spec', 'color'].includes(k))));
+    const v3 = { ...backup, version: 3, items: strip(backup.items), indexed_rates: strip(backup.indexed_rates), quote_lines: strip(backup.quote_lines) };
+    const parsed = parseBackup(JSON.stringify(v3));
+    expect(parsed.items.every((i) => i.brand === '' && i.color === '')).toBe(true);
+    const target = await freshDb();
+    await restoreBackup(target, parsed);
+    expect((await loadSnapshot(target)).items.length).toBe((await loadSnapshot(db)).items.length);
   });
 
   it('still restores version 2 backups, which have no hidden materials', async () => {

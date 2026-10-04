@@ -6,6 +6,9 @@ import {
   materialKey,
   parseAmount,
   parseExtractionOutput,
+  variantDifferences,
+  variantKey,
+  variantLabel,
   type ItemRow,
   type ListRow,
   type IndexedRateRow,
@@ -22,7 +25,7 @@ function list(id: string, over: Partial<ListRow> = {}): ListRow {
 function item(id: string, list_id: string, over: Partial<ItemRow> = {}): ItemRow {
   return {
     id, list_id, item_name: 'Cement', original_term: 'bori', quantity: 10, unit: 'Bag', unit_price: 400,
-    total_amount: 4000, vendor: 'Sharma', date: '2026-01-01', created_at: ts('2026-01-01'),
+    total_amount: 4000, vendor: 'Sharma', date: '2026-01-01', brand: '', model: '', spec: '', color: '', created_at: ts('2026-01-01'),
     updated_at: ts('2026-01-01'), ...over,
   };
 }
@@ -50,7 +53,7 @@ describe('buildItemDatabase', () => {
       item('i3', 'l3', { unit_price: 420, date: '2026-02-01', vendor: 'Gupta' }),
     ];
     const rates: IndexedRateRow[] = [{
-      id: 'r1', item_name: 'cement', unit: 'bag', date: '2026-03-01', price: 450, vendor: 'Manual',
+      id: 'r1', item_name: 'cement', unit: 'bag', date: '2026-03-01', price: 450, vendor: 'Manual', brand: '', model: '', spec: '', color: '',
       indexed_at: ts('2026-03-01'),
     }];
     const db = buildItemDatabase(lists, items, rates, {});
@@ -85,7 +88,7 @@ describe('buildItemDatabase', () => {
 describe('parseExtractionOutput', () => {
   it('parses clean JSON and fills defaults', () => {
     const out = parseExtractionOutput('[{"item_name":"Sand","original_term":"Reti","quantity":"2","unit":"MT","unit_price":1500}]');
-    expect(out).toEqual([{ item_name: 'Sand', original_term: 'Reti', quantity: 2, unit: 'MT', unit_price: 1500, total_amount: 3000, vendor: '', date: '' }]);
+    expect(out).toEqual([{ item_name: 'Sand', original_term: 'Reti', quantity: 2, unit: 'MT', unit_price: 1500, total_amount: 3000, vendor: '', date: '', brand: '', model: '', spec: '', color: '' }]);
   });
   it('recovers an array wrapped in prose and drops junk', () => {
     const out = parseExtractionOutput('Here you go:\n[{"item_name":"Bricks","quantity":500,"unit":"piece"}, {"foo":1}]\nThanks');
@@ -110,5 +113,28 @@ describe('parseAmount', () => {
     expect(parseAmount('abc')).toBeNull();
     expect(parseAmount('1.2.3')).toBeNull();
     expect(parseAmount(undefined)).toBeNull();
+  });
+});
+
+describe('variants', () => {
+  it('labels, keys and compares brand / model / spec / colour', () => {
+    expect(variantLabel({ brand: 'Jaquar', model: ' CNS-101 ', color: 'White' })).toBe('Jaquar · CNS-101 · White');
+    expect(variantLabel({})).toBe('');
+    expect(variantKey({ brand: 'JAQUAR ' })).toBe(variantKey({ brand: 'jaquar', model: '' }));
+    expect(variantDifferences({ brand: 'Jaquar', color: 'White' }, { brand: 'Hindware', color: '' })).toEqual(['brand']);
+  });
+
+  it('groups prices per variant under one material', () => {
+    const db = buildItemDatabase([list('l1')], [
+      item('a', 'l1', { item_name: 'Switch', unit: 'piece', unit_price: 120, brand: 'Legrand', color: 'White' }),
+      item('b', 'l1', { item_name: 'Switch', unit: 'piece', unit_price: 95, brand: 'Anchor' }),
+      item('c', 'l1', { item_name: 'Switch', unit: 'piece', unit_price: 125, brand: 'legrand', color: 'white' }),
+    ], [], {});
+    expect(db).toHaveLength(1);
+    expect(db[0].variants.map((v) => [v.label, v.priceHistory.length, v.latestPrice])).toEqual([
+      ['Anchor', 1, 95],
+      ['Legrand · White', 2, 125],
+    ]);
+    expect(materialDatabaseToCSV(db).split('\n')).toHaveLength(3);
   });
 });

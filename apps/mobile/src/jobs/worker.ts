@@ -1,4 +1,4 @@
-import { todayISO, type LearnedTermRow } from '@nirman/shared';
+import { todayISO, variantLabel, type LearnedTermRow } from '@nirman/shared';
 import { completeJob, completeQuoteJob, getJobImages, learningMap, listItems, setJobStatus, type Job } from '../data/repo.ts';
 import type { Db } from '../data/sql.ts';
 import { classifyError, createGeminiExtractor, type Extractor } from '../lib/gemini.ts';
@@ -124,7 +124,7 @@ export class JobWorker {
         // Sr. numbers are the BOQ's printed order; remember which item each one was.
         const boq = await listItems(this.db, job.list_id);
         const lines = await extractor.extractQuote({
-          boq: boq.map((b, i) => ({ sr: i + 1, item_name: b.item_name, quantity: b.quantity, unit: b.unit })),
+          boq: boq.map((b, i) => ({ sr: i + 1, item_name: b.item_name, quantity: b.quantity, unit: b.unit, variant: variantLabel(b) })),
           text: job.text,
           images,
           learning,
