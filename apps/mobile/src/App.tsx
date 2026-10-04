@@ -90,7 +90,7 @@ export default function App() {
   const search = searchQuery.trim();
   const filteredItems = useMemo(() => {
     if (!search) return listedItems;
-    return new Fuse(listedItems, { keys: ['item_name', 'vendor', 'original_term'], threshold: 0.4 }).search(search).map((r) => r.item);
+    return new Fuse(listedItems, { keys: ['item_name', 'vendor', 'original_term', 'brand', 'model', 'spec', 'color'], threshold: 0.4 }).search(search).map((r) => r.item);
   }, [listedItems, search]);
 
   const matchesFilters = (category: string[], address: string[]) =>
@@ -104,7 +104,7 @@ export default function App() {
   }, [history, search, categoryFilter, addressFilter]);
 
   const filteredDatabase = useMemo(() => {
-    const base = search ? new Fuse(itemDatabase, { keys: ['name'], threshold: 0.4 }).search(search).map((r) => r.item) : itemDatabase;
+    const base = search ? new Fuse(itemDatabase, { keys: ['name', 'variants.label'], threshold: 0.4 }).search(search).map((r) => r.item) : itemDatabase;
     return base.filter((e) => matchesFilters(e.categories, e.addresses));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemDatabase, search, categoryFilter, addressFilter]);

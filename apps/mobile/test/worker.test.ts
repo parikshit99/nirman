@@ -27,7 +27,7 @@ function setup(
 }
 
 const quoteLine = (over: Partial<ExtractedQuoteLine>): ExtractedQuoteLine => ({
-  boq_sr: null, original_term: '', item_name: '', quantity: 0, unit: 'Bag', unit_price: 0, total_amount: 0, note: '', ...over,
+  boq_sr: null, original_term: '', item_name: '', quantity: 0, unit: 'Bag', unit_price: 0, total_amount: 0, note: '', brand: '', model: '', spec: '', color: '', ...over,
 });
 
 const queue = (db: Awaited<ReturnType<typeof freshDb>>, text = '15 bori cement') =>
@@ -114,8 +114,8 @@ describe('JobWorker', () => {
     const snap = await loadSnapshot(db);
     const boqItems = snap.items.filter((i) => i.list_id === boqId);
     expect(quoteCalls[0].boq).toEqual([
-      { sr: 1, item_name: 'Sand', quantity: 15, unit: 'MT' },
-      { sr: 2, item_name: 'Cement', quantity: 15, unit: 'Bag' },
+      { sr: 1, item_name: 'Sand', quantity: 15, unit: 'MT', variant: '' },
+      { sr: 2, item_name: 'Cement', quantity: 15, unit: 'Bag', variant: '' },
     ]);
     expect(quoteCalls[0].images).toEqual(['IMG']);
     expect(snap.jobs).toHaveLength(0);

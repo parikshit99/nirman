@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Trash2 } from 'lucide-react';
-import { compareQuotes, normalizeTerm, parseAmount, type QuoteLineRow, type QuoteRow } from '@nirman/shared';
+import { compareQuotes, normalizeTerm, parseAmount, variantDifferences, variantLabel, type QuoteLineRow, type QuoteRow, type VariantField } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { VsLastBadge, rupees } from '../components/PriceBadges.tsx';
 import type { QuoteLinePatch } from '../data/repo.ts';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
+import { VariantFields } from '../components/VariantFields.tsx';
 
 /**
  * Check the AI's reading of one vendor quote: every line with the BOQ item it
@@ -86,6 +87,7 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
                 <span>
                   <span className="font-mono text-gray-400 mr-1">{itemsById.get(item.id)?.sr}.</span>
                   {item.item_name}
+                  {variantLabel(item) && <span className="text-gray-500"> · {variantLabel(item)}</span>}
                 </span>
                 <span className="font-mono text-gray-500 shrink-0">
                   {item.quantity} {item.unit}
@@ -154,6 +156,9 @@ interface LineCardProps {
 function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDelete }: LineCardProps) {
   const [rate, setRate] = useState(String(line.unit_price || ''));
   const [unit, setUnit] = useState(line.unit);
+  const [showDetails, setShowDetails] = useState(false);
+  const [variant, setVariant] = useState({ brand: line.brand, model: line.model, spec: line.spec, color: line.color });
+  const variantDiffers = match ? variantDifferences(match.item, line) : [];
   const unitDiffers = !!match && normalizeTerm(unit) !== normalizeTerm(match.item.unit);
   const field = 'px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-white disabled:border-transparent';
 
@@ -166,6 +171,7 @@ function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDel
             {line.item_name !== line.original_term && line.original_term ? `${line.item_name} · ` : ''}
             {line.quantity > 0 && `${line.quantity} ${line.unit}`}
           </div>
+          {variantLabel(line) && <div className="text-xs font-bold text-gray-700">{variantLabel(line)}</div>}
         </div>
         {!readOnly && (
           <button onClick={onDelete} className="p-1 text-gray-300 hover:text-red-500 self-start" aria-label={`Delete line ${line.original_term || line.item_name}`}>
@@ -185,7 +191,7 @@ function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDel
           <option value="">— Not in BOQ (extra item) —</option>
           {boq.items.map((item, i) => (
             <option key={item.id} value={item.id}>
-              {i + 1}. {item.item_name} ({item.quantity} {item.unit})
+              {i + 1}. {item.item_name}{variantLabel(item) ? ` · ${variantLabel(item)}` : ''} ({item.quantity} {item.unit})
             </option>
           ))}
         </select>
@@ -218,8 +224,37 @@ function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDel
         />
       </div>
 
+      {!readOnly && (
+        <button onClick={() => setShowDetails(!showDetails)} className="mt-2 text-xs font-bold text-gray-600" aria-expanded={showDetails}>
+          {showDetails ? '▴' : '▾'} Brand, model, size, color
+        </button>
+      )}
+      {showDetails && (
+        <div className="mt-2">
+          <VariantFields
+            value={variant}
+            onChange={(f: VariantField, v: string) => setVariant((p) => ({ ...p, [f]: v }))}
+            inputClassName={`w-full ${field}`}
+          />
+          <button
+            onClick={() => {
+              onChange(Object.fromEntries(Object.entries(variant).map(([k, v]) => [k, v.trim()])));
+              setShowDetails(false);
+            }}
+            className="mt-2 px-3 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-bold"
+          >
+            Save details
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-1.5 mt-2">
         {line.unit_price <= 0 && <Flag tone="red">No rate written</Flag>}
+        {variantDiffers.length > 0 && (
+          <Flag tone="orange">
+            Different {variantDiffers.join(' / ').replace('spec', 'size/spec')}: BOQ asks for {variantLabel(match!.item)}. Not ranked against other vendors
+          </Flag>
+        )}
         {duplicate && <Flag tone="orange">Item {match?.sr} is matched twice; only the first line counts</Flag>}
         {unitDiffers && <Flag tone="orange">Different unit: BOQ is in {match!.item.unit}. Fix the rate and unit, or it won't be compared</Flag>}
         {cell?.qtyDiffers && (

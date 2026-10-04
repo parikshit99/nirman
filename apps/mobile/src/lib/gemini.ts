@@ -8,16 +8,16 @@ import {
   buildSystemInstruction,
   parseExtractionOutput,
   parseQuoteOutput,
-  type ExtractedMaterial,
-  type ExtractedQuoteLine,
+  type MaterialInput,
+  type QuoteLineInput,
   type ExtractionRequest,
   type QuoteExtractionRequest,
 } from '@nirman/shared';
 
 export interface Extractor {
-  extract(req: ExtractionRequest): Promise<ExtractedMaterial[]>;
+  extract(req: ExtractionRequest): Promise<MaterialInput[]>;
   /** Read a vendor's quote and match its lines to the BOQ. */
-  extractQuote(req: QuoteExtractionRequest): Promise<ExtractedQuoteLine[]>;
+  extractQuote(req: QuoteExtractionRequest): Promise<QuoteLineInput[]>;
 }
 
 /**
@@ -30,6 +30,14 @@ export class ExtractionError extends Error {
     super(message);
   }
 }
+
+/** Brand, model / item code, size/spec and colour: filled only when the source shows them. */
+const VARIANT_SCHEMA = {
+  brand: { type: Type.STRING },
+  model: { type: Type.STRING },
+  spec: { type: Type.STRING },
+  color: { type: Type.STRING },
+};
 
 const RESPONSE_SCHEMA = {
   type: Type.ARRAY,
@@ -44,6 +52,7 @@ const RESPONSE_SCHEMA = {
       total_amount: { type: Type.NUMBER },
       vendor: { type: Type.STRING },
       date: { type: Type.STRING },
+      ...VARIANT_SCHEMA,
     },
     required: ['item_name', 'original_term', 'quantity', 'unit'],
   },
@@ -62,6 +71,7 @@ const QUOTE_SCHEMA = {
       unit_price: { type: Type.NUMBER },
       total_amount: { type: Type.NUMBER },
       note: { type: Type.STRING },
+      ...VARIANT_SCHEMA,
     },
     required: ['boq_sr', 'original_term', 'item_name', 'quantity', 'unit', 'unit_price'],
   },

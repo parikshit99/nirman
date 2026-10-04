@@ -3,6 +3,27 @@ import { z } from 'zod';
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
 const isoTimestamp = z.string().datetime({ offset: true });
 
+/**
+ * What exactly was bought or asked for, where the price depends on it: brand, model or item code,
+ * size/spec (thickness, grade, rating) and colour. All optional; rows saved before these existed
+ * read as blank.
+ */
+export const VARIANT_FIELDS = ['brand', 'model', 'spec', 'color'] as const;
+export type VariantField = (typeof VARIANT_FIELDS)[number];
+export type Variant = Record<VariantField, string>;
+const storedVariant = {
+  brand: z.string().max(200).default(''),
+  model: z.string().max(200).default(''),
+  spec: z.string().max(200).default(''),
+  color: z.string().max(100).default(''),
+};
+const readVariant = {
+  brand: z.string().catch(''),
+  model: z.string().catch(''),
+  spec: z.string().catch(''),
+  color: z.string().catch(''),
+};
+
 /** One material line as returned by the AI extractor. */
 export const extractedMaterialSchema = z.object({
   item_name: z.string(),
@@ -13,14 +34,18 @@ export const extractedMaterialSchema = z.object({
   total_amount: z.coerce.number().catch(0),
   vendor: z.string().default(''),
   date: z.string().default(''),
+  ...readVariant,
 });
 export type ExtractedMaterial = z.infer<typeof extractedMaterialSchema>;
+/** A material to add: like ExtractedMaterial, but optional fields (e.g. brand) may be left out. */
+export type MaterialInput = z.input<typeof extractedMaterialSchema>;
 
 // ---------------------------------------------------------------------------
 // Rows stored in the phone's database (and in backup files).
 // ---------------------------------------------------------------------------
 
 const id = z.string().min(1).max(200);
+
 
 export const listKinds = ['audit', 'boq'] as const;
 export const listStatuses = ['draft', 'saved'] as const;
@@ -50,6 +75,7 @@ export const itemRowSchema = z.object({
   total_amount: z.number(),
   vendor: z.string().max(200),
   date: z.string().max(20),
+  ...storedVariant,
   created_at: isoTimestamp,
   updated_at: isoTimestamp,
 });
@@ -62,6 +88,7 @@ export const indexedRateRowSchema = z.object({
   date: z.string().max(20),
   price: z.number(),
   vendor: z.string().max(200),
+  ...storedVariant,
   indexed_at: isoTimestamp,
 });
 export type IndexedRateRow = z.infer<typeof indexedRateRowSchema>;
@@ -110,6 +137,7 @@ export const quoteLineRowSchema = z.object({
   unit_price: z.number(),
   total_amount: z.number(),
   note: z.string().max(500),
+  ...storedVariant,
 });
 export type QuoteLineRow = z.infer<typeof quoteLineRowSchema>;
 
@@ -184,8 +212,11 @@ export const extractedQuoteLineSchema = z.object({
   unit_price: z.coerce.number().catch(0),
   total_amount: z.coerce.number().catch(0),
   note: z.string().catch(''),
+  ...readVariant,
 });
 export type ExtractedQuoteLine = z.infer<typeof extractedQuoteLineSchema>;
+/** A quote line to store: optional fields (e.g. brand) may be left out. */
+export type QuoteLineInput = z.input<typeof extractedQuoteLineSchema>;
 
 export interface QuoteBoqItem {
   /** 1-based Sr. number, as printed on the BOQ PDF. */
@@ -193,6 +224,8 @@ export interface QuoteBoqItem {
   item_name: string;
   quantity: number;
   unit: string;
+  /** Brand, model, size/spec and colour the BOQ asks for, e.g. "Jaquar · ABC-123 · White". */
+  variant?: string;
 }
 
 export interface QuoteExtractionRequest {

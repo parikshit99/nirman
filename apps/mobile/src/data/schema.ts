@@ -111,6 +111,21 @@ const MIGRATIONS: string[] = [
     hidden_at TEXT NOT NULL
   );
   `,
+  // 4: brand, model / item code, size/spec and colour, where the price depends on them.
+  `
+  ALTER TABLE items ADD COLUMN brand TEXT NOT NULL DEFAULT '';
+  ALTER TABLE items ADD COLUMN model TEXT NOT NULL DEFAULT '';
+  ALTER TABLE items ADD COLUMN spec TEXT NOT NULL DEFAULT '';
+  ALTER TABLE items ADD COLUMN color TEXT NOT NULL DEFAULT '';
+  ALTER TABLE indexed_rates ADD COLUMN brand TEXT NOT NULL DEFAULT '';
+  ALTER TABLE indexed_rates ADD COLUMN model TEXT NOT NULL DEFAULT '';
+  ALTER TABLE indexed_rates ADD COLUMN spec TEXT NOT NULL DEFAULT '';
+  ALTER TABLE indexed_rates ADD COLUMN color TEXT NOT NULL DEFAULT '';
+  ALTER TABLE quote_lines ADD COLUMN brand TEXT NOT NULL DEFAULT '';
+  ALTER TABLE quote_lines ADD COLUMN model TEXT NOT NULL DEFAULT '';
+  ALTER TABLE quote_lines ADD COLUMN spec TEXT NOT NULL DEFAULT '';
+  ALTER TABLE quote_lines ADD COLUMN color TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 /** Default categories sort before anything the user adds. */

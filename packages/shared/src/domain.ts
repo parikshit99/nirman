@@ -1,4 +1,4 @@
-import type { ExtractedMaterial, IndexedRateRow, ItemRow, LearningMap, ListRow, QuoteLineRow, QuoteRow } from './schemas.ts';
+import { VARIANT_FIELDS, type ExtractedMaterial, type IndexedRateRow, type ItemRow, type LearningMap, type ListRow, type QuoteLineRow, type QuoteRow, type Variant, type VariantField } from './schemas.ts';
 
 export const DEFAULT_CATEGORIES = ['Civil', 'Electrical', 'Plumbing', 'Carpenter', 'Hvac', 'Tile', 'Stone', 'Other'];
 
@@ -9,6 +9,41 @@ export function normalizeTerm(term: string): string {
 /** Stable identity of a material in the database: name + unit, case-insensitive. */
 export function materialKey(name: string, unit: string | undefined | null): string {
   return JSON.stringify([normalizeTerm(name), normalizeTerm(unit || 'unit')]);
+}
+
+/** Brand, model, size/spec and colour of a row, trimmed; missing fields are blank. */
+export function variantOf(row: Partial<Variant>): Variant {
+  return { brand: (row.brand ?? '').trim(), model: (row.model ?? '').trim(), spec: (row.spec ?? '').trim(), color: (row.color ?? '').trim() };
+}
+
+/** Identity of a variant within a material: the four fields, case-insensitive; all blank is the plain item. */
+export function variantKey(row: Partial<Variant>): string {
+  return JSON.stringify(VARIANT_FIELDS.map((f) => normalizeTerm(row[f] ?? '')));
+}
+
+/** "Jaquar · ABC-123 · 2.5 sq mm · White", or '' when nothing is set. */
+export function variantLabel(row: Partial<Variant>): string {
+  return VARIANT_FIELDS.map((f) => (row[f] ?? '').trim()).filter(Boolean).join(' · ');
+}
+
+/**
+ * Fields where `offered` names something other than what `wanted` asks for. A blank on either
+ * side never counts: a BOQ that names no brand accepts any brand.
+ */
+export function variantDifferences(wanted: Partial<Variant>, offered: Partial<Variant>): VariantField[] {
+  return VARIANT_FIELDS.filter((f) => {
+    const a = normalizeTerm(wanted[f] ?? '');
+    const b = normalizeTerm(offered[f] ?? '');
+    return a !== '' && b !== '' && a !== b;
+  });
+}
+
+/** Whether a recorded price is for what `wanted` describes: every field `wanted` sets must match. */
+export function variantMatches(wanted: Partial<Variant>, candidate: Partial<Variant>): boolean {
+  return VARIANT_FIELDS.every((f) => {
+    const a = normalizeTerm(wanted[f] ?? '');
+    return a === '' || a === normalizeTerm(candidate[f] ?? '');
+  });
 }
 
 /**
@@ -78,6 +113,20 @@ export interface PricePoint {
   itemId?: string;
   /** Id of the single added rate (Index rate, or a confirmed vendor quote), so it can be removed. */
   rateId?: string;
+  /** Brand, model, size/spec and colour this price was for (blank fields when not recorded). */
+  variant: Variant;
+}
+
+/** One brand/model/spec/colour of a material, with its own prices. */
+export interface MaterialVariant {
+  key: string;
+  /** e.g. "Jaquar · ABC-123 · White"; '' for the plain item. */
+  label: string;
+  variant: Variant;
+  priceHistory: PricePoint[];
+  minPrice: number;
+  maxPrice: number;
+  latestPrice: number;
 }
 
 export interface MaterialEntry {
@@ -92,7 +141,19 @@ export interface MaterialEntry {
   maxPrice: number;
   avgPrice: number;
   latestPrice: number;
+  /** Every brand/model/spec/colour recorded for this material, plain item first. */
+  variants: MaterialVariant[];
 }
+
+const priceStats = (priceHistory: PricePoint[]) => {
+  const prices = priceHistory.map((h) => h.price);
+  const has = prices.length > 0;
+  return {
+    minPrice: has ? Math.min(...prices) : 0,
+    maxPrice: has ? Math.max(...prices) : 0,
+    latestPrice: has ? priceHistory[priceHistory.length - 1].price : 0,
+  };
+};
 
 /**
  * Build the material price database from saved sessions and manually indexed
@@ -104,17 +165,19 @@ export function buildItemDatabase(
   rates: IndexedRateRow[],
   learning: LearningMap,
 ): MaterialEntry[] {
-  type Acc = Omit<MaterialEntry, 'vendors' | 'categories' | 'addresses' | 'minPrice' | 'maxPrice' | 'avgPrice' | 'latestPrice'> & {
+  type Acc = Omit<MaterialEntry, 'vendors' | 'categories' | 'addresses' | 'minPrice' | 'maxPrice' | 'avgPrice' | 'latestPrice' | 'variants'> & {
     vendors: Set<string>;
     categories: Set<string>;
     addresses: Set<string>;
+    /** Every variant seen, priced or not (a BOQ line has no price but still names its brand). */
+    variants: Map<string, Variant>;
   };
   const db = new Map<string, Acc>();
   const entry = (name: string, unit: string): Acc => {
     const key = materialKey(name, unit);
     let e = db.get(key);
     if (!e) {
-      e = { key, name, unit, vendors: new Set(), categories: new Set(), addresses: new Set(), priceHistory: [] };
+      e = { key, name, unit, vendors: new Set(), categories: new Set(), addresses: new Set(), priceHistory: [], variants: new Map() };
       db.set(key, e);
     }
     return e;
@@ -129,6 +192,8 @@ export function buildItemDatabase(
 
     const { item_name, unit } = applyLearning(learning, raw);
     const e = entry(item_name, unit);
+    const variant = variantOf(raw);
+    if (!e.variants.has(variantKey(variant))) e.variants.set(variantKey(variant), variant);
     if (raw.vendor) e.vendors.add(raw.vendor);
     if (list.category) e.categories.add(list.category);
     if (list.address) e.addresses.add(list.address);
@@ -140,6 +205,7 @@ export function buildItemDatabase(
         timestamp: list.created_at,
         listTitle: list.title || 'Untitled session',
         itemId: raw.id,
+        variant,
       });
     }
   }
@@ -147,12 +213,15 @@ export function buildItemDatabase(
   for (const rate of rates) {
     const { item_name, unit } = applyLearning(learning, rate);
     const e = entry(item_name, unit);
+    const variant = variantOf(rate);
+    if (!e.variants.has(variantKey(variant))) e.variants.set(variantKey(variant), variant);
     e.priceHistory.push({
       date: rate.date,
       price: rate.price,
       vendor: rate.vendor || 'Manual Index',
       timestamp: rate.indexed_at,
       rateId: rate.id,
+      variant,
     });
     if (rate.vendor) e.vendors.add(rate.vendor);
   }
@@ -164,17 +233,21 @@ export function buildItemDatabase(
         return byDate !== 0 ? byDate : new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
       });
       const prices = priceHistory.map((h) => h.price);
-      const has = prices.length > 0;
+      const variants: MaterialVariant[] = [...e.variants.entries()]
+        .map(([key, variant]) => {
+          const points = priceHistory.filter((p) => variantKey(p.variant) === key);
+          return { key, label: variantLabel(variant), variant, priceHistory: points, ...priceStats(points) };
+        })
+        .sort((a, b) => (a.label === '' ? -1 : b.label === '' ? 1 : a.label.localeCompare(b.label)));
       return {
         ...e,
         priceHistory,
         vendors: [...e.vendors],
         categories: [...e.categories],
         addresses: [...e.addresses],
-        minPrice: has ? Math.min(...prices) : 0,
-        maxPrice: has ? Math.max(...prices) : 0,
-        avgPrice: has ? prices.reduce((a, b) => a + b, 0) / prices.length : 0,
-        latestPrice: has ? priceHistory[priceHistory.length - 1].price : 0,
+        ...priceStats(priceHistory),
+        avgPrice: prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0,
+        variants,
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -200,6 +273,8 @@ export interface QuoteCell {
   unitDiffers: boolean;
   /** Vendor's quantity differs from the BOQ quantity. */
   qtyDiffers: boolean;
+  /** Brand, model, size/spec or colour the vendor named that differs from what the BOQ asks for. */
+  variantDiffers: VariantField[];
   /** Change against the last price recorded before this quote (0.08 = +8%), when comparable. */
   vsLast: number | null;
   /** The last price that vsLast is measured against. */
@@ -228,6 +303,8 @@ export interface VendorSummary {
   extras: QuoteLineRow[];
   /** Lines quoted in a different unit than the BOQ (left out of the total). */
   unitIssues: number;
+  /** Lines for a different brand/model/spec/colour than the BOQ asks for (in the total, but not ranked). */
+  variantIssues: number;
   /** Same items at their last recorded prices, and the change against that. */
   lastTotal: number;
   vsLast: number | null;
@@ -243,6 +320,8 @@ export interface QuoteComparison {
 }
 
 const sameUnit = (a: string, b: string) => normalizeTerm(a || 'unit') === normalizeTerm(b || 'unit');
+/** Priced in the BOQ's unit for what the BOQ asks for, so it can be ranked against other vendors. */
+const isComparable = (c: QuoteCell | undefined): c is QuoteCell => !!c && c.price > 0 && !c.unitDiffers && c.variantDiffers.length === 0;
 const fromQuote = (p: PricePoint, q: QuoteRow) => p.vendor === q.vendor && p.date === q.quote_date;
 
 function summarizeHistory(points: PricePoint[]): PriceHistory {
@@ -279,25 +358,28 @@ export function compareQuotes(
   const rows: ComparisonRow[] = boqItems.map((item, i) => {
     const { item_name, unit } = applyLearning(learning, item);
     const allPoints = byKey.get(materialKey(item_name, unit))?.priceHistory ?? [];
-    const history = summarizeHistory(allPoints.filter((p) => !quotes.some((q) => fromQuote(p, q))));
+    // Only prices for what this BOQ line asks for: a line naming Jaquar is not measured against Hindware.
+    const history = summarizeHistory(allPoints.filter((p) => variantMatches(item, p.variant) && !quotes.some((q) => fromQuote(p, q))));
     const cells: ComparisonRow['cells'] = {};
     for (const q of quotes) {
       const line = (linesByQuote.get(q.id) ?? []).find((l) => l.boq_item_id === item.id);
       if (!line) continue;
       const unitDiffers = !sameUnit(line.unit, item.unit);
+      const variantDiffers = variantDifferences(item, line);
       // Other vendors' quotes in this comparison are left out too, so the order of confirming doesn't matter.
-      const lastPoint = unitDiffers ? null : history.points.filter((p) => p.date <= q.quote_date).at(-1) ?? null;
+      const lastPoint = unitDiffers || variantDiffers.length ? null : history.points.filter((p) => p.date <= q.quote_date).at(-1) ?? null;
       cells[q.id] = {
         line,
         price: line.unit_price,
         unitDiffers,
         qtyDiffers: line.quantity > 0 && line.quantity !== item.quantity,
+        variantDiffers,
         vsLast: lastPoint && line.unit_price > 0 ? (line.unit_price - lastPoint.price) / lastPoint.price : null,
         lastPoint,
         cheapest: false,
       };
     }
-    const comparable = Object.values(cells).filter((c): c is QuoteCell => !!c && c.price > 0 && !c.unitDiffers);
+    const comparable = Object.values(cells).filter(isComparable);
     if (comparable.length > 1) {
       const low = Math.min(...comparable.map((c) => c.price));
       for (const c of comparable) c.cheapest = c.price === low;
@@ -305,10 +387,7 @@ export function compareQuotes(
     return { sr: i + 1, item, history, cells };
   });
 
-  const comparableIn = (row: ComparisonRow, q: QuoteRow) => {
-    const c = row.cells[q.id];
-    return !!c && c.price > 0 && !c.unitDiffers;
-  };
+  const comparableIn = (row: ComparisonRow, q: QuoteRow) => isComparable(row.cells[q.id]);
   const common = rows.filter((row) => quotes.length > 0 && quotes.every((q) => comparableIn(row, q)));
   const boqIds = new Set(boqItems.map((b) => b.id));
   const vendors: VendorSummary[] = quotes.map((q) => {
@@ -317,6 +396,7 @@ export function compareQuotes(
     let comparedTotal = 0;
     let quoted = 0;
     let unitIssues = 0;
+    let variantIssues = 0;
     const missing: ItemRow[] = [];
     for (const row of rows) {
       const cell = row.cells[q.id];
@@ -329,6 +409,7 @@ export function compareQuotes(
         unitIssues++;
         continue;
       }
+      if (cell.variantDiffers.length) variantIssues++;
       total += row.item.quantity * cell.price;
       if (cell.lastPoint) {
         comparedTotal += row.item.quantity * cell.price;
@@ -343,6 +424,7 @@ export function compareQuotes(
       missing,
       extras,
       unitIssues,
+      variantIssues,
       lastTotal,
       vsLast: lastTotal > 0 ? (comparedTotal - lastTotal) / lastTotal : null,
       commonTotal: common.reduce((sum, row) => sum + row.item.quantity * row.cells[q.id]!.price, 0),
@@ -357,18 +439,26 @@ function csvCell(value: string | number): string {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
+/** One row per variant (brand/model/spec/colour) of each material. */
 export function materialDatabaseToCSV(entries: MaterialEntry[]): string {
-  const headers = ['Item Name', 'Unit', 'Categories', 'Vendors', 'Min Price (Rs)', 'Max Price (Rs)', 'Avg Price (Rs)', 'Latest Price (Rs)', 'Project Locations'];
-  const rows = entries.map((e) => [
-    csvCell(e.name),
-    csvCell(e.unit),
-    csvCell(e.categories.join(', ')),
-    csvCell(e.vendors.join(', ')),
-    e.minPrice,
-    e.maxPrice,
-    Math.round(e.avgPrice),
-    e.latestPrice,
-    csvCell(e.addresses.join(', ')),
-  ]);
+  const headers = ['Item Name', 'Unit', 'Brand', 'Model', 'Size/Spec', 'Color', 'Categories', 'Vendors', 'Min Price (Rs)', 'Max Price (Rs)', 'Avg Price (Rs)', 'Latest Price (Rs)', 'Project Locations'];
+  const rows = entries.flatMap((e) =>
+    (e.variants.length ? e.variants : [{ variant: variantOf({}), priceHistory: e.priceHistory, ...priceStats(e.priceHistory) }]).map((v) => {
+      const prices = v.priceHistory.map((p) => p.price);
+      const vendors = [...new Set(v.priceHistory.map((p) => p.vendor))];
+      return [
+        csvCell(e.name),
+        csvCell(e.unit),
+        ...VARIANT_FIELDS.map((f) => csvCell(v.variant[f])),
+        csvCell(e.categories.join(', ')),
+        csvCell((vendors.length ? vendors : e.vendors).join(', ')),
+        v.minPrice,
+        v.maxPrice,
+        prices.length ? Math.round(prices.reduce((x, y) => x + y, 0) / prices.length) : 0,
+        v.latestPrice,
+        csvCell(e.addresses.join(', ')),
+      ];
+    }),
+  );
   return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
 }

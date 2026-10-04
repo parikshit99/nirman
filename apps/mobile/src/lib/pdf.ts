@@ -1,10 +1,12 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { ItemRow, ListRow, QuoteComparison } from '@nirman/shared';
+import { variantLabel, type ItemRow, type ListRow, type QuoteComparison } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
 import appIcon from './pdf-icon.png?inline';
 
 const rupees = (n: number) => `Rs. ${(n || 0).toLocaleString('en-IN')}`;
+/** Item name, with brand · model · size/spec · colour on a second line when given. */
+const describe = (item: ItemRow) => [item.item_name, variantLabel(item)].filter(Boolean).join('\n');
 
 /** The app icon at the top left, with the report title beside it. */
 function drawTitle(doc: jsPDF, title: string, size: number) {
@@ -34,7 +36,7 @@ export function buildPdf(kind: ListKind, items: ItemRow[], notes: string): jsPDF
   const body = items.map((item, i) => {
     const row: (string | number)[] = [
       i + 1,
-      item.item_name,
+      describe(item),
       item.quantity,
       item.unit,
       isAudit ? rupees(item.unit_price) : '',
@@ -115,7 +117,7 @@ export function buildQuoteComparisonPdf(boq: ListRow, comparison: QuoteCompariso
   const head = ['Sr.', 'Item', 'Qty', 'Last price', ...comparison.vendors.map((v) => v.quote.vendor)];
   const body: string[][] = comparison.rows.map((row) => [
     String(row.sr),
-    row.item.item_name,
+    describe(row.item),
     `${row.item.quantity} ${row.item.unit}`,
     row.history.last ? `${rupees(row.history.last.price)}\n${row.history.last.date} ${row.history.last.vendor}` : '-',
     ...comparison.vendors.map((v) => {

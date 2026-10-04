@@ -1,5 +1,5 @@
 import { Download, Plus, Trophy } from 'lucide-react';
-import { compareQuotes, type QuoteCell, type QuoteRow } from '@nirman/shared';
+import { compareQuotes, variantLabel, type QuoteCell, type QuoteRow } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { Sparkline, VsLastBadge, pct, rupees, shortDate } from '../components/PriceBadges.tsx';
 import { shareFile } from '../lib/files.ts';
@@ -61,6 +61,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
               <span>· {v.quoted}/{boq.items.length} quoted</span>
               {v.missing.length > 0 && <b className="text-red-600">· {v.missing.length} missing</b>}
               {v.unitIssues > 0 && <span className="text-orange-700">· {v.unitIssues} other unit</span>}
+              {v.variantIssues > 0 && <span className="text-orange-700">· {v.variantIssues} other brand/model</span>}
             </div>
             {multi && comparison.commonItems < boq.items.length && (
               <div className="text-[11px] text-gray-600 mt-1">
@@ -83,6 +84,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
               <div className="min-w-0">
                 <span className="font-mono text-gray-400 mr-1 text-xs">{row.sr}.</span>
                 <span className="font-bold text-sm">{row.item.item_name}</span>
+                {variantLabel(row.item) && <div className="text-xs text-gray-600">{variantLabel(row.item)}</div>}
               </div>
               <span className="text-[11px] text-gray-500 font-mono shrink-0">
                 {row.item.quantity} {row.item.unit}
@@ -131,6 +133,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
                 <td className="p-2">
                   <span className="font-mono text-gray-400 mr-1">{row.sr}.</span>
                   <span className="font-bold">{row.item.item_name}</span>
+                  {variantLabel(row.item) && <div className="text-[11px] text-gray-600">{variantLabel(row.item)}</div>}
                   <div className="text-[11px] text-gray-500">
                     {row.item.quantity} {row.item.unit}
                   </div>
@@ -210,6 +213,7 @@ function PriceCell({ cell }: { cell?: QuoteCell }) {
         <VsLastBadge vsLast={cell.vsLast} last={cell.lastPoint} />
       </div>
       {cell.unitDiffers && <div className="text-[11px] text-orange-700">different unit, not compared</div>}
+      {cell.variantDiffers.length > 0 && <div className="text-[11px] text-orange-700">{variantLabel(cell.line)}: not what the BOQ asks for, not ranked</div>}
       {cell.qtyDiffers && <div className="text-[11px] text-gray-500">quoted for {cell.line.quantity}</div>}
     </div>
   );

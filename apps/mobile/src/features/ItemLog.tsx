@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { AlertTriangle, Calendar, Check, FileCode, HardHat, History, Pencil, Trash2, Truck, X, Zap } from 'lucide-react';
-import { materialKey, parseAmount, todayISO, type ItemRow, type MaterialEntry } from '@nirman/shared';
+import { VARIANT_FIELDS, materialKey, parseAmount, todayISO, variantLabel, variantMatches, type ItemRow, type MaterialEntry } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
+import { VariantFields } from '../components/VariantFields.tsx';
 import type { ItemPatch, ListKind } from '../data/repo.ts';
 import { useBackHandler } from '../lib/backButton.ts';
 import { useAppState } from '../state/AppState.tsx';
@@ -33,6 +34,10 @@ export function ItemLog({ kind, items, searching }: Props) {
       unit: item.unit,
       unit_price: String(item.unit_price),
       vendor: item.vendor,
+      brand: item.brand,
+      model: item.model,
+      spec: item.spec,
+      color: item.color,
     });
   };
 
@@ -50,6 +55,7 @@ export function ItemLog({ kind, items, searching }: Props) {
       unit: draft.unit.trim(),
       unit_price: unitPrice,
       vendor: draft.vendor.trim(),
+      ...Object.fromEntries(VARIANT_FIELDS.map((f) => [f, (draft[f] ?? '').trim()])),
     };
     await actions.updateItem(editingId, patch);
     setEditingId(null);
@@ -92,6 +98,7 @@ export function ItemLog({ kind, items, searching }: Props) {
                         <span className="text-xs font-bold text-gray-500">Item</span>
                         <input autoFocus aria-label="Item name" className={`${field} font-bold`} value={draft.item_name} onChange={set('item_name')} />
                       </label>
+                      <VariantFields value={draft} onChange={(f, v) => setDraft((p) => ({ ...p, [f]: v }))} inputClassName={field} />
                       <div className="grid grid-cols-3 gap-2">
                         <label className="block">
                           <span className="text-xs font-bold text-gray-500">Qty</span>
@@ -136,7 +143,7 @@ export function ItemLog({ kind, items, searching }: Props) {
                     <ItemCard
                       item={item}
                       isAudit={isAudit}
-                      dbMatch={byKey.get(materialKey(item.item_name, item.unit))}
+                      dbMatch={pricesFor(byKey.get(materialKey(item.item_name, item.unit)), item)}
                       onEdit={() => startEditing(item)}
                       onIndex={() => actions.indexRates([item])}
                       pendingDelete={pendingDeletes.has(item.id)}
@@ -169,10 +176,18 @@ export function ItemLog({ kind, items, searching }: Props) {
   );
 }
 
+/** Past prices for this exact item: a line naming a brand/model/colour only sees prices for that. */
+type MatchingPrices = Pick<MaterialEntry, 'latestPrice' | 'priceHistory'>;
+function pricesFor(entry: MaterialEntry | undefined, item: ItemRow): MatchingPrices | undefined {
+  if (!entry) return undefined;
+  const priceHistory = entry.priceHistory.filter((p) => variantMatches(item, p.variant));
+  return priceHistory.length ? { priceHistory, latestPrice: priceHistory[priceHistory.length - 1].price } : undefined;
+}
+
 interface CardProps {
   item: ItemRow;
   isAudit: boolean;
-  dbMatch?: MaterialEntry;
+  dbMatch?: MatchingPrices;
   onEdit(): void;
   onIndex(): void;
   pendingDelete: boolean;
@@ -215,6 +230,7 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, pendingDelete, onDe
             </span>
             {isAudit && <span className="font-mono font-bold text-sm text-[var(--color-brand-dark)] shrink-0">{rupees(item.total_amount)}</span>}
           </div>
+          {variantLabel(item) && <div className="text-xs font-bold text-gray-700 mt-0.5">{variantLabel(item)}</div>}
           <div className="text-xs text-gray-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span className="font-mono">
               {item.quantity} {item.unit}
