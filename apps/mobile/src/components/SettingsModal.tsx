@@ -282,15 +282,22 @@ function StorageSection() {
       </dl>
       {hiddenMaterials.length > 0 && (
         <div className="pt-2">
-          <div className="text-[11px] text-gray-500 mb-1">Hidden from Data ({hiddenMaterials.length})</div>
+          <div className="flex justify-between items-center text-[11px] text-gray-500 mb-1">
+            <span>Deleted from Data ({hiddenMaterials.length})</span>
+            {hiddenMaterials.length > 1 && (
+              <button onClick={async () => { for (const m of hiddenMaterials) await actions.unhideMaterial(m.id); }} className="text-blue-600 font-bold underline" aria-label="Restore all deleted materials to Data">
+                Restore all
+              </button>
+            )}
+          </div>
           <ul className="space-y-1">
             {hiddenMaterials.map((m) => (
               <li key={m.id} className="flex items-center justify-between gap-2 text-xs bg-gray-50 rounded-lg px-3 py-1.5">
                 <span className="truncate">
                   {m.name} <span className="text-gray-500">· per {m.unit}</span>
                 </span>
-                <button onClick={() => actions.unhideMaterial(m.id)} className="text-blue-600 font-bold underline shrink-0">
-                  Unhide
+                <button onClick={() => actions.unhideMaterial(m.id)} className="text-blue-600 font-bold underline shrink-0" aria-label={`Restore ${m.name} to Data`}>
+                  Restore
                 </button>
               </li>
             ))}

@@ -157,14 +157,21 @@ const priceStats = (priceHistory: PricePoint[]) => {
 
 /**
  * Build the material price database from saved sessions and manually indexed
- * rates. Draft lists are ignored.
+ * rates. Draft lists are ignored. `deleted` maps a material key to when it was
+ * deleted from the database: everything recorded up to then is left out (saved
+ * lists themselves are untouched), and anything recorded later shows again.
  */
 export function buildItemDatabase(
   lists: ListRow[],
   items: ItemRow[],
   rates: IndexedRateRow[],
   learning: LearningMap,
+  deleted: Record<string, string> = {},
 ): MaterialEntry[] {
+  const isDeleted = (name: string, unit: string, recordedAt: string) => {
+    const cutoff = deleted[materialKey(name, unit)];
+    return !!cutoff && recordedAt <= cutoff;
+  };
   type Acc = Omit<MaterialEntry, 'vendors' | 'categories' | 'addresses' | 'minPrice' | 'maxPrice' | 'avgPrice' | 'latestPrice' | 'variants'> & {
     vendors: Set<string>;
     categories: Set<string>;
@@ -191,6 +198,7 @@ export function buildItemDatabase(
     if (!list) continue;
 
     const { item_name, unit } = applyLearning(learning, raw);
+    if (isDeleted(item_name, unit, list.created_at)) continue;
     const e = entry(item_name, unit);
     const variant = variantOf(raw);
     if (!e.variants.has(variantKey(variant))) e.variants.set(variantKey(variant), variant);
@@ -212,6 +220,7 @@ export function buildItemDatabase(
 
   for (const rate of rates) {
     const { item_name, unit } = applyLearning(learning, rate);
+    if (isDeleted(item_name, unit, rate.indexed_at)) continue;
     const e = entry(item_name, unit);
     const variant = variantOf(rate);
     if (!e.variants.has(variantKey(variant))) e.variants.set(variantKey(variant), variant);
@@ -461,4 +470,62 @@ export function materialDatabaseToCSV(entries: MaterialEntry[]): string {
     }),
   );
   return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Possible duplicates (the same thing recorded under another name)
+// ---------------------------------------------------------------------------
+
+const words = (name: string) => normalizeTerm(name).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+const hasDigit = (w: string) => /\p{N}/u.test(w);
+
+/** Same word, or one letter off for longer words ("cemnt" / "cement"). */
+function sameWord(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (hasDigit(a) || hasDigit(b) || a.length < 4 || b.length < 4 || Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  let j = 0;
+  let edits = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      i++;
+      j++;
+      continue;
+    }
+    if (++edits > 1) return false;
+    if (a.length > b.length) i++;
+    else if (b.length > a.length) j++;
+    else {
+      i++;
+      j++;
+    }
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1;
+}
+
+/**
+ * How alike two material names are, 0..1, or 0 when they can't be the same product: names with
+ * different codes or numbers ("JDS White 101" vs "102", "12mm" vs "16mm") never match, and extra
+ * product words ("Wash Basin" vs "Wash Basin Diverter") lower the score.
+ */
+export function nameSimilarity(a: string, b: string): number {
+  const wa = [...new Set(words(a))];
+  const wb = [...new Set(words(b))];
+  if (!wa.length || !wb.length) return 0;
+  const codes = (ws: string[]) => ws.filter(hasDigit).sort().join(' ');
+  if (codes(wa) !== codes(wb)) return 0;
+  const shared = wa.filter((w) => wb.some((v) => sameWord(w, v))).length;
+  return shared / (wa.length + wb.length - shared);
+}
+
+/** Materials that look like the same thing under another name, best first (same unit before others). */
+export function similarMaterials(material: MaterialEntry, all: MaterialEntry[], limit = 5): MaterialEntry[] {
+  const sameUnit = (e: MaterialEntry) => normalizeTerm(e.unit) === normalizeTerm(material.unit);
+  return all
+    .filter((e) => e.key !== material.key)
+    .map((e) => ({ e, score: nameSimilarity(material.name, e.name) }))
+    .filter((s) => s.score >= 0.67)
+    .sort((x, y) => Number(sameUnit(y.e)) - Number(sameUnit(x.e)) || y.score - x.score)
+    .slice(0, limit)
+    .map((s) => s.e);
 }
