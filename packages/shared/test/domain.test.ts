@@ -6,6 +6,7 @@ import {
   materialKey,
   parseAmount,
   parseExtractionOutput,
+  similarMaterials,
   variantDifferences,
   variantKey,
   variantLabel,
@@ -136,5 +137,26 @@ describe('variants', () => {
       ['Legrand · White', 2, 125],
     ]);
     expect(materialDatabaseToCSV(db).split('\n')).toHaveLength(3);
+  });
+});
+
+describe('similarMaterials', () => {
+  const entry = (name: string, unit = 'piece') => buildItemDatabase([list('l1')], [item(name + unit, 'l1', { item_name: name, unit, original_term: '' })], [], {})[0];
+
+  it('does not offer different products that share words', () => {
+    const basin = entry('Wash Basin');
+    const others = ['Wash Basin Diverter Spout', 'Wash Basin JDS White 101', 'Wash Basin JDS White 102', 'Center Hole Basin Mixer'].map((n) => entry(n));
+    expect(similarMaterials(basin, others)).toEqual([]);
+    expect(similarMaterials(others[1], others)).toEqual([]);
+  });
+
+  it('offers reworded names and misspellings, same unit first', () => {
+    const opc = entry('Cement OPC 53', 'Bag');
+    const grade = entry('OPC Cement 53 grade', 'Bag');
+    expect(similarMaterials(opc, [grade]).map((e) => e.name)).toEqual(['OPC Cement 53 grade']);
+    const typo = entry('Cemnt', 'Bag');
+    const kg = entry('Cement', 'kg');
+    const bag = entry('Cement', 'Bag');
+    expect(similarMaterials(typo, [kg, bag]).map((e) => `${e.name}/${e.unit}`)).toEqual(['Cement/Bag', 'Cement/kg']);
   });
 });

@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { Check, ChevronDown, Database, Download, EyeOff, GitMerge, Pencil, TrendingUp, Trash2, Truck, X } from 'lucide-react';
-import Fuse from 'fuse.js';
-import { materialDatabaseToCSV, materialKey, parseAmount, todayISO, variantLabel, type MaterialEntry } from '@nirman/shared';
+import { materialDatabaseToCSV, materialKey, parseAmount, similarMaterials, todayISO, variantLabel, type MaterialEntry } from '@nirman/shared';
 import { FilterChips } from '../components/FilterChips.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
@@ -438,10 +437,7 @@ function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClos
   const [name, setName] = useState(material.name);
   const [unit, setUnit] = useState(material.unit);
   const others = itemDatabase.filter((e) => e.key !== material.key);
-  const similar = new Fuse(others, { keys: ['name'], threshold: 0.45, ignoreLocation: true })
-    .search(material.name)
-    .slice(0, 5)
-    .map((r) => r.item);
+  const similar = similarMaterials(material, itemDatabase);
 
   const mergeInto = async (target: MaterialEntry) => {
     const sameUnit = target.unit.toLowerCase() === material.unit.toLowerCase();
@@ -518,9 +514,14 @@ function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClos
               {similar.map((e) => (
                 <li key={e.key} className="flex items-center justify-between gap-2 p-2 border border-gray-200 rounded-xl">
                   <span className="min-w-0 text-sm">
-                    <span className="font-bold block truncate">{e.name}</span>
+                    <span className="font-bold block break-words">{e.name}</span>
+                    {e.variants.some((v) => v.label) && (
+                      <span className="text-xs font-bold text-gray-700 block break-words">
+                        {e.variants.map((v) => v.label).filter(Boolean).join(' / ')}
+                      </span>
+                    )}
                     <span className="text-xs text-gray-500">
-                      per {e.unit} · {e.priceHistory.length} price{e.priceHistory.length === 1 ? '' : 's'}
+                      per {e.unit} · {e.priceHistory.length ? `₹${Math.round(e.latestPrice).toLocaleString('en-IN')} latest` : 'no prices'}
                     </span>
                   </span>
                   <button onClick={() => mergeInto(e)} className="shrink-0 px-3 py-2 text-xs font-bold text-orange-700 bg-orange-50 rounded-lg flex items-center gap-1">
