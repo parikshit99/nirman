@@ -5,8 +5,8 @@ import type { ListKind } from '../data/repo.ts';
 import appIcon from './pdf-icon.png?inline';
 
 const rupees = (n: number) => `Rs. ${(n || 0).toLocaleString('en-IN')}`;
-/** Item name, with brand · model · size/spec · colour on a second line when given. */
-const describe = (item: ItemRow) => [item.item_name, variantLabel(item)].filter(Boolean).join('\n');
+/** Item name, with brand · model · size/spec · colour, and how it was ordered, on further lines when given. */
+const describe = (item: ItemRow) => [item.item_name, variantLabel(item), item.ordered_as && `Ordered: ${item.ordered_as}`].filter(Boolean).join('\n');
 
 /** The app icon at the top left, with the report title beside it. */
 function drawTitle(doc: jsPDF, title: string, size: number) {

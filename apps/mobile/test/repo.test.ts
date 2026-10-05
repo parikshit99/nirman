@@ -296,6 +296,7 @@ describe('local repository', () => {
       await db.run('ALTER TABLE indexed_rates DROP COLUMN category');
       await db.run('ALTER TABLE indexed_rates DROP COLUMN address');
       await db.run('ALTER TABLE items DROP COLUMN delivered_at');
+      await db.run('ALTER TABLE items DROP COLUMN ordered_as');
       await db.run('UPDATE schema_version SET version = 4');
       await migrateLocal(db);
       const rates = (await loadSnapshot(db)).rates.map((r) => [r.item_name, r.category, r.address]).sort();

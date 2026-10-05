@@ -142,6 +142,10 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE items ADD COLUMN delivered_at TEXT NOT NULL DEFAULT '';
   `,
+  // 7: how a line was ordered when it is billed in another unit (TMT bundles billed per kg, tiles per sqft).
+  `
+  ALTER TABLE items ADD COLUMN ordered_as TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 /** Default categories sort before anything the user adds. */

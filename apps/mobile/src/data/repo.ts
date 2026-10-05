@@ -172,6 +172,7 @@ async function insertMaterials(tx: SqlExecutor, listId: string, input: MaterialI
       date: m.date || '',
       ...variantOf(m),
       delivered_at: '',
+      ordered_as: m.ordered_as,
       created_at: ts,
       updated_at: ts,
     });
@@ -192,7 +193,7 @@ export async function addItems(db: Db, listId: string, materials: MaterialInput[
   await db.transaction((tx) => insertMaterials(tx, listId, materials));
 }
 
-export type ItemPatch = Partial<Pick<ItemRow, 'item_name' | 'quantity' | 'unit' | 'unit_price' | 'vendor' | 'date' | 'delivered_at' | VariantField>>;
+export type ItemPatch = Partial<Pick<ItemRow, 'item_name' | 'quantity' | 'unit' | 'unit_price' | 'vendor' | 'date' | 'delivered_at' | 'ordered_as' | VariantField>>;
 
 /**
  * Save an edited item. When the name or unit changed, remember the correction

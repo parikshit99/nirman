@@ -5,6 +5,7 @@ import { VARIANT_FIELDS, materialKey, parseAmount, todayISO, variantLabel, varia
 import { useDialogs } from '../components/Dialogs.tsx';
 import { DeliveredToggle } from '../components/DeliveredToggle.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
+import { QuantityHelper } from '../components/QuantityHelper.tsx';
 import { VariantFields } from '../components/VariantFields.tsx';
 import type { ItemPatch, ListKind } from '../data/repo.ts';
 import { useBackHandler } from '../lib/backButton.ts';
@@ -39,6 +40,7 @@ export function ItemLog({ kind, items, searching }: Props) {
       model: item.model,
       spec: item.spec,
       color: item.color,
+      ordered_as: item.ordered_as,
     });
   };
 
@@ -56,6 +58,7 @@ export function ItemLog({ kind, items, searching }: Props) {
       unit: draft.unit.trim(),
       unit_price: unitPrice,
       vendor: draft.vendor.trim(),
+      ordered_as: (draft.ordered_as ?? '').trim(),
       ...Object.fromEntries(VARIANT_FIELDS.map((f) => [f, (draft[f] ?? '').trim()])),
     };
     await actions.updateItem(editingId, patch);
@@ -101,6 +104,18 @@ export function ItemLog({ kind, items, searching }: Props) {
                         <input autoFocus aria-label="Item name" className={`${field} font-bold`} value={draft.item_name} onChange={set('item_name')} />
                       </label>
                       <VariantFields value={draft} onChange={(f, v) => setDraft((p) => ({ ...p, [f]: v }))} inputClassName={field} />
+                      <QuantityHelper
+                        itemName={draft.item_name}
+                        spec={draft.spec ?? ''}
+                        fieldClassName={field}
+                        onApply={(r) => setDraft((p) => ({ ...p, quantity: String(r.quantity), unit: r.unit, spec: r.spec, ordered_as: r.ordered_as }))}
+                      />
+                      {draft.ordered_as && (
+                        <label className="block">
+                          <span className="text-xs font-bold text-gray-500">Ordered as</span>
+                          <input aria-label="Ordered as" className={field} value={draft.ordered_as} onChange={set('ordered_as')} />
+                        </label>
+                      )}
                       <div className="grid grid-cols-3 gap-2">
                         <label className="block">
                           <span className="text-xs font-bold text-gray-500">Qty</span>
@@ -243,6 +258,7 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendin
             {isAudit && <span className="font-mono font-bold text-sm text-[var(--color-brand-dark)] shrink-0">{rupees(item.total_amount)}</span>}
           </div>
           {variantLabel(item) && <div className="text-xs font-bold text-gray-700 mt-0.5">{variantLabel(item)}</div>}
+          {item.ordered_as && <div className="text-xs text-orange-800 mt-0.5">Ordered: {item.ordered_as}</div>}
           <div className="text-xs text-gray-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span className="font-mono">
               {item.quantity} {item.unit}

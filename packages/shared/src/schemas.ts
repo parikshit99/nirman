@@ -35,6 +35,8 @@ export const extractedMaterialSchema = z.object({
   vendor: z.string().default(''),
   date: z.string().default(''),
   ...readVariant,
+  /** How it was ordered when billed in another unit, e.g. "3 bundles of 12 mm". */
+  ordered_as: z.string().catch(''),
 });
 export type ExtractedMaterial = z.infer<typeof extractedMaterialSchema>;
 /** A material to add: like ExtractedMaterial, but optional fields (e.g. brand) may be left out. */
@@ -78,6 +80,8 @@ export const itemRowSchema = z.object({
   ...storedVariant,
   /** Date the material reached the site (YYYY-MM-DD); blank until ticked as delivered. */
   delivered_at: z.string().max(20).default(''),
+  /** How it was ordered when billed in another unit, e.g. "3 bundles of 12 mm" (billed in kg). */
+  ordered_as: z.string().max(300).default(''),
   created_at: isoTimestamp,
   updated_at: isoTimestamp,
 });

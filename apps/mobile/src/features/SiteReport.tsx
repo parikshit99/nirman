@@ -50,7 +50,7 @@ export function SiteReport({ onClose }: { onClose(): void }) {
     const name = `Site_report_${address.replace(/[^\w-]+/g, '_').slice(0, 40)}_${todayISO()}`;
     try {
       if (format === 'xlsx') {
-        await shareFiles([await sheetToXlsx(siteReportSheet(address, filters, report), `${name}.xlsx`, 'Site report', [16, 30, 12, 8, 12, 14, 24, 14, 12, 12, 14, 18, 20, 14])]);
+        await shareFiles([await sheetToXlsx(siteReportSheet(address, filters, report), `${name}.xlsx`, 'Site report', [16, 30, 12, 12, 12, 14, 24, 10, 8, 26, 12, 14, 18, 20, 14])]);
       } else {
         const doc = buildSiteReportPdf(address, filters, report);
         await shareFiles(format === 'pdf' ? [pdfFile(doc, name)] : await pdfToJpegs(doc, name));
