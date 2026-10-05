@@ -1,6 +1,6 @@
 # What's new in Nirman
 
-Builds are numbered `<series>.<build>`; the newest series is at the top.
+Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
 ## 2.2 — Order slips
 

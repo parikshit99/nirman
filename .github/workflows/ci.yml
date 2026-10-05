@@ -26,6 +26,8 @@ jobs:
       contents: write # to publish the latest-debug release
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history, to count the changes since the last version bump
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -39,8 +41,15 @@ jobs:
           # The default list includes the long-removed 'tools' package, which makes sdkmanager fail.
           packages: platform-tools
       - run: npm ci
-      - name: Set the app version (major.minor from apps/mobile/package.json, then the build number)
-        run: echo "APP_VERSION=$(node -p "require('./apps/mobile/package.json').version.split('.').slice(0, 2).join('.')").${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+      - name: Set the app version (major.minor from apps/mobile/package.json, then the number of changes since it was set)
+        # Feature releases bump major.minor by hand (see CLAUDE.md); every later fix on main counts up the patch:
+        # 2.2.0, 2.2.1, 2.2.2 ... and back to .0 at the next bump. Android's versionCode stays the run number.
+        run: |
+          MAJOR_MINOR=$(node -p "require('./apps/mobile/package.json').version.split('.').slice(0, 2).join('.')")
+          BUMPED_AT=$(git log -1 --format=%H -G'"version":' -- apps/mobile/package.json)
+          PATCH=$(git rev-list --count "$BUMPED_AT..HEAD")
+          echo "APP_VERSION=$MAJOR_MINOR.$PATCH" >> "$GITHUB_ENV"
+          echo "Version $MAJOR_MINOR.$PATCH ($PATCH changes since $MAJOR_MINOR was set in ${BUMPED_AT::7})"
       - name: Build web bundle
         run: npm run build -w apps/mobile
       - run: npx cap sync android

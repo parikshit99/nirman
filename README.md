@@ -66,6 +66,10 @@ cd android && ./gradlew assembleDebug
 
 ### Versions
 
-Every build is numbered `2.0.<build>` (e.g. `2.0.130`). The build number comes from CI and goes up with every build, so each APK installs over the previous one as an update. To start a new series (e.g. `2.1`), change `version` in `apps/mobile/package.json` and add a section at the top of [CHANGELOG.md](CHANGELOG.md); only the first two numbers of the version are used, and the newest changelog section becomes the release notes and the app's *What's new* screen, shown once after the update. The version shows in *Settings → On this phone*, in Android's App info, in the release title, and as a `v2.0.<build>` tag on the commit it was built from. Local builds show `dev`.
+Versions are `MAJOR.MINOR.PATCH` (e.g. `2.2.3`):
+- **MAJOR.MINOR** changes by hand for a new feature (2.2 → 2.3) or a major release (2.x → 3.0), set in `apps/mobile/package.json` with a matching section at the top of [CHANGELOG.md](CHANGELOG.md). That section becomes the release notes and the app's *What's new* screen, shown once after the update.
+- **PATCH** counts up by itself: CI sets it to the number of changes merged since MAJOR.MINOR was last set, so fixes go 2.2.0 → 2.2.1 → 2.2.2 and the count starts again at .0 with the next feature release.
+
+[CLAUDE.md](CLAUDE.md) has the rules for deciding which kind a change is. Android's internal version code is the CI build number, so every APK still installs over the previous one as an update. The version shows in *Settings → On this phone*, in Android's App info, in the release title, and as a `v2.2.3` tag on the commit it was built from. Local builds show `dev`.
 
 CI (`.github/workflows/ci.yml`) type-checks, runs the tests and builds a debug APK on every push. Builds of `main` are published to the [`latest-debug` release](https://github.com/parikshit99/nirman/releases/tag/latest-debug), which is where the download link above points; builds of a pull request are under that workflow run's *Artifacts*. For a Play Store release, add a signing config and run `./gradlew bundleRelease`.
