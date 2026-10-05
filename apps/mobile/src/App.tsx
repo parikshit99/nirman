@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { Database, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Save, Share2, ShoppingCart, Search, Trash2, X } from 'lucide-react';
+import { Database, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Save, Share2, ShoppingCart, Search, Trash2, Users, X } from 'lucide-react';
 import Fuse from 'fuse.js';
-import { filterMaterials, guessCategory, todayISO, type MaterialFilter } from '@nirman/shared';
+import { filterMaterials, guessCategory, todayISO, type ContractRow, type MaterialFilter } from '@nirman/shared';
 import { useDialogs } from './components/Dialogs.tsx';
 import { useBackHandler } from './lib/backButton.ts';
 import { prefs } from './lib/prefs.ts';
@@ -24,6 +24,9 @@ import { HistorySidebar, HistoryView } from './features/HistoryView.tsx';
 import { DeliveriesSheet } from './features/DeliveriesSheet.tsx';
 import { SiteReport } from './features/SiteReport.tsx';
 import { ItemLog } from './features/ItemLog.tsx';
+import { LabourSidebar, LabourView, type StatusFilter } from './features/LabourView.tsx';
+import { ContractSheet } from './features/ContractSheet.tsx';
+import { ContractForm } from './components/ContractForm.tsx';
 import { buildPdf } from './lib/pdf.ts';
 import { listSheet, pdfFile, pdfToJpegs, sheetToXlsx, type ExportFormat } from './lib/exports.ts';
 import { shareFiles } from './lib/files.ts';
@@ -33,12 +36,13 @@ import { ShareTargetSheet, type ShareTarget } from './components/ShareTargetShee
 import { onIncomingShare, type IncomingShare } from './lib/sharedFiles.ts';
 import { useAppState, type HistoryRecord } from './state/AppState.tsx';
 
-type AppTab = 'auditor' | 'boq' | 'history' | 'database';
+type AppTab = 'auditor' | 'boq' | 'labour' | 'history' | 'database';
 
 /** `about` is the one line shown under the tabs saying what the open tab does. */
 const TABS: { id: AppTab; label: string; icon: typeof LayoutDashboard; about: string }[] = [
   { id: 'auditor', label: 'Spend', icon: ShoppingCart, about: 'Photograph bills or type what was bought; get a spending log with the rate paid for each item.' },
   { id: 'boq', label: 'BOQ', icon: FileCode, about: 'Photograph a drawing or list; get a blank BOQ (no rates) to send vendors, then compare their quotes.' },
+  { id: 'labour', label: 'Labour', icon: Users, about: 'Labour contracts: record work measured, payments and deductions; see what each contractor is owed and share statements.' },
   { id: 'database', label: 'Data', icon: Database, about: 'Every price you have recorded, per material, to see how rates change over time.' },
   { id: 'history', label: 'History', icon: History, about: 'Saved purchase lists and BOQs. Open one to edit it, export it, or add vendor quotes.' },
 ];
@@ -56,7 +60,7 @@ const kindOf = (tab: AppTab): ListKind | null => (tab === 'auditor' ? 'audit' : 
 
 export default function App() {
   const state = useAppState();
-  const { actions, history, itemDatabase, itemsFor, boqNotes, categoryNames, uniqueAddresses, settings, pendingDeletes, savedBoqs } = state;
+  const { actions, history, itemDatabase, itemsFor, boqNotes, categoryNames, uniqueAddresses, settings, pendingDeletes, savedBoqs, contracts, allAddresses } = state;
   const dialogs = useDialogs();
 
   const [activeTab, setActiveTab] = useState<AppTab>('auditor');
@@ -133,6 +137,27 @@ export default function App() {
     return filterMaterials(base, materialFilter).filter((e) => matchesFilters(e.categories, e.addresses));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemDatabase, search, categoryFilter, addressFilter, materialFilter]);
+
+  const [contractStatus, setContractStatus] = useState<StatusFilter>('active');
+  const filteredContracts = useMemo(() => {
+    const base = search ? new Fuse(contracts, { keys: ['contractor', 'work', 'address', 'phone', 'category'], threshold: 0.4 }).search(search).map((r) => r.item) : contracts;
+    return base.filter((c) => (contractStatus === 'all' || c.status === contractStatus) && matchesFilters([c.category], [c.address]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contracts, search, categoryFilter, addressFilter, contractStatus]);
+  /** Contract being added (no contract) or edited. */
+  const [contractForm, setContractForm] = useState<{ contract?: ContractRow } | null>(null);
+  const [openContract, setOpenContract] = useState<string | null>(null);
+  const contractors = useMemo(() => {
+    const byName = new Map<string, { name: string; phone: string }>();
+    for (const c of contracts) if (!byName.has(c.contractor.toLowerCase())) byName.set(c.contractor.toLowerCase(), { name: c.contractor, phone: c.phone });
+    return [...byName.values()];
+  }, [contracts]);
+  const saveContract = async (input: Parameters<typeof actions.saveContract>[0]) => {
+    const editing = contractForm?.contract;
+    const id = await actions.saveContract(input, editing?.id);
+    if (input.address) prefs.set('nirmaan_contract_site', input.address);
+    if (!editing) setOpenContract(id);
+  };
 
   const totalSpent = kind === 'audit' ? filteredItems.reduce((acc, i) => acc + (pendingDeletes.has(i.id) ? 0 : i.total_amount || 0), 0) : 0;
   const titlePrefix = (k: ListKind) => (k === 'audit' ? 'Purchases' : 'BOQ');
@@ -320,11 +345,12 @@ export default function App() {
             <button
               key={id}
               onClick={() => setActiveTab(id)}
+              aria-label={label}
               aria-current={activeTab === id ? 'page' : undefined}
               className={`flex-1 md:flex-none flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-3 md:px-4 py-2 rounded-md text-[11px] font-bold uppercase tracking-wide sm:tracking-wider transition-all whitespace-nowrap
                 ${activeTab === id ? 'bg-white text-[var(--color-brand-dark)] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
             >
-              <Icon size={14} /> {label}
+              <Icon size={14} className="hidden min-[440px]:inline" /> {label}
             </button>
           ))}
         </nav>
@@ -408,15 +434,19 @@ export default function App() {
                 incoming={captureShare?.kind === kind ? captureShare.share : null}
                 onIncomingUsed={clearCaptureShare}
               />
-            ) : <HistorySidebar onNewBoq={() => setActiveTab('boq')} onSiteReport={() => setSiteReportOpen(true)} />}
+            ) : activeTab === 'labour' ? (
+              <LabourSidebar contracts={filteredContracts} onNew={() => setContractForm({})} onSiteReport={() => setSiteReportOpen(true)} />
+            ) : (
+              <HistorySidebar onNewBoq={() => setActiveTab('boq')} onSiteReport={() => setSiteReportOpen(true)} />
+            )}
           </section>
         )}
 
         <section className="flex-1 flex flex-col technical-grid lg:overflow-hidden bg-white mt-4 lg:mt-0">
           <div className="p-4 md:p-6 pb-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <h2 className="text-[11px] md:text-xs font-mono uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2">
-              {activeTab === 'history' ? <History size={12} /> : activeTab === 'database' ? <Database size={12} /> : activeTab === 'auditor' ? <FileText size={12} /> : <FileCode size={12} />}
-              {activeTab === 'history' ? 'Saved Sessions' : activeTab === 'database' ? 'Material Database' : activeTab === 'auditor' ? 'Purchase Log' : 'BOQ Draft'}
+              {activeTab === 'history' ? <History size={12} /> : activeTab === 'database' ? <Database size={12} /> : activeTab === 'labour' ? <Users size={12} /> : activeTab === 'auditor' ? <FileText size={12} /> : <FileCode size={12} />}
+              {activeTab === 'history' ? 'Saved Sessions' : activeTab === 'database' ? 'Material Database' : activeTab === 'labour' ? 'Labour Contracts' : activeTab === 'auditor' ? 'Purchase Log' : 'BOQ Draft'}
             </h2>
             <div className="relative w-full md:w-auto">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -425,7 +455,7 @@ export default function App() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 aria-label="Search"
-                placeholder={activeTab === 'history' ? 'Search sessions...' : activeTab === 'database' ? 'Search materials...' : 'Filter items...'}
+                placeholder={activeTab === 'history' ? 'Search sessions...' : activeTab === 'database' ? 'Search materials...' : activeTab === 'labour' ? 'Search contractors...' : 'Filter items...'}
                 className="w-full md:w-64 pl-8 pr-4 py-2 bg-gray-50 border border-[var(--color-brand-concrete)] rounded-full text-xs font-mono outline-none focus:border-gray-400 transition-all"
               />
             </div>
@@ -441,6 +471,17 @@ export default function App() {
                 onCategory={setCategoryFilter}
                 addressFilter={addressFilter}
                 onAddress={setAddressFilter}
+              />
+            ) : activeTab === 'labour' ? (
+              <LabourView
+                contracts={filteredContracts}
+                status={contractStatus}
+                onStatus={setContractStatus}
+                categoryFilter={categoryFilter}
+                onCategory={setCategoryFilter}
+                addressFilter={addressFilter}
+                onAddress={setAddressFilter}
+                onOpen={(c) => setOpenContract(c.id)}
               />
             ) : activeTab === 'history' ? (
               <HistoryView
@@ -534,6 +575,24 @@ export default function App() {
               setQuoteTarget(null);
               setQuoteShare(undefined);
             }}
+          />
+        )}
+        {openContract && (
+          <ContractSheet key="contract" contractId={openContract} onEdit={(contract) => setContractForm({ contract })} onClose={() => setOpenContract(null)} />
+        )}
+        {contractForm && (
+          <ContractForm
+            key="contract-form"
+            contract={contractForm.contract}
+            defaults={{
+              address: addressFilter !== 'All' ? addressFilter : prefs.get('nirmaan_contract_site', ''),
+              category: categoryFilter !== 'All' ? categoryFilter : categoryNames[0] || 'Civil',
+            }}
+            addresses={allAddresses}
+            categories={categoryNames}
+            contractors={contractors}
+            onSave={saveContract}
+            onClose={() => setContractForm(null)}
           />
         )}
         {siteReportOpen && <SiteReport key="site-report" onClose={() => setSiteReportOpen(false)} />}

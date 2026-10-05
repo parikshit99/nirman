@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { variantLabel, type ItemRow, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
+import { describeTerms, variantLabel, type ContractRow, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
 import appIcon from './pdf-icon.png?inline';
 
@@ -225,7 +225,7 @@ const lastY = (doc: jsPDF) => (doc as unknown as { lastAutoTable: { finalY: numb
  * Everything bought for one site: a summary per work category and material,
  * then every line with its date. `filters` describes what was included.
  */
-export function buildSiteReportPdf(address: string, filters: string, report: SiteReport): jsPDF {
+export function buildSiteReportPdf(address: string, filters: string, report: SiteReport, labour?: LabourReport): jsPDF {
   const doc = new jsPDF();
   drawTitle(doc, 'SITE REPORT', 22);
   doc.setFontSize(11);
@@ -236,9 +236,11 @@ export function buildSiteReportPdf(address: string, filters: string, report: Sit
   doc.text(doc.splitTextToSize(filters, 180), 14, 34);
   doc.text(`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`, 14, 43);
 
+  const hasLabour = !!labour?.rows.length;
   if (report.lineCount === 0) {
     doc.setFontSize(11);
     doc.text('No purchases match these filters.', 14, 55);
+    if (hasLabour) drawLabour(doc, labour!, report.total, 62);
     return doc;
   }
 
@@ -251,7 +253,7 @@ export function buildSiteReportPdf(address: string, filters: string, report: Sit
     }
     summary.push(['', '', { content: `${c.name} total`, styles: { fontStyle: 'bold', halign: 'right' } }, { content: rupees(Math.round(c.amount)), styles: { fontStyle: 'bold' } }, '', '']);
   }
-  summary.push(['', '', { content: 'GRAND TOTAL', styles: { fontStyle: 'bold', halign: 'right' } }, { content: rupees(Math.round(report.total)), styles: { fontStyle: 'bold' } }, '', '']);
+  summary.push(['', '', { content: hasLabour ? 'MATERIALS TOTAL' : 'GRAND TOTAL', styles: { fontStyle: 'bold', halign: 'right' } }, { content: rupees(Math.round(report.total)), styles: { fontStyle: 'bold' } }, '', '']);
   autoTable(doc, {
     head: [['Material', 'Quantity', 'Avg rate', 'Amount', 'Vendors', 'Bills']],
     body: summary,
@@ -261,6 +263,8 @@ export function buildSiteReportPdf(address: string, filters: string, report: Sit
     headStyles: { fillColor: [18, 18, 18], textColor: [255, 255, 255] },
     columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 5: { halign: 'center', cellWidth: 12 } },
   });
+
+  if (hasLabour) drawLabour(doc, labour!, report.total, lastY(doc) + 12);
 
   // Appendix: every line, oldest first.
   const lines = report.categories.flatMap((c) => c.materials.flatMap((m) => m.lines.map((l) => ({ ...l, category: c.name, material: m.name }))));
@@ -291,6 +295,86 @@ export function buildSiteReportPdf(address: string, filters: string, report: Sit
     headStyles: { fillColor: [18, 18, 18], textColor: [255, 255, 255] },
     columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
   });
+  return doc;
+}
+
+/** Labour on the site: one row per contract, then materials + labour. */
+function drawLabour(doc: jsPDF, labour: LabourReport, materials: number, y: number) {
+  if (y > 250) {
+    doc.addPage();
+    y = 20;
+  }
+  doc.setFontSize(12);
+  doc.setTextColor(30);
+  doc.text('Labour', 14, y);
+  const bold = (content: string) => ({ content, styles: { fontStyle: 'bold' as const } });
+  autoTable(doc, {
+    head: [['Contractor', 'Work', 'Category', 'Work done', 'Paid', 'Balance now']],
+    body: [
+      ...labour.rows.map((r) => [r.contract.contractor, r.contract.work || '-', r.contract.category || '-', rupees(Math.round(r.workDone)), rupees(Math.round(r.paid)), rupees(Math.round(r.balance))]),
+      ['', '', bold('Labour total'), bold(rupees(Math.round(labour.workDone))), bold(rupees(Math.round(labour.paid))), bold(rupees(Math.round(labour.balance)))],
+      ['', '', bold('GRAND TOTAL'), bold(rupees(Math.round(materials + labour.workDone))), { content: 'materials + labour work done', colSpan: 2, styles: { textColor: [120, 120, 120] } }],
+    ],
+    startY: y + 4,
+    theme: 'grid',
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [18, 18, 18], textColor: [255, 255, 255] },
+    columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } },
+  });
+}
+
+const formatAmount = (n: number) => (n ? rupees(Math.round(n * 100) / 100) : '');
+
+/** A contractor's account: terms, each entry with a running balance, and the summary of what is due. */
+export function buildContractStatementPdf(c: ContractRow, st: ContractStatement, period: string): jsPDF {
+  const doc = new jsPDF();
+  drawTitle(doc, 'LABOUR STATEMENT', 20);
+  const rows: [string, string][] = [['Contractor', [c.contractor, c.phone].filter(Boolean).join(' - ')]];
+  if (c.work) rows.push(['Work', c.work]);
+  if (c.address) rows.push(['Site', [c.address, c.category].filter(Boolean).join(' - ')]);
+  rows.push(['Terms', describeTerms(c, rupees)]);
+  if (c.start_date) rows.push(['Started', formatDate(c.start_date)]);
+  rows.push(['Period', period || 'All entries']);
+  autoTable(doc, {
+    body: rows,
+    startY: 27,
+    theme: 'plain',
+    styles: { fontSize: 10, cellPadding: 1.2 },
+    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 30, textColor: [90, 90, 90] }, 1: { textColor: [20, 20, 20] } },
+  });
+  const body: (string | { content: string; colSpan?: number; styles?: object })[][] = [];
+  if (st.opening !== null) body.push(['', { content: 'Brought forward', styles: { fontStyle: 'italic' } }, '', '', '', rupees(st.opening)]);
+  for (const r of st.rows) body.push([r.date, r.particulars, formatAmount(r.work), formatAmount(r.deduction), formatAmount(r.paid), rupees(r.balance)]);
+  if (!body.length) body.push([{ content: 'No entries in this period.', colSpan: 6 }]);
+  autoTable(doc, {
+    head: [['Date', 'Particulars', 'Work done', 'Deduction', 'Paid', 'Balance']],
+    body,
+    startY: lastY(doc) + 4,
+    theme: 'grid',
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [18, 18, 18], textColor: [255, 255, 255] },
+    columnStyles: { 0: { cellWidth: 20 }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } },
+  });
+  const t = st.totals;
+  const summary: [string, string][] = [['Work done', rupees(t.workDone)]];
+  if (c.retention_pct > 0) summary.push([`Less retention ${c.retention_pct}%${c.retention_released_at ? ' (released)' : ' (held)'}`, rupees(t.retention)]);
+  if (t.deductions) summary.push(['Less deductions', rupees(t.deductions)]);
+  summary.push(['Less paid', rupees(t.paid)]);
+  summary.push([t.balance < 0 ? 'Paid in advance' : 'Balance due', rupees(Math.abs(t.balance))]);
+  autoTable(doc, {
+    body: summary,
+    startY: lastY(doc) + 6,
+    margin: { left: 110 },
+    theme: 'plain',
+    styles: { fontSize: 10, cellPadding: 1.2 },
+    columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+    didParseCell: (data) => {
+      if (data.row.index === summary.length - 1) data.cell.styles.fontStyle = 'bold';
+    },
+  });
+  doc.setFontSize(8);
+  doc.setTextColor(120);
+  doc.text(`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`, 14, lastY(doc) + 10);
   return doc;
 }
 

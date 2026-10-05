@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildItemDatabase,
+  type ContractEntryRow,
   type ExtractedMaterial,
   type ItemRow,
   type ListRow,
@@ -159,6 +160,12 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       addCategory: write(repo.addCategory),
       deleteCategory: write(repo.deleteCategory),
       deleteJob: write(repo.deleteJob),
+      saveContract: write(repo.saveContract),
+      setContractStatus: write(repo.setContractStatus),
+      setRetentionReleased: write(repo.setRetentionReleased),
+      saveContractEntry: write(repo.saveContractEntry),
+      deleteContractLater: deleteLater(repo.deleteContract),
+      deleteContractEntryLater: deleteLater(repo.deleteContractEntry),
       /** Strike through now, delete after UNDO_MS unless undone (or sooner via flushDeletes). */
       deleteItemLater: deleteLater(repo.deleteItem),
       deleteQuoteLineLater: deleteLater(repo.deleteQuoteLine),
@@ -233,7 +240,17 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       if (list) list.push(line);
       else linesByQuote.set(line.quote_id, [line]);
     }
+    const entriesByContract = new Map<string, ContractEntryRow[]>();
+    for (const e of snapshot.contractEntries) {
+      const list = entriesByContract.get(e.contract_id);
+      if (list) list.push(e);
+      else entriesByContract.set(e.contract_id, [e]);
+    }
     return {
+      contracts: snapshot.contracts,
+      entriesFor: (contractId: string): ContractEntryRow[] => entriesByContract.get(contractId) ?? [],
+      /** Sites from saved lists and contracts, for address suggestions. */
+      allAddresses: [...new Set([...history.map((h) => h.address), ...snapshot.contracts.map((c) => c.address)].filter(Boolean))],
       itemsFor: (kind: ListKind) => byList.get(DRAFT_IDS[kind]) ?? [],
       learning,
       savedBoqs: history.filter((h) => h.kind === 'boq'),

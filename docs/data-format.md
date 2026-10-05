@@ -31,6 +31,8 @@ The `nirmaan` names are the original internal ids. They stay unchanged so existi
 | `quotes` | vendor's reply to a saved BOQ | `boq_id` (a `lists` id); `vendor`, `quote_date`; `status`: `review` or `confirmed` |
 | `quote_lines` | line in a vendor quote | `quote_id`, `position`; `boq_item_id`, the BOQ `items` row it was matched to (empty = not in the BOQ); plus `original_term`, `item_name`, `quantity`, `unit`, `unit_price`, `total_amount`, `note` |
 | `hidden_materials` | material deleted from the Data tab and price checks | `id` is the material's key (see Conventions); `name`, `unit`, `hidden_at`. Prices recorded up to `hidden_at` are left out; later ones show again. Saved lists are not changed; removing the row restores it. |
+| `contracts` | labour contract | `contractor`, `phone`, `address`, `category`, `work`; `kind`: `rate` (paid `rate` per `unit`, optional `est_quantity`) or `lump_sum` (`amount`); `retention_pct`; `start_date`; `status`: `active` or `closed`; `retention_released_at` (blank while held); `notes` |
+| `contract_entries` | something recorded on a contract | `contract_id`, `date`; `kind`: `work` (`quantity` in the contract's unit, or % of a lump sum), `payment` (`amount`, `mode`: cash / upi / bank / cheque) or `deduction` (`amount`); `note` |
 | `jobs`, `job_images` | entry waiting to be read by Gemini (with its photos as base64) | temporary; deleted once read |
 | `schema_version` | — | number of migrations applied |
 
@@ -63,10 +65,11 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
 ```json
 {
   "app": "nirmaan-auditor",
-  "version": 7,
+  "version": 8,
   "exported_at": "2026-10-03T19:13:38.586Z",
   "lists": [], "items": [], "indexed_rates": [], "learned_terms": [],
-  "categories": [], "quotes": [], "quote_lines": [], "hidden_materials": []
+  "categories": [], "quotes": [], "quote_lines": [], "hidden_materials": [],
+  "contracts": [], "contract_entries": []
 }
 ```
 
@@ -78,6 +81,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
   - version 3 (before variant fields) has rows without `brand`, `model`, `spec`, `color`;
   - version 4 (before rate categories) has `indexed_rates` rows without `category` and `address`;
   - version 5 (before delivery tracking) has `items` rows without `delivered_at`;
-  - version 6 (before order units) has `items` rows without `ordered_as`.
+  - version 6 (before order units) has `items` rows without `ordered_as`;
+  - version 7 (before labour contracts) has no `contracts` or `contract_entries`.
 - Restoring replaces everything on the phone.
 - Any reimplementation should read this format, so old backups keep working.

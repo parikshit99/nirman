@@ -161,6 +161,41 @@ const MIGRATIONS: string[] = [
       ORDER BY l.updated_at DESC LIMIT 1), '') END
   WHERE address = ''
   `,
+  // 9: labour contracts and what happens on them (work measured, payments, deductions).
+  `
+  CREATE TABLE IF NOT EXISTS contracts (
+    id TEXT PRIMARY KEY,
+    contractor TEXT NOT NULL DEFAULT '',
+    phone TEXT NOT NULL DEFAULT '',
+    address TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT '',
+    work TEXT NOT NULL DEFAULT '',
+    kind TEXT NOT NULL,
+    rate REAL NOT NULL DEFAULT 0,
+    unit TEXT NOT NULL DEFAULT '',
+    est_quantity REAL NOT NULL DEFAULT 0,
+    amount REAL NOT NULL DEFAULT 0,
+    retention_pct REAL NOT NULL DEFAULT 0,
+    start_date TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'active',
+    retention_released_at TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS contract_entries (
+    id TEXT PRIMARY KEY,
+    contract_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    date TEXT NOT NULL,
+    quantity REAL NOT NULL DEFAULT 0,
+    amount REAL NOT NULL DEFAULT 0,
+    mode TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS contract_entries_contract_idx ON contract_entries (contract_id);
+  `,
 ];
 
 /** Default categories sort before anything the user adds. */

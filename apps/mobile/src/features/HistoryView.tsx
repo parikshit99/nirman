@@ -5,8 +5,8 @@ import { useDialogs } from '../components/Dialogs.tsx';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
 
 export function HistorySidebar({ onNewBoq, onSiteReport }: { onNewBoq(): void; onSiteReport(): void }) {
-  const { history } = useAppState();
-  const hasPurchases = history.some((h) => h.kind === 'audit' && h.address);
+  const { history, contracts } = useAppState();
+  const hasPurchases = history.some((h) => h.kind === 'audit' && h.address) || contracts.some((c) => c.address);
   return (
     <div className="space-y-3 lg:space-y-6">
       <div className="hidden lg:block p-4 bg-orange-50 border border-orange-100 rounded-xl">
