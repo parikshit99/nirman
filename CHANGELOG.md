@@ -2,6 +2,14 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 3.1 — Bills read on the phone
+
+- **Bills are now read on the phone first**, with no internet or API key. Printed bills (photographed) and typed lists like "cement 50 bags 380" become lines in about a second, with vendor, date, quantities, rates and amounts, your learned corrections, and TMT / tile conversions.
+- The phone checks its own reading (quantity × rate = amount, and the bill's total). When it isn't sure, as with most handwritten bills, Gemini reads it instead; without a key, the phone's reading is used.
+- Choose in **Settings → How bills are read**: *Phone first* (default), *Phone only* (nothing is sent to Gemini) or *Gemini always*.
+- **Keep bill photos for training** (off by default): each photographed bill is kept on the phone with the lines it became, as you correct them. Export them from Settings to train an AI that runs inside the app later.
+- Settings → Model is now a list of the Gemini models your key can use. A bill that times out three times stops retrying, so the queue can finish. *Index rate* now saves the purchase list to History.
+
 ## 3.0 — Labour contracts
 
 **New Labour tab**

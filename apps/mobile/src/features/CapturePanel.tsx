@@ -320,7 +320,7 @@ export function CapturePanel({
           </button>
 
           {jobs.length > 0 && (
-            <JobList jobs={jobs} offline={!status.online} hasKey={!!settings.geminiApiKey} onRetry={actions.retryJob} onDelete={(j) => actions.deleteJob(j.id)} />
+            <JobList jobs={jobs} offline={!status.online} hasKey={!!settings.geminiApiKey || settings.readingMode !== 'gemini'} onRetry={actions.retryJob} onDelete={(j) => actions.deleteJob(j.id)} />
           )}
         </div>
       </div>

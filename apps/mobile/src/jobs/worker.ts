@@ -1,8 +1,10 @@
-import { todayISO, variantLabel, type LearnedTermRow } from '@nirman/shared';
-import { completeJob, completeQuoteJob, getJobImages, learningMap, listItems, setJobStatus, type Job } from '../data/repo.ts';
+import { boxesToRows, parseBill, todayISO, variantLabel, type BillReading, type LearnedTermRow, type MaterialInput, type TextBox } from '@nirman/shared';
+import { completeJob, completeQuoteJob, getJobImages, learningMap, listItems, saveTrainingSample, setJobStatus, type Job } from '../data/repo.ts';
 import type { Db } from '../data/sql.ts';
 import { classifyError, createGeminiExtractor, type Extractor } from '../lib/gemini.ts';
 import { log, scrub } from '../lib/diagnostics.ts';
+import { loadConversions } from '../lib/conversionSettings.ts';
+import { readPhotoText } from '../lib/textReader.ts';
 import type { Settings } from '../lib/settings.ts';
 
 export interface WorkerStatus {
@@ -26,6 +28,12 @@ export const MAX_TIMEOUTS = 3;
 
 export const NO_KEY_MESSAGE = 'Add your Gemini API key in Settings to read queued entries.';
 
+/** A phone reading at least this sure is used without asking Gemini. */
+export const PHONE_CONFIDENCE = 0.75;
+
+const describeItems = (items: MaterialInput[]) =>
+  `out: ${items.map((i) => `${i.item_name} ${i.quantity} ${i.unit} @${i.unit_price}${i.vendor ? ` ${i.vendor}` : ''}${i.ordered_as ? ` (${i.ordered_as})` : ''}`).join('; ')}`;
+
 /**
  * Sends queued AI entries (text/photos saved while offline) to Gemini once the
  * phone is online and a key is set, and stores the items it returns. Runs on
@@ -48,6 +56,8 @@ export class JobWorker {
     private makeExtractor: (apiKey: string, model: string, onModelReplaced?: (model: string) => void) => Extractor = createGeminiExtractor,
     /** Called when Gemini no longer knew the configured model and another was used. */
     private onModelReplaced?: (model: string) => void,
+    /** Reads the text on a photo on the phone; null where that isn't available. */
+    private readPhoto: ((image: string) => Promise<TextBox[]>) | null = readPhotoText,
   ) {}
 
   subscribe(fn: () => void): () => void {
@@ -97,19 +107,21 @@ export class JobWorker {
       this.setStatus({ lastError: null });
       return;
     }
-    const { geminiApiKey, geminiModel } = this.getSettings();
-    if (!geminiApiKey) {
+    const { geminiApiKey, geminiModel, readingMode } = this.getSettings();
+    const useGemini = readingMode !== 'phone' && !!geminiApiKey;
+    if (readingMode === 'gemini' && !geminiApiKey) {
       this.setStatus({ lastError: NO_KEY_MESSAGE });
       return;
     }
-    if (!this.status.online) return;
+    if (readingMode === 'gemini' && !this.status.online) return;
 
     this.setStatus({ processing: true });
-    const extractor = this.makeExtractor(geminiApiKey, geminiModel, this.onModelReplaced);
+    const extractor = useGemini ? this.makeExtractor(geminiApiKey, geminiModel, this.onModelReplaced) : null;
     try {
-      for (const job of pending) await this.process(job, extractor);
+      let waiting: string | null = null;
+      for (const job of pending) waiting = (await this.process(job, extractor)) ?? waiting;
       this.backoff = 0;
-      this.setStatus({ processing: false, lastError: null });
+      this.setStatus({ processing: false, lastError: waiting });
     } catch (err) {
       this.backoff = Math.min(MAX_BACKOFF_MS, this.backoff ? this.backoff * 2 : MIN_BACKOFF_MS);
       this.setStatus({ processing: false, lastError: (err as Error).message });
@@ -117,10 +129,22 @@ export class JobWorker {
     }
   }
 
-  /** Throws only for temporary failures, which stop the run and retry later. */
-  private async process(job: Job, extractor: Extractor) {
-    await setJobStatus(this.db, job.id, 'processing');
-    this.onDataChanged();
+  /** Read an entry on the phone: typed text, and the text on its photos where the phone can read them. */
+  private async readOnPhone(job: Job, images: string[], learning: ReturnType<typeof learningMap>): Promise<(BillReading & { ocrText: string }) | null> {
+    const rows = job.text.split(/\n|;|,(?=\s*[a-z])/i).map((r) => r.trim()).filter(Boolean);
+    // Where photos can't be read on the device (the browser), only the typed text is used.
+    if (this.readPhoto) for (const image of images) rows.push(...boxesToRows(await this.readPhoto(image)));
+    if (!rows.length) return null;
+    const reading = parseBill(rows, { learning, captureDate: job.capture_date || todayISO(), conversions: loadConversions() });
+    return { ...reading, ocrText: rows.join('\n') };
+  }
+
+  /**
+   * Throws only for temporary failures, which stop the run and retry later.
+   * Returns a message when the entry has to wait (for a key or a connection).
+   */
+  private async process(job: Job, extractor: Extractor | null): Promise<string | null> {
+    const { readingMode, collectTraining } = this.getSettings();
     // For the diagnostic log: what kind of reading, how big, how long, how it ended, the text given and what came back.
     const started = performance.now();
     const facts: Record<string, string | number | boolean> = { kind: job.quote_id ? 'quote' : 'entry', textChars: job.text.length };
@@ -131,6 +155,48 @@ export class JobWorker {
       const images = await getJobImages(this.db, job.id);
       facts.photos = images.length;
       const learning = learningMap(await this.db.all<LearnedTermRow>('SELECT * FROM learned_terms'));
+      const finish = async (items: MaterialInput[], engine: string, ocrText = '') => {
+        const ids = await completeJob(this.db, job.id, items);
+        if (collectTraining && images.length) await saveTrainingSample(this.db, { engine, ocr_text: ocrText, images, item_ids: ids, category: job.category });
+      };
+
+      // Vendor quotes are matched to the BOQ by Gemini; entries are read on the phone first.
+      let phone: Awaited<ReturnType<JobWorker['readOnPhone']>> = null;
+      if (!job.quote_id && readingMode !== 'gemini') {
+        try {
+          phone = await this.readOnPhone(job, images, learning);
+        } catch (err) {
+          log('error', `phone reading: ${(err as Error).message}`, { where: 'textReader' });
+        }
+        const sure = !!phone?.lines.length && phone.confidence >= PHONE_CONFIDENCE;
+        const noGemini = !extractor || !this.status.online;
+        if (phone?.lines.length && (sure || readingMode === 'phone' || !extractor)) {
+          const items = phone.lines.map((l) => l.item);
+          await finish(items, 'phone', phone.ocrText);
+          logReading('ok', { engine: 'phone', lines: items.length, confidence: phone.confidence }, describeItems(items));
+          return null;
+        }
+        if (readingMode === 'phone' || !extractor) {
+          const why = images.length && !this.readPhoto ? 'Photos can only be read on the phone app or by Gemini.' : 'Could not read this on the phone.';
+          const fix = readingMode === 'phone' ? 'Type the items, or allow Gemini in Settings → How bills are read.' : 'Type the items, or add a Gemini API key in Settings.';
+          await setJobStatus(this.db, job.id, 'failed', `${why} ${fix}`);
+          logReading('empty', { engine: 'phone', confidence: phone?.confidence ?? 0 });
+          return null;
+        }
+        if (noGemini) {
+          // Unsure on the phone: wait for a connection to ask Gemini.
+          logReading('waiting', { engine: 'phone', confidence: phone?.confidence ?? 0 });
+          return null;
+        }
+      }
+      if (job.quote_id && readingMode === 'phone') {
+        await setJobStatus(this.db, job.id, 'failed', 'Vendor quotes are read by Gemini. Use “Type rates”, or allow Gemini in Settings → How bills are read.');
+        return null;
+      }
+      if (!extractor) return NO_KEY_MESSAGE;
+      if (!this.status.online) return null;
+      await setJobStatus(this.db, job.id, 'processing');
+      this.onDataChanged();
       if (job.quote_id) {
         // Sr. numbers are the BOQ's printed order; remember which item each one was.
         const boq = await listItems(this.db, job.list_id);
@@ -151,7 +217,7 @@ export class JobWorker {
             `out: ${lines.map((l) => `#${l.boq_sr ?? '-'} ${l.item_name} ${l.quantity ?? ''} ${l.unit ?? ''} @${l.unit_price}`).join('; ')}`,
           );
         }
-        return;
+        return null;
       }
       const items = await extractor.extract({
         text: job.text,
@@ -164,13 +230,10 @@ export class JobWorker {
         await setJobStatus(this.db, job.id, 'failed', 'No items detected. Make sure the photo or text is clear, then retry.');
         logReading('empty');
       } else {
-        await completeJob(this.db, job.id, items);
-        logReading(
-          'ok',
-          { lines: items.length, converted: items.filter((i) => i.ordered_as).length },
-          `out: ${items.map((i) => `${i.item_name} ${i.quantity} ${i.unit} @${i.unit_price}${i.vendor ? ` ${i.vendor}` : ''}${i.ordered_as ? ` (${i.ordered_as})` : ''}`).join('; ')}`,
-        );
+        await finish(items, 'gemini', phone?.ocrText);
+        logReading('ok', { engine: 'gemini', lines: items.length, converted: items.filter((i) => i.ordered_as).length, phoneConfidence: phone?.confidence ?? -1 }, describeItems(items));
       }
+      return null;
     } catch (err) {
       const e = classifyError(err);
       logReading('failed', { error: e.kind, message: scrub(e.message).slice(0, 120) });
@@ -188,6 +251,7 @@ export class JobWorker {
         await setJobStatus(this.db, job.id, 'pending');
         throw e;
       }
+      return null;
     } finally {
       this.onDataChanged();
     }

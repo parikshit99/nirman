@@ -196,6 +196,18 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX IF NOT EXISTS contract_entries_contract_idx ON contract_entries (contract_id);
   `,
+  // 10: opt-in training data: bill photos (JSON array of base64 JPEGs) and the items they became. Not in backups.
+  `
+  CREATE TABLE IF NOT EXISTS training_samples (
+    id TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    engine TEXT NOT NULL DEFAULT '',
+    ocr_text TEXT NOT NULL DEFAULT '',
+    images TEXT NOT NULL DEFAULT '[]',
+    item_ids TEXT NOT NULL DEFAULT '[]',
+    category TEXT NOT NULL DEFAULT ''
+  );
+  `,
 ];
 
 /** Default categories sort before anything the user adds. */
