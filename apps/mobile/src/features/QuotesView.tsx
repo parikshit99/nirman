@@ -149,7 +149,7 @@ function QuoteList({ boq, quotes, onAdd, onOpen }: { boq: HistoryRecord; quotes:
                 <div className="font-bold text-sm text-gray-900 truncate">{q.vendor || 'Unnamed vendor'}</div>
                 <div className="text-xs font-mono text-gray-500">{new Date(q.quote_date).toLocaleDateString('en-IN')}</div>
               </div>
-              <button onClick={() => remove(q)} className="p-2.5 -m-1.5 text-gray-400 hover:text-red-500" aria-label={`Delete ${q.vendor}'s quote`}>
+              <button onClick={() => remove(q)} className="p-2.5 -m-1.5 text-gray-500 hover:text-red-500" aria-label={`Delete ${q.vendor}'s quote`}>
                 <Trash2 size={16} />
               </button>
             </div>

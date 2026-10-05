@@ -406,7 +406,7 @@ export default function App() {
               </>
             )}
             {canClear && (
-              <button onClick={clearCurrent} className="p-2.5 rounded-lg transition-all text-gray-400 hover:text-red-500 hover:bg-red-50" aria-label="Clear">
+              <button onClick={clearCurrent} className="p-2.5 rounded-lg transition-all text-gray-500 hover:text-red-500 hover:bg-red-50" aria-label="Clear">
                 <Trash2 size={16} />
               </button>
             )}

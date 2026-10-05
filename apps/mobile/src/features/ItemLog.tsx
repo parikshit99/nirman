@@ -271,7 +271,7 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendin
           <div className="flex items-start justify-between gap-2">
             <span className="font-bold text-sm text-[var(--color-brand-dark)] flex items-center gap-1.5 min-w-0">
               <span className="truncate">{item.item_name}</span>
-              <Pencil size={12} className="text-gray-400 shrink-0" />
+              <Pencil size={12} className="text-gray-500 shrink-0" />
             </span>
             {isAudit && <span className="font-mono font-bold text-sm text-[var(--color-brand-dark)] shrink-0">{rupees(item.total_amount)}</span>}
           </div>

@@ -175,7 +175,7 @@ function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDel
           {variantLabel(line) && <div className="text-xs font-bold text-gray-700">{variantLabel(line)}</div>}
         </div>
         {!readOnly && (
-          <button onClick={onDelete} className="p-2.5 -m-1.5 text-gray-400 hover:text-red-500 self-start" aria-label={`Delete line ${line.original_term || line.item_name}`}>
+          <button onClick={onDelete} className="p-2.5 -m-1.5 text-gray-500 hover:text-red-500 self-start" aria-label={`Delete line ${line.original_term || line.item_name}`}>
             <Trash2 size={14} />
           </button>
         )}

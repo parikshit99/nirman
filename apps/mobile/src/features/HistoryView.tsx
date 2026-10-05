@@ -115,13 +115,13 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
                 <div className="flex gap-1 items-center">
                   <button
                     onClick={() => onEdit(record)}
-                    className="p-2.5 -m-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all flex items-center"
+                    className="p-2.5 -m-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all flex items-center"
                     aria-label="Edit record info"
                   >
                     <Pencil size={14} />
                     <span className="text-xs font-bold uppercase ml-1">Edit</span>
                   </button>
-                  <button onClick={() => remove(record)} className="p-2.5 -m-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" aria-label="Delete record">
+                  <button onClick={() => remove(record)} className="p-2.5 -m-1.5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" aria-label="Delete record">
                     <Trash2 size={16} />
                   </button>
                 </div>

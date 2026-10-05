@@ -112,6 +112,24 @@ describe('JobWorker', () => {
       expect(sample.lines.map((l: { item_name: string }) => l.item_name).sort()).toEqual(['OPC Cement', 'Sand']);
     });
 
+    it('reports where an entry is being read, step by step', async () => {
+      const seen: string[] = [];
+      const { db, worker } = await setup(async () => [cement], phoneFirst, undefined, async () => boxes(['scribbles']));
+      worker.subscribe(() => {
+        const c = worker.status.current;
+        if (c && seen.at(-1) !== `${c.engine}: ${c.step}`) seen.push(`${c.engine}: ${c.step}`);
+      });
+      await enqueueJob(db, { listId: DRAFT_IDS.audit, text: '', images: ['A', 'B'], category: '', captureDate: '2026-10-05' });
+      await worker.run();
+      expect(seen).toEqual([
+        'phone: Reading photo 1 of 2 on the phone',
+        'phone: Reading photo 2 of 2 on the phone',
+        'phone: Checking the reading on the phone',
+        'gemini: Phone couldn’t read it, reading with Gemini',
+      ]);
+      expect(worker.status.current).toBeNull();
+    });
+
     it('asks Gemini when the phone is unsure, and waits for a connection to do so', async () => {
       const { db, worker, calls } = await setup(async () => [cement], phoneFirst, undefined, async () => boxes(['scribbles', 'Cmnt 5O bgs']));
       worker.status.online = false;

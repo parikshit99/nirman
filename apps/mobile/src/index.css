@@ -76,6 +76,7 @@
   --color-blue-100: oklch(32% 0.06 255);
   --color-blue-600: oklch(76% 0.13 255);
   --color-blue-700: oklch(82% 0.1 255);
+  --color-blue-800: oklch(86% 0.08 255);
 }
 
 /* The PDF preview stays paper-coloured, like the file it shows. */

@@ -13,6 +13,8 @@ import {
   MicOff,
   Plus,
   RotateCcw,
+  Smartphone,
+  Sparkles,
   Trash2,
   Truck,
   X,
@@ -28,6 +30,7 @@ import { useAppState } from '../state/AppState.tsx';
 import { prefs } from '../lib/prefs.ts';
 import { workTypeKey } from '../lib/workType.ts';
 import type { IncomingShare } from '../lib/sharedFiles.ts';
+import type { ReadingProgress } from '../jobs/worker.ts';
 import { ManualEntry } from './ManualEntry.tsx';
 
 export function CapturePanel({
@@ -330,7 +333,7 @@ export function CapturePanel({
           {!inputText.trim() && images.length === 0 && <p className="text-xs text-gray-500 text-center -mt-2">Add a bill photo or type what {kind === 'audit' ? 'was bought' : 'you need'} first.</p>}
 
           {showJobs && jobs.length > 0 && (
-            <JobList jobs={jobs} offline={!status.online} hasKey={!!settings.geminiApiKey || settings.readingMode !== 'gemini'} onRetry={actions.retryJob} onDelete={(j) => actions.deleteJob(j.id)} />
+            <JobList jobs={jobs} current={status.current} offline={!status.online} hasKey={!!settings.geminiApiKey || settings.readingMode !== 'gemini'} onRetry={actions.retryJob} onDelete={(j) => actions.deleteJob(j.id)} />
           )}
         </div>
       </div>
@@ -398,18 +401,52 @@ export function QueuedReadings({ kind }: { kind: ListKind }) {
   const jobs = jobsFor(kind);
   if (jobs.length === 0) return null;
   return (
-    <JobList jobs={jobs} offline={!status.online} hasKey={!!settings.geminiApiKey || settings.readingMode !== 'gemini'} onRetry={actions.retryJob} onDelete={(j) => actions.deleteJob(j.id)} />
+    <JobList jobs={jobs} current={status.current} offline={!status.online} hasKey={!!settings.geminiApiKey || settings.readingMode !== 'gemini'} onRetry={actions.retryJob} onDelete={(j) => actions.deleteJob(j.id)} />
+  );
+}
+
+/** Where an entry is being read (phone or Gemini), what step, and a bar; Gemini's bar follows the time taken. */
+function ReadingBar({ current, photos }: { current: ReadingProgress; photos: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (current.progress !== null) return;
+    const timer = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(timer);
+  }, [current.progress]);
+  const seconds = Math.max(0, Math.round((now - current.startedAt) / 1000));
+  // Gemini usually answers in 5–30 s; the bar slows as it nears the end rather than stopping.
+  const expected = photos ? 20 : 6;
+  const value = current.progress ?? Math.min(0.95, 1 - Math.exp(-seconds / expected));
+  const phone = current.engine === 'phone';
+  return (
+    <div className="mt-1 space-y-1" role="status" aria-live="polite">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span
+          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${phone ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}
+        >
+          {phone ? <Smartphone size={10} /> : <Sparkles size={10} />} {phone ? 'On phone' : 'Gemini'}
+        </span>
+        <span className="text-gray-600">{current.step}</span>
+        {!phone && <span className="text-gray-500 font-mono">{seconds}s</span>}
+      </div>
+      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value * 100)}>
+        <div className={`h-full transition-all duration-500 ${phone ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${Math.max(4, value * 100)}%` }} />
+      </div>
+      {!phone && current.model && <div className="text-xs text-gray-500 font-mono truncate">{current.model}</div>}
+    </div>
   );
 }
 
 function JobList({
   jobs,
+  current,
   offline,
   hasKey,
   onRetry,
   onDelete,
 }: {
   jobs: Job[];
+  current: ReadingProgress | null;
   offline: boolean;
   hasKey: boolean;
   onRetry(job: Job): void;
@@ -422,6 +459,8 @@ function JobList({
       {jobs.map((job) => {
         const label = job.text ? `“${job.text.slice(0, 60)}${job.text.length > 60 ? '…' : ''}”` : '';
         const photos = job.image_count ? `${job.image_count} photo${job.image_count > 1 ? 's' : ''}` : '';
+        const reading = current?.jobId === job.id ? current : null;
+        const busy = !!reading || job.status === 'processing';
         return (
           <div
             key={job.id}
@@ -429,7 +468,7 @@ function JobList({
               ${job.status === 'failed' ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'}`}
           >
             <div className="mt-0.5 shrink-0">
-              {job.status === 'processing' ? (
+              {busy ? (
                 <Loader2 size={14} className="animate-spin text-orange-500" />
               ) : job.status === 'failed' ? (
                 <AlertTriangle size={14} className="text-red-500" />
@@ -439,11 +478,15 @@ function JobList({
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-bold text-gray-700 truncate">{[photos, label].filter(Boolean).join(' · ') || 'Entry'}</div>
-              <div className={`text-xs ${job.status === 'failed' ? 'text-red-600' : 'text-gray-500'}`}>
-                {job.status === 'processing' ? 'Reading with AI…' : job.status === 'failed' ? job.error : waitingReason}
-              </div>
+              {reading ? (
+                <ReadingBar current={reading} photos={job.image_count} />
+              ) : (
+                <div className={`text-xs ${job.status === 'failed' ? 'text-red-600' : 'text-gray-500'}`}>
+                  {job.status === 'processing' ? 'Reading…' : job.status === 'failed' ? job.error : waitingReason}
+                </div>
+              )}
             </div>
-            {job.status !== 'processing' && (
+            {!busy && (
               <div className="flex gap-1 shrink-0">
                 {job.status === 'failed' && (
                   <button onClick={() => onRetry(job)} className="p-2.5 -m-1.5 text-gray-500 hover:text-orange-600" aria-label="Retry">
