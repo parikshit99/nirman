@@ -24,7 +24,7 @@ export function Sparkline({ points, width = 64, height = 18 }: { points: PricePo
   const xy = prices.map((p, i) => `${((i / (prices.length - 1)) * (width - 2) + 1).toFixed(1)},${(height - 1 - ((p - min) / span) * (height - 2)).toFixed(1)}`);
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Price trend: ${prices.map(rupees).join(', ')}`}>
-      <polyline points={xy.join(' ')} fill="none" stroke="#FF7A00" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      <polyline points={xy.join(' ')} fill="none" stroke="var(--color-brand-primary)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   );
 }
