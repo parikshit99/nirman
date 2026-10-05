@@ -1,5 +1,6 @@
 import React from 'react';
 import { logError } from '../lib/diagnostics.ts';
+import { Button } from './ui/Button.tsx';
 
 /** If a screen crashes, log it and offer to reload instead of showing a blank page. */
 export class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
@@ -20,9 +21,9 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
         <div className="space-y-3">
           <h1 className="text-lg font-bold">Something went wrong</h1>
           <p className="text-sm text-gray-500">Your data is safe. Reload the app; if it happens again, use Settings → Report a problem.</p>
-          <button onClick={() => window.location.reload()} className="px-5 py-3 bg-black text-white rounded-xl text-sm font-bold">
+          <Button variant="primary" onClick={() => window.location.reload()}>
             Reload
-          </button>
+          </Button>
         </div>
       </div>
     );

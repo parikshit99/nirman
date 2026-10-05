@@ -2,7 +2,9 @@ import { motion } from 'motion/react';
 import { CheckSquare, ClipboardList, Eye, History, Pencil, Plus, RotateCcw, Trash2, Truck } from 'lucide-react';
 import { FilterChips } from '../components/FilterChips.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
+import { EmptyState } from '../components/ui/EmptyState.tsx';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
+import { Button } from '../components/ui/Button.tsx';
 
 export function HistorySidebar({ onNewBoq, onSiteReport }: { onNewBoq(): void; onSiteReport(): void }) {
   const { history, contracts } = useAppState();
@@ -20,19 +22,13 @@ export function HistorySidebar({ onNewBoq, onSiteReport }: { onNewBoq(): void; o
         <span>{history.length} Sessions</span>
       </div>
       <div className={`grid gap-2 ${hasPurchases ? 'grid-cols-2 lg:grid-cols-1' : 'grid-cols-1'}`}>
-        <button
-          onClick={onNewBoq}
-          className="w-full py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
-        >
+        <Button variant="secondary" block onClick={onNewBoq}>
           <Plus size={14} /> New BOQ
-        </button>
+        </Button>
         {hasPurchases && (
-          <button
-            onClick={onSiteReport}
-            className="w-full py-3 bg-[var(--color-brand-dark)] text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"
-          >
+          <Button variant="secondary" block onClick={onSiteReport}>
             <ClipboardList size={14} /> Site report
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -81,13 +77,9 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {records.length === 0 ? (
-          <div className="col-span-full py-16 text-center text-gray-400">
-            <History size={36} className="mx-auto mb-3 opacity-40" />
-            <p className="text-sm font-bold text-gray-500">{history.length ? 'No saved lists match.' : 'Nothing saved yet.'}</p>
-            <p className="text-xs mt-1">
-              {history.length ? 'Check the filters or search.' : 'Lists you save from Spend or BOQ (the Save button) appear here.'}
-            </p>
-          </div>
+          <EmptyState icon={History} title={history.length ? 'No saved lists match.' : 'Nothing saved yet.'} className="col-span-full">
+            {history.length ? 'Check the filters or search.' : 'Lists you save from Spend or BOQ (the Save button) appear here.'}
+          </EmptyState>
         ) : (
           records.map((record) => (
             <motion.div
@@ -151,12 +143,9 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
               {record.notes && <div className="mb-4 text-[11px] text-gray-400 italic line-clamp-1 border-l border-gray-200 pl-2">"{record.notes}"</div>}
 
               <div className="flex gap-2">
-                <button
-                  onClick={() => onOpen(record)}
-                  className="flex-1 py-2 bg-gray-900 text-white text-[11px] font-bold uppercase tracking-widest rounded-lg hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
-                >
+                <Button variant="primary" size="sm" className="flex-1" onClick={() => onOpen(record)}>
                   <Eye size={12} /> Open & Restore
-                </button>
+                </Button>
                 {record.kind === 'audit' && record.items.length > 0 && (
                   <button
                     onClick={() => onBuyAgain(record)}

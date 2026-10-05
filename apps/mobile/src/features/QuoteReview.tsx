@@ -7,6 +7,7 @@ import type { QuoteLinePatch } from '../data/repo.ts';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
 import { VariantFields } from '../components/VariantFields.tsx';
+import { Button } from '../components/ui/Button.tsx';
 
 /**
  * Check the AI's reading of one vendor quote: every line with the BOQ item it
@@ -231,20 +232,18 @@ function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDel
       )}
       {showDetails && (
         <div className="mt-2">
-          <VariantFields
-            value={variant}
-            onChange={(f: VariantField, v: string) => setVariant((p) => ({ ...p, [f]: v }))}
-            inputClassName={`w-full ${field}`}
-          />
-          <button
+          <VariantFields value={variant} onChange={(f: VariantField, v: string) => setVariant((p) => ({ ...p, [f]: v }))} inputClassName={`w-full ${field}`} />
+          <Button
+            variant="primary"
+            size="sm"
+            className="mt-2"
             onClick={() => {
               onChange(Object.fromEntries(Object.entries(variant).map(([k, v]) => [k, v.trim()])));
               setShowDetails(false);
             }}
-            className="mt-2 px-3 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-bold"
           >
             Save details
-          </button>
+          </Button>
         </div>
       )}
 

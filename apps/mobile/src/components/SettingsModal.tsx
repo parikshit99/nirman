@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { motion } from 'motion/react';
-import { CheckCircle2, Download, Eye, EyeOff, KeyRound, Loader2, Settings as SettingsIcon, Upload, X } from 'lucide-react';
+import { CheckCircle2, Download, Eye, EyeOff, KeyRound, Loader2, Settings as SettingsIcon, Upload } from 'lucide-react';
 import { backupFilename, BackupError } from '../data/backup.ts';
 import { shareFile, textToBase64 } from '../lib/files.ts';
 import { FALLBACK_MODELS, listReadingModels, testGeminiKey, type ModelOption } from '../lib/gemini.ts';
@@ -15,59 +14,38 @@ import { parseSize, sizeLabel, type SheetSize } from '@nirman/shared';
 import { describeLastBackup, recordBackup } from '../lib/backupReminder.ts';
 import { useAppState } from '../state/AppState.tsx';
 import { useDialogs } from './Dialogs.tsx';
-import { useBackHandler } from '../lib/backButton.ts';
+import { Sheet, SheetHeader } from './ui/Sheet.tsx';
+import { Button } from './ui/Button.tsx';
 
 /**
  * API key, backup and storage info. On first launch it doubles as a short
  * welcome that asks for the key (skippable: typing items in works without one).
  */
 export function SettingsModal({ onClose, firstRun, onWhatsNew }: { onClose(): void; firstRun?: boolean; onWhatsNew?(): void }) {
-  useBackHandler(onClose);
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-    >
-      <motion.div
-        initial={{ scale: 0.95, y: 10 }}
-        animate={{ scale: 1, y: 0 }}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-title"
-        className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto"
-      >
-        <div className="flex justify-between items-center">
-          <h3 id="settings-title" className="font-bold text-gray-900 uppercase tracking-widest text-sm flex items-center gap-2">
-            <SettingsIcon size={18} className="text-orange-500" /> {firstRun ? 'Welcome' : 'Settings'}
-          </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-black" aria-label="Close">
-            <X size={20} />
-          </button>
-        </div>
-        {firstRun && (
-          <p className="text-[11px] text-gray-500 leading-relaxed">
+    <Sheet kind="dialog" size="sm" labelledBy="settings-title" onClose={onClose} className="p-6 space-y-6">
+      <SheetHeader id="settings-title" icon={<SettingsIcon size={18} className="text-orange-500" />} title={firstRun ? 'Welcome' : 'Settings'} onClose={onClose} />
+      {firstRun && (
+        <p className="text-[11px] text-gray-500 leading-relaxed">
             Everything you record is stored only on this phone and works offline. Printed bills and typed lists are read on the phone. For
             handwritten bills and vendor quotes, add your own Google Gemini API key below. You can skip this and add it later from Settings.
-          </p>
-        )}
-        <ApiKeySection onSaved={firstRun ? onClose : undefined} />
-        {firstRun ? (
-          <button onClick={onClose} className="w-full py-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[11px]">
-            Skip for now
-          </button>
-        ) : (
-          <>
-            <ReadingSection />
-            <BackupSection />
-            <ConversionsSection />
-            <DiagnosticsSection />
-            <StorageSection onWhatsNew={onWhatsNew} />
-          </>
-        )}
-      </motion.div>
-    </motion.div>
+        </p>
+      )}
+      <ApiKeySection onSaved={firstRun ? onClose : undefined} />
+      {firstRun ? (
+        <button onClick={onClose} className="w-full py-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[11px]">
+          Skip for now
+        </button>
+      ) : (
+        <>
+          <ReadingSection />
+          <BackupSection />
+          <ConversionsSection />
+          <DiagnosticsSection />
+          <StorageSection onWhatsNew={onWhatsNew} />
+        </>
+      )}
+    </Sheet>
   );
 }
 
@@ -329,13 +307,9 @@ function BackupSection() {
       </p>
       <p className={`text-[11px] font-bold ${lastBackup === 'never' ? 'text-red-600' : 'text-gray-700'}`}>Last backup: {lastBackup}</p>
       <div className="flex gap-3">
-        <button
-          onClick={doExport}
-          disabled={busy}
-          className="flex-1 py-3 bg-black text-white font-bold rounded-xl uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 disabled:opacity-50"
-        >
+        <Button variant="primary" className="flex-1" onClick={doExport} disabled={busy}>
           <Download size={14} /> Save backup
-        </button>
+        </Button>
         <button
           onClick={() => fileRef.current?.click()}
           disabled={busy}
@@ -572,9 +546,9 @@ function ConversionsSection() {
           </label>
           <p className="text-[11px] text-gray-500">Sizes are width x length, separated by commas, e.g. {sizeLabel({ width: 600, length: 1200 }).replace(' mm', '')}, 800x1600.</p>
           <div className="flex gap-3 items-center">
-            <button onClick={save} className="px-4 py-2 bg-gray-900 text-white rounded-lg font-bold">
+            <Button variant="primary" size="sm" onClick={save}>
               Save
-            </button>
+            </Button>
             <button
               onClick={() => {
                 resetConversions();
@@ -638,9 +612,9 @@ function DiagnosticsSection() {
         className="w-full h-16 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-orange-400 resize-none"
       />
       <div className="grid grid-cols-2 gap-2">
-        <button onClick={report} className="py-2.5 bg-gray-900 text-white rounded-xl text-[11px] font-bold uppercase tracking-widest">
+        <Button variant="secondary" size="sm" onClick={report}>
           Report a problem
-        </button>
+        </Button>
         <button onClick={shareLog} className="py-2.5 bg-gray-100 text-gray-700 rounded-xl text-[11px] font-bold uppercase tracking-widest">
           Share log
         </button>

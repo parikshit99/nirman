@@ -7,6 +7,7 @@ import { DeliveredToggle } from '../components/DeliveredToggle.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
 import { QuantityHelper } from '../components/QuantityHelper.tsx';
 import { VariantFields } from '../components/VariantFields.tsx';
+import { EmptyState } from '../components/ui/EmptyState.tsx';
 import type { ItemPatch, ListKind } from '../data/repo.ts';
 import { useBackHandler } from '../lib/backButton.ts';
 import { useAppState } from '../state/AppState.tsx';
@@ -82,14 +83,9 @@ export function ItemLog({ kind, items, searching, onIndex }: Props) {
         <div className="divide-y divide-gray-100 min-h-[200px]">
           <AnimatePresence initial={false}>
             {items.length === 0 ? (
-              <div className="p-12 md:p-20 flex flex-col items-center justify-center text-gray-300">
-                {isAudit ? <HardHat size={48} strokeWidth={1} /> : <FileCode size={48} strokeWidth={1} />}
-                <p className="mt-4 font-mono text-sm uppercase tracking-widest text-center">
-                  {searching ? 'No match in search' : 'No items yet'}
-                  <br />
-                  <span className="text-xs normal-case">{searching ? 'Try clearing filters' : 'Add items with a photo, voice or text'}</span>
-                </p>
-              </div>
+              <EmptyState icon={isAudit ? HardHat : FileCode} title={searching ? 'No items match.' : 'No items yet.'}>
+                {searching ? 'Check the search.' : 'Add items with a photo, voice or text, or type one in.'}
+              </EmptyState>
             ) : (
               items.map((item) => (
                 <motion.div

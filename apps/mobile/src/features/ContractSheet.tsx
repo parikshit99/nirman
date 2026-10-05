@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { motion } from 'motion/react';
 import { Banknote, Hammer, MinusCircle, Pencil, Phone, Share2, Trash2, X } from 'lucide-react';
 import {
   contractTotals,
@@ -16,10 +15,12 @@ import {
 } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
+import { Sheet } from '../components/ui/Sheet.tsx';
 import { useBackHandler } from '../lib/backButton.ts';
 import { useAppState } from '../state/AppState.tsx';
 import { rupees } from './LabourView.tsx';
 import { StatementSheet } from './StatementSheet.tsx';
+import { Button } from '../components/ui/Button.tsx';
 
 const KIND_LABEL: Record<ContractEntryKind, string> = { work: 'Work done', payment: 'Payment', deduction: 'Deduction' };
 
@@ -30,7 +31,6 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
   const contract = contracts.find((c) => c.id === contractId);
   const [entryForm, setEntryForm] = useState<{ kind: ContractEntryKind; entry?: ContractEntryRow } | null>(null);
   const [statementOpen, setStatementOpen] = useState(false);
-  useBackHandler(onClose, !entryForm && !statementOpen);
   if (!contract) return null;
 
   const entries = entriesFor(contract.id);
@@ -64,11 +64,10 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
       {sub && <div className="text-[10px] text-gray-500">{sub}</div>}
     </div>
   );
-  const action = 'flex-1 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5';
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 flex items-stretch md:items-center justify-center md:p-4 bg-black/60">
-      <div role="dialog" aria-modal="true" aria-labelledby="contract-title" className="bg-white w-full max-w-lg md:rounded-2xl p-4 shadow-2xl flex flex-col overflow-y-auto space-y-3">
+    <>
+      <Sheet kind="screen" size="lg" layer="under" labelledBy="contract-title" onClose={onClose} backEnabled={!entryForm && !statementOpen} className="p-4 space-y-3">
         <div className="flex justify-between items-start gap-2">
           <div className="min-w-0">
             <h3 id="contract-title" className="font-bold text-gray-900 text-lg leading-tight">
@@ -118,15 +117,15 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
           <EntryForm contract={contract} kind={entryForm.kind} entry={entryForm.entry} onDone={() => setEntryForm(null)} />
         ) : (
           <div className="flex gap-2">
-            <button onClick={() => setEntryForm({ kind: 'work' })} className={`${action} bg-orange-500 text-white`}>
+            <Button variant="primary" className="flex-1" onClick={() => setEntryForm({ kind: 'work' })}>
               <Hammer size={14} /> Work
-            </button>
-            <button onClick={() => setEntryForm({ kind: 'payment' })} className={`${action} bg-[var(--color-brand-dark)] text-white`}>
+            </Button>
+            <Button variant="secondary" className="flex-1" onClick={() => setEntryForm({ kind: 'payment' })}>
               <Banknote size={14} /> Payment
-            </button>
-            <button onClick={() => setEntryForm({ kind: 'deduction' })} className={`${action} bg-white border border-gray-200 text-gray-700`}>
+            </Button>
+            <Button variant="secondary" className="flex-1" onClick={() => setEntryForm({ kind: 'deduction' })}>
               <MinusCircle size={14} /> Deduct
-            </button>
+            </Button>
           </div>
         )}
 
@@ -166,25 +165,22 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
         {contract.notes && <p className="text-xs text-gray-600 whitespace-pre-wrap bg-gray-50 rounded-lg p-2">{contract.notes}</p>}
 
         <div className="grid grid-cols-2 gap-2 pt-1">
-          <button onClick={() => setStatementOpen(true)} className={`${action} bg-[var(--color-brand-primary)] text-white`}>
+          <Button variant="secondary" onClick={() => setStatementOpen(true)}>
             <Share2 size={14} /> Statement
-          </button>
-          <button onClick={() => onEdit(contract)} className={`${action} bg-white border border-gray-200 text-gray-700`}>
+          </Button>
+          <Button variant="secondary" onClick={() => onEdit(contract)}>
             <Pencil size={14} /> Edit terms
-          </button>
-          <button
-            onClick={() => (closed ? actions.setContractStatus(contract.id, 'active') : closeContract())}
-            className={`${action} bg-white border border-gray-200 text-gray-700`}
-          >
+          </Button>
+          <Button variant="secondary" onClick={() => (closed ? actions.setContractStatus(contract.id, 'active') : closeContract())}>
             {closed ? 'Reopen' : 'Close contract'}
-          </button>
-          <button onClick={deleteContract} className={`${action} bg-white border border-red-200 text-red-600`}>
+          </Button>
+          <Button variant="dangerOutline" onClick={deleteContract}>
             <Trash2 size={14} /> Delete
-          </button>
+          </Button>
         </div>
-      </div>
+      </Sheet>
       {statementOpen && <StatementSheet contract={contract} entries={entries} onClose={() => setStatementOpen(false)} />}
-    </motion.div>
+    </>
   );
 }
 
@@ -255,9 +251,9 @@ function EntryForm({ contract, kind, entry, onDone }: { contract: ContractRow; k
         className={input}
         placeholder={isWork ? 'e.g. Ground floor walls' : kind === 'payment' ? 'e.g. Advance, week 3' : 'e.g. Cement supplied, 10 bags'}
       />
-      <button onClick={save} className="w-full h-10 bg-[var(--color-brand-dark)] text-white font-bold rounded-lg text-sm">
+      <Button variant="primary" block onClick={save}>
         {entry ? 'Save' : 'Add'}
-      </button>
+      </Button>
     </div>
   );
 }

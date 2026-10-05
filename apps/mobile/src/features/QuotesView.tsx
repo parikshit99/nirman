@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { motion } from 'motion/react';
 import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, Image as ImageIcon, Loader2, Plus, RotateCcw, Trash2, Truck, X } from 'lucide-react';
 import { MAX_IMAGES, compareQuotes, parseAmount, todayISO, variantLabel, type QuoteRow } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
@@ -11,7 +10,9 @@ import { isNative } from '../lib/platform.ts';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
 import { QuoteCompare } from './QuoteCompare.tsx';
 import { QuoteReview } from './QuoteReview.tsx';
-import { useBackHandler } from '../lib/backButton.ts';
+import { Sheet } from '../components/ui/Sheet.tsx';
+import { Tabs } from '../components/ui/Tabs.tsx';
+import { Button } from '../components/ui/Button.tsx';
 
 type Screen = { name: 'list' | 'add' | 'compare' } | { name: 'review'; quoteId: string };
 
@@ -27,75 +28,66 @@ export function QuotesView({ boqId, initial, onClose }: { boqId: string; initial
   // Shared photos fill in the first quote only.
   const [shared, setShared] = useState(initial);
   // Back steps out of a quote or the add form first, then closes.
-  useBackHandler(() => (screen.name === 'review' || screen.name === 'add' ? setScreen({ name: 'list' }) : onClose()));
+  const stepBack = () => (screen.name === 'review' || screen.name === 'add' ? setScreen({ name: 'list' }) : onClose());
   if (!boq) return null;
 
   const reviewing = screen.name === 'review' ? quotes.find((q) => q.id === screen.quoteId) : undefined;
   const back = () => setScreen({ name: 'list' });
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center md:p-4 bg-black/70 backdrop-blur-sm"
-    >
-      <div role="dialog" aria-modal="true" aria-labelledby="quotes-title" className="bg-white w-full max-w-5xl h-full md:h-[90vh] md:rounded-2xl flex flex-col shadow-2xl overflow-hidden">
-        <div className="p-4 border-b border-gray-200 bg-gray-50 flex items-center gap-3">
-          {screen.name === 'review' || screen.name === 'add' ? (
-            <button onClick={back} className="p-1 text-gray-500 hover:text-black" aria-label="Back to quotes">
-              <ArrowLeft size={20} />
-            </button>
-          ) : (
-            <div className="p-2 bg-[var(--color-brand-primary)] text-white rounded-lg shrink-0">
-              <Truck size={18} />
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <h3 id="quotes-title" className="text-sm font-bold truncate">Vendor quotes · {boq.title || 'Untitled BOQ'}</h3>
-            <p className="text-[11px] text-gray-500 font-mono truncate">
-              {boq.items.length} BOQ items{boq.address ? ` · ${boq.address}` : ''}
-            </p>
-          </div>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-black" aria-label="Close">
-            <X size={22} />
+    <Sheet kind="screen" size="xl" tall scroll={false} labelledBy="quotes-title" onClose={onClose} onBack={stepBack}>
+      <div className="p-4 border-b border-gray-200 bg-gray-50 flex items-center gap-3">
+        {screen.name === 'review' || screen.name === 'add' ? (
+          <button onClick={back} className="p-1 text-gray-500 hover:text-black" aria-label="Back to quotes">
+            <ArrowLeft size={20} />
           </button>
-        </div>
-
-        {(screen.name === 'list' || screen.name === 'compare') && (
-          <nav className="flex gap-1 p-2 border-b border-gray-100" aria-label="Quote views">
-            {(['compare', 'list'] as const).map((name) => (
-              <button
-                key={name}
-                onClick={() => setScreen({ name })}
-                aria-current={screen.name === name ? 'page' : undefined}
-                className={`flex-1 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider ${screen.name === name ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'}`}
-              >
-                {name === 'compare' ? `Compare (${confirmed.length})` : `Quotes (${quotes.length})`}
-              </button>
-            ))}
-          </nav>
+        ) : (
+          <div className="p-2 bg-[var(--color-brand-primary)] text-white rounded-lg shrink-0">
+            <Truck size={18} />
+          </div>
         )}
-
-        <div className="flex-1 overflow-y-auto p-4">
-          {screen.name === 'add' && (
-            <AddQuote
-              boqId={boqId}
-              initial={shared}
-              onDone={(reviewQuoteId) => {
-                setShared(undefined);
-                // A typed quote opens straight in review, to check and confirm.
-                if (reviewQuoteId) setScreen({ name: 'review', quoteId: reviewQuoteId });
-                else back();
-              }}
-            />
-          )}
-          {screen.name === 'list' && <QuoteList boq={boq} quotes={quotes} onAdd={() => setScreen({ name: 'add' })} onOpen={(q) => setScreen({ name: 'review', quoteId: q.id })} />}
-          {screen.name === 'review' && (reviewing ? <QuoteReview boq={boq} quote={reviewing} onDone={() => setScreen({ name: 'compare' })} /> : <p className="text-xs text-gray-500">This quote was deleted.</p>)}
-          {screen.name === 'compare' && <QuoteCompare boq={boq} quotes={confirmed} onAdd={() => setScreen({ name: 'add' })} />}
+        <div className="min-w-0 flex-1">
+            <h3 id="quotes-title" className="text-sm font-bold truncate">Vendor quotes · {boq.title || 'Untitled BOQ'}</h3>
+          <p className="text-[11px] text-gray-500 font-mono truncate">
+            {boq.items.length} BOQ items{boq.address ? ` · ${boq.address}` : ''}
+          </p>
         </div>
+        <button onClick={onClose} className="p-1 text-gray-400 hover:text-black" aria-label="Close">
+          <X size={22} />
+        </button>
       </div>
-    </motion.div>
+
+      {(screen.name === 'list' || screen.name === 'compare') && (
+        <Tabs
+          label="Quote views"
+          className="m-2"
+          value={screen.name}
+          onChange={(name) => setScreen({ name })}
+          options={[
+            { id: 'compare', label: `Compare (${confirmed.length})` },
+            { id: 'list', label: `Quotes (${quotes.length})` },
+          ]}
+        />
+      )}
+
+      <div className="flex-1 overflow-y-auto p-4">
+        {screen.name === 'add' && (
+          <AddQuote
+            boqId={boqId}
+            initial={shared}
+            onDone={(reviewQuoteId) => {
+              setShared(undefined);
+              // A typed quote opens straight in review, to check and confirm.
+              if (reviewQuoteId) setScreen({ name: 'review', quoteId: reviewQuoteId });
+              else back();
+            }}
+          />
+        )}
+        {screen.name === 'list' && <QuoteList boq={boq} quotes={quotes} onAdd={() => setScreen({ name: 'add' })} onOpen={(q) => setScreen({ name: 'review', quoteId: q.id })} />}
+        {screen.name === 'review' && (reviewing ? <QuoteReview boq={boq} quote={reviewing} onDone={() => setScreen({ name: 'compare' })} /> : <p className="text-xs text-gray-500">This quote was deleted.</p>)}
+        {screen.name === 'compare' && <QuoteCompare boq={boq} quotes={confirmed} onAdd={() => setScreen({ name: 'add' })} />}
+      </div>
+    </Sheet>
   );
 }
 
@@ -169,9 +161,9 @@ function QuoteList({ boq, quotes, onAdd, onOpen }: { boq: HistoryRecord; quotes:
                 </button>
               )}
               {!job && lines.length > 0 && (
-                <button onClick={() => onOpen(q)} className="flex-1 py-2 bg-gray-900 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider">
+                <Button variant="primary" size="sm" className="flex-1" onClick={() => onOpen(q)}>
                   {q.status === 'confirmed' ? 'View lines' : 'Review & confirm'}
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -313,7 +305,7 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
         </>
       ) : (
         <>
-      <div>
+          <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Photos of the quote</span>
             <div className="mt-1 grid grid-cols-3 gap-2">
               {images.map((src, idx) => (

@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from 'react';
-import { motion } from 'motion/react';
 import { Sparkles, X } from 'lucide-react';
-import { useBackHandler } from '../lib/backButton.ts';
+import { Button } from './ui/Button.tsx';
+import { Sheet } from './ui/Sheet.tsx';
 import type { ReleaseNotes } from '../lib/whatsNew.ts';
 
 /** **bold** and *italic* inside a line of the changelog. */
@@ -57,30 +57,27 @@ function render(lines: string[]) {
 
 /** The newest section of the changelog, shown once after an update and from Settings. */
 export function WhatsNewModal({ notes, onClose }: { notes: ReleaseNotes; onClose(): void }) {
-  useBackHandler(onClose);
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-      <div role="dialog" aria-modal="true" aria-labelledby="whats-new-title" className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="p-5 pb-3 flex justify-between items-start gap-3 border-b border-gray-100">
-          <div>
-            <p className="text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold flex items-center gap-1">
-              <Sparkles size={12} className="text-orange-500" /> What's new · version {notes.version}
-            </p>
-            <h3 id="whats-new-title" className="font-bold text-lg text-gray-900 mt-0.5">
-              {notes.title || `Nirman ${notes.version}`}
-            </h3>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-black" aria-label="Close">
-            <X size={20} />
-          </button>
+    <Sheet kind="dialog" size="lg" scroll={false} labelledBy="whats-new-title" onClose={onClose}>
+      <div className="p-5 pb-3 flex justify-between items-start gap-3 border-b border-gray-100">
+        <div>
+          <p className="text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold flex items-center gap-1">
+            <Sparkles size={12} className="text-orange-500" /> What's new · version {notes.version}
+          </p>
+          <h3 id="whats-new-title" className="font-bold text-lg text-gray-900 mt-0.5">
+            {notes.title || `Nirman ${notes.version}`}
+          </h3>
         </div>
-        <div className="p-5 pt-3 space-y-3 overflow-y-auto">{render(notes.lines)}</div>
-        <div className="p-4 border-t border-gray-100">
-          <button onClick={onClose} className="w-full h-11 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl uppercase tracking-widest text-sm">
-            Got it
-          </button>
-        </div>
+        <button onClick={onClose} className="text-gray-400 hover:text-black" aria-label="Close">
+          <X size={20} />
+        </button>
       </div>
-    </motion.div>
+      <div className="p-5 pt-3 space-y-3 overflow-y-auto">{render(notes.lines)}</div>
+      <div className="p-4 border-t border-gray-100">
+        <Button variant="primary" block onClick={onClose}>
+          Got it
+        </Button>
+      </div>
+    </Sheet>
   );
 }

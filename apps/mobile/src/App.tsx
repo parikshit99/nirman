@@ -4,6 +4,7 @@ import { Database, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, S
 import Fuse from 'fuse.js';
 import { filterMaterials, guessCategory, todayISO, type ContractRow, type MaterialFilter } from '@nirman/shared';
 import { useDialogs } from './components/Dialogs.tsx';
+import { Button } from './components/ui/Button.tsx';
 import { useBackHandler } from './lib/backButton.ts';
 import { prefs } from './lib/prefs.ts';
 import { workTypeKey } from './lib/workType.ts';
@@ -55,6 +56,9 @@ interface SaveState {
   initial: ListMeta;
   titlePrefix: string;
 }
+
+/** Below 480 px Preview and Share show only their icons (Save below 360 px), so the header fits 320 px. */
+const NARROW_ICON = 'max-[479px]:w-9 max-[479px]:px-0';
 
 const kindOf = (tab: AppTab): ListKind | null => (tab === 'auditor' ? 'audit' : tab === 'boq' ? 'boq' : null);
 
@@ -357,7 +361,7 @@ export default function App() {
             <StatusChip onClick={() => setSettingsOpen(true)} />
           </div>
           {kind && (
-            <div className="min-w-0 text-right pr-3 border-r border-gray-100 leading-tight">
+            <div className="min-w-0 text-right pr-2 min-[360px]:pr-3 border-r border-gray-100 leading-tight">
               <div className="text-[11px] uppercase tracking-wider text-gray-400 font-mono whitespace-nowrap">{kind === 'audit' ? 'Spent' : 'Items'}</div>
               <div className="text-xs md:text-sm font-mono font-bold" data-testid="header-total">
                 {kind === 'audit' ? `₹${totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : `${filteredItems.length} Recs`}
@@ -365,30 +369,18 @@ export default function App() {
             </div>
           )}
 
-          {/* Fits 320 px: below 480 px Preview and Share show only their icons. */}
-          <div className="flex items-center gap-1.5 md:gap-2 ml-auto shrink-0">
+          <div className="flex items-center gap-1 min-[360px]:gap-1.5 md:gap-2 ml-auto shrink-0">
             {kind && activeItems.length > 0 && (
               <>
-                <button
-                  onClick={openSave}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 bg-blue-600 text-white text-[11px] md:text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-md hover:bg-blue-700 transition-colors whitespace-nowrap"
-                >
-                  <Save size={14} /> <span>Save</span>
-                </button>
-                <button
-                  onClick={() => setPreviewOpen(true)}
-                  aria-label="Preview"
-                  className="flex items-center gap-1.5 p-2 min-[480px]:px-2.5 min-[480px]:py-1.5 md:px-3 md:py-2 bg-white border border-gray-200 text-[var(--color-brand-dark)] text-[11px] md:text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap"
-                >
+                <Button variant="primary" size="sm" onClick={openSave} aria-label="Save" className="max-[359px]:w-9 max-[359px]:px-0">
+                  <Save size={14} /> <span className="hidden min-[360px]:inline">Save</span>
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setPreviewOpen(true)} aria-label="Preview" className={NARROW_ICON}>
                   <Eye size={14} /> <span className="hidden min-[480px]:inline">Preview</span>
-                </button>
-                <button
-                  onClick={openShare}
-                  aria-label="Share"
-                  className="flex items-center gap-1.5 p-2 min-[480px]:px-2.5 min-[480px]:py-1.5 md:px-3 md:py-2 bg-[var(--color-brand-primary)] text-white text-[11px] md:text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-md hover:brightness-110 transition-colors whitespace-nowrap"
-                >
+                </Button>
+                <Button variant="secondary" size="sm" onClick={openShare} aria-label="Share" className={NARROW_ICON}>
                   <Share2 size={14} /> <span className="hidden min-[480px]:inline">Share</span>
-                </button>
+                </Button>
               </>
             )}
             {canClear && (

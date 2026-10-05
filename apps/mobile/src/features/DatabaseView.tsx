@@ -2,14 +2,27 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { Check, ChevronDown, Database, Download, GitMerge, Pencil, TrendingUp, Trash2, Truck, X } from 'lucide-react';
-import { materialDatabaseToCSV, materialFilterOptions, materialKey, parseAmount, similarMaterials, todayISO, variantLabel, type MaterialEntry, type MaterialFilter } from '@nirman/shared';
+import {
+  materialDatabaseToCSV,
+  materialFilterOptions,
+  materialKey,
+  parseAmount,
+  similarMaterials,
+  todayISO,
+  variantLabel,
+  type MaterialEntry,
+  type MaterialFilter,
+} from '@nirman/shared';
 import { FilterChips } from '../components/FilterChips.tsx';
 import { MaterialFilters } from '../components/MaterialFilters.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
 import { shareFile, textToBase64 } from '../lib/files.ts';
 import { useAppState } from '../state/AppState.tsx';
-import { useBackHandler } from '../lib/backButton.ts';
+import { Button } from '../components/ui/Button.tsx';
+import { EmptyState } from '../components/ui/EmptyState.tsx';
+import { Tabs } from '../components/ui/Tabs.tsx';
+import { Sheet, SheetHeader } from '../components/ui/Sheet.tsx';
 
 type SubTab = 'materials' | 'categories';
 
@@ -32,18 +45,7 @@ export function DatabaseView(props: Props) {
   const [tab, setTab] = useState<SubTab>('materials');
   return (
     <div className="space-y-6">
-      <div className="flex border-b border-gray-200 overflow-x-auto no-scrollbar">
-        {SUB_TABS.map(({ id, label }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={`px-4 md:px-6 py-3 text-xs font-bold uppercase tracking-widest transition-all border-b-2 whitespace-nowrap
-              ${tab === id ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <Tabs<SubTab> label="Data" options={SUB_TABS} value={tab} onChange={setTab} className="md:max-w-sm" />
       <p className="text-xs text-gray-600 leading-snug -mt-3">{SUB_TABS.find((t) => t.id === tab)!.about}</p>
       {tab === 'materials' && <Materials {...props} />}
       {tab === 'categories' && <Categories />}
@@ -215,20 +217,16 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
 
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm w-full divide-y divide-gray-100">
         {entries.length === 0 ? (
-          <div className="p-10 text-center text-gray-400 space-y-2">
-            <Database size={40} className="mx-auto opacity-30" />
-            {totalMaterials > 0 ? (
-              <p className="text-sm">No materials match the search or filters.</p>
-            ) : (
-              <>
-                <p className="text-sm font-bold text-gray-600">No prices yet</p>
-                <p className="text-xs leading-relaxed max-w-sm mx-auto">
-                  Prices appear here when you save a purchase list (Save button), tap <b>Index</b> on a purchase (which saves the list to History), or confirm a vendor quote.
-                  {unsavedPriced > 0 && ` Your purchase list has ${unsavedPriced} priced item${unsavedPriced === 1 ? '' : 's'} not added yet.`}
-                </p>
-              </>
-            )}
-          </div>
+          totalMaterials > 0 ? (
+            <EmptyState icon={Database} title="No materials match.">
+              Check the filters or search.
+            </EmptyState>
+          ) : (
+            <EmptyState icon={Database} title="No prices yet">
+              Prices appear here when you save a purchase list (Save button), tap <b>Index</b> on a purchase (which saves the list to History), or confirm a vendor quote.
+              {unsavedPriced > 0 && ` Your purchase list has ${unsavedPriced} priced item${unsavedPriced === 1 ? '' : 's'} not added yet.`}
+            </EmptyState>
+          )
         ) : (
           entries.map((item, idx) => {
             const points = item.priceHistory.filter((h) => h.price > 0);
@@ -491,7 +489,6 @@ function PriceRow({ point: p }: { point: MaterialEntry['priceHistory'][number] }
 function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClose(): void }) {
   const { actions, itemDatabase, hiddenMaterials } = useAppState();
   const dialogs = useDialogs();
-  useBackHandler(onClose);
   const [name, setName] = useState(material.name);
   const [unit, setUnit] = useState(material.unit);
   const others = itemDatabase.filter((e) => e.key !== material.key);
@@ -537,70 +534,63 @@ function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClos
 
   const field = 'mt-1 w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500';
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div role="dialog" aria-modal="true" aria-labelledby="material-editor-title" className="bg-white w-full max-w-md rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto space-y-5">
-        <div className="flex justify-between items-start">
-          <h3 id="material-editor-title" className="font-bold text-gray-900 uppercase tracking-widest text-sm">Edit material</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-black" aria-label="Close">
-            <X size={20} />
-          </button>
-        </div>
+    <Sheet labelledBy="material-editor-title" onClose={onClose} className="p-5 space-y-5">
+      <SheetHeader id="material-editor-title" title="Edit material" onClose={onClose} />
 
-        <div className="space-y-3">
-          <div className="flex gap-2">
-            <label className="block flex-1 min-w-0">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Name</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
-            </label>
-            <label className="block w-24">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Unit</span>
-              <input value={unit} onChange={(e) => setUnit(e.target.value)} className={field} />
-            </label>
-          </div>
-          <p className="text-[11px] text-gray-500">
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <label className="block flex-1 min-w-0">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Name</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
+          </label>
+          <label className="block w-24">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Unit</span>
+            <input value={unit} onChange={(e) => setUnit(e.target.value)} className={field} />
+          </label>
+        </div>
+        <p className="text-[11px] text-gray-500">
             Changes its {material.priceHistory.length === 1 ? 'price' : `${material.priceHistory.length} prices`} and the lines in saved lists. Using the name and unit of another material merges the two.
-          </p>
-          <button onClick={save} className="w-full h-11 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl text-xs uppercase tracking-widest">
-            Save
-          </button>
-        </div>
-
-        {similar.length > 0 && (
-          <section>
-            <h4 className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-2">Same thing under another name?</h4>
-            <ul className="space-y-1.5">
-              {similar.map((e) => (
-                <li key={e.key} className="flex items-center justify-between gap-2 p-2 border border-gray-200 rounded-xl">
-                  <span className="min-w-0 text-sm">
-                    <span className="font-bold block break-words">{e.name}</span>
-                    {e.variants.some((v) => v.label) && (
-                      <span className="text-xs font-bold text-gray-700 block break-words">
-                        {e.variants.map((v) => v.label).filter(Boolean).join(' / ')}
-                      </span>
-                    )}
-                    <span className="text-xs text-gray-500">
-                      per {e.unit} · {e.priceHistory.length ? `₹${Math.round(e.latestPrice).toLocaleString('en-IN')} latest` : 'no prices'}
-                    </span>
-                  </span>
-                  <button onClick={() => mergeInto(e)} className="shrink-0 px-3 py-2 text-xs font-bold text-orange-700 bg-orange-50 rounded-lg flex items-center gap-1">
-                    <GitMerge size={13} /> Merge into this
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        <section className="pt-3 border-t border-gray-100">
-          <button onClick={hide} className="w-full py-2.5 text-xs font-bold text-red-600 bg-red-50 rounded-xl flex items-center justify-center gap-2">
-            <Trash2 size={14} /> Delete from Data
-          </button>
-          <p className="text-[11px] text-gray-500 mt-1.5">
-            Removes its prices from Data and price checks. Saved lists in History don't change, and new purchases show up again. Restore it in Settings.
-          </p>
-        </section>
+        </p>
+        <Button variant="primary" block onClick={save}>
+          Save
+        </Button>
       </div>
-    </motion.div>
+
+      {similar.length > 0 && (
+        <section>
+          <h4 className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-2">Same thing under another name?</h4>
+          <ul className="space-y-1.5">
+            {similar.map((e) => (
+              <li key={e.key} className="flex items-center justify-between gap-2 p-2 border border-gray-200 rounded-xl">
+                <span className="min-w-0 text-sm">
+                  <span className="font-bold block break-words">{e.name}</span>
+                  {e.variants.some((v) => v.label) && (
+                    <span className="text-xs font-bold text-gray-700 block break-words">
+                        {e.variants.map((v) => v.label).filter(Boolean).join(' / ')}
+                    </span>
+                  )}
+                  <span className="text-xs text-gray-500">
+                    per {e.unit} · {e.priceHistory.length ? `₹${Math.round(e.latestPrice).toLocaleString('en-IN')} latest` : 'no prices'}
+                  </span>
+                </span>
+                <button onClick={() => mergeInto(e)} className="shrink-0 px-3 py-2 text-xs font-bold text-orange-700 bg-orange-50 rounded-lg flex items-center gap-1">
+                  <GitMerge size={13} /> Merge into this
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="pt-3 border-t border-gray-100">
+        <button onClick={hide} className="w-full py-2.5 text-xs font-bold text-red-600 bg-red-50 rounded-xl flex items-center justify-center gap-2">
+          <Trash2 size={14} /> Delete from Data
+        </button>
+        <p className="text-[11px] text-gray-500 mt-1.5">
+          Removes its prices from Data and price checks. Saved lists in History don't change, and new purchases show up again. Restore it in Settings.
+        </p>
+      </section>
+    </Sheet>
   );
 }
 

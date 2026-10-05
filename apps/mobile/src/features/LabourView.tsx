@@ -2,7 +2,10 @@ import { ClipboardList, HardHat, Plus, Users } from 'lucide-react';
 import { contractTotals, sumTotals, type ContractRow, type ContractTotals } from '@nirman/shared';
 import { FilterChips } from '../components/FilterChips.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
+import { EmptyState } from '../components/ui/EmptyState.tsx';
+import { Tabs } from '../components/ui/Tabs.tsx';
 import { useAppState } from '../state/AppState.tsx';
+import { Button } from '../components/ui/Button.tsx';
 
 export const rupees = (n: number) => `₹${Math.round(n || 0).toLocaleString('en-IN')}`;
 
@@ -47,24 +50,24 @@ export function LabourSidebar({ contracts, onNew, onSiteReport }: { contracts: C
         </div>
       )}
       <div className={`grid gap-2 ${hasSites ? 'grid-cols-2 lg:grid-cols-1' : 'grid-cols-1'}`}>
-        <button
-          onClick={onNew}
-          className="w-full py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"
-        >
+        <Button variant="primary" block onClick={onNew}>
           <Plus size={14} /> New contract
-        </button>
+        </Button>
         {hasSites && (
-          <button
-            onClick={onSiteReport}
-            className="w-full py-3 bg-[var(--color-brand-dark)] text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"
-          >
+          <Button variant="secondary" block onClick={onSiteReport}>
             <ClipboardList size={14} /> Site report
-          </button>
+          </Button>
         )}
       </div>
     </div>
   );
 }
+
+const STATUS_TABS: { id: StatusFilter; label: string }[] = [
+  { id: 'active', label: 'Ongoing' },
+  { id: 'closed', label: 'Closed' },
+  { id: 'all', label: 'All' },
+];
 
 interface Props {
   contracts: ContractRow[];
@@ -82,8 +85,6 @@ export function LabourView({ contracts, status, onStatus, categoryFilter, onCate
   const { contracts: all, entriesFor, pendingDeletes, categoryNames, actions } = useAppState();
   const sites = [...new Set(all.map((c) => c.address).filter(Boolean))].sort();
   const usedCategories = new Set(all.map((c) => c.category));
-  const chip = (on: boolean) =>
-    `px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${on ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500'}`;
 
   return (
     <div className="space-y-4">
@@ -98,22 +99,14 @@ export function LabourView({ contracts, status, onStatus, categoryFilter, onCate
             onAddress={onAddress}
             addressLabel="Sites"
           />
-          <div className="flex gap-2" role="group" aria-label="Contract status">
-            {(['active', 'closed', 'all'] as const).map((s) => (
-              <button key={s} className={chip(status === s)} onClick={() => onStatus(s)} aria-pressed={status === s}>
-                {s === 'active' ? 'Ongoing' : s === 'closed' ? 'Closed' : 'All'}
-              </button>
-            ))}
-          </div>
+          <Tabs label="Contract status" options={STATUS_TABS} value={status} onChange={onStatus} className="md:max-w-sm" />
         </>
       )}
 
       {contracts.length === 0 ? (
-        <div className="py-16 text-center text-gray-400">
-          <HardHat size={36} className="mx-auto mb-3 opacity-40" />
-          <p className="text-sm font-bold text-gray-500">{all.length ? 'No contracts match.' : 'No labour contracts yet.'}</p>
-          {!all.length && <p className="text-xs mt-1">Add one with “New contract”: the contractor, the job, and the rate or lump sum.</p>}
-        </div>
+        <EmptyState icon={HardHat} title={all.length ? 'No contracts match.' : 'No labour contracts yet.'}>
+          {all.length ? 'Check the filters or search.' : 'Add one with “New contract”: the contractor, the job, and the rate or lump sum.'}
+        </EmptyState>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {contracts.map((c) => (
