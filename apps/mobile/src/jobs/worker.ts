@@ -12,6 +12,20 @@ export interface WorkerStatus {
   processing: boolean;
   /** Why queued entries aren't being processed right now, if anything is wrong. */
   lastError: string | null;
+  /** The entry being read right now, for the progress bar. */
+  current: ReadingProgress | null;
+}
+
+export interface ReadingProgress {
+  jobId: string;
+  engine: 'phone' | 'gemini';
+  /** What is happening, e.g. "Reading photo 1 of 2 on the phone". */
+  step: string;
+  /** 0–1 when known; null while waiting on Gemini (the bar then follows the time taken). */
+  progress: number | null;
+  /** When this step started (ms since epoch). */
+  startedAt: number;
+  model?: string;
 }
 
 export interface Connectivity {
@@ -41,7 +55,7 @@ const describeItems = (items: MaterialInput[]) =>
  * temporary failures retry with exponential back-off.
  */
 export class JobWorker {
-  status: WorkerStatus = { online: true, processing: false, lastError: null };
+  status: WorkerStatus = { online: true, processing: false, lastError: null, current: null };
   private listeners = new Set<() => void>();
   private running: Promise<void> | null = null;
   private again = false;
@@ -130,10 +144,19 @@ export class JobWorker {
   }
 
   /** Read an entry on the phone: typed text, and the text on its photos where the phone can read them. */
+  private progress(job: Job, engine: ReadingProgress['engine'], step: string, progress: number | null, model?: string) {
+    this.setStatus({ current: { jobId: job.id, engine, step, progress, startedAt: Date.now(), model } });
+  }
+
   private async readOnPhone(job: Job, images: string[], learning: ReturnType<typeof learningMap>): Promise<(BillReading & { ocrText: string }) | null> {
     const rows = job.text.split(/\n|;|,(?=\s*[a-z])/i).map((r) => r.trim()).filter(Boolean);
     // Where photos can't be read on the device (the browser), only the typed text is used.
-    if (this.readPhoto) for (const image of images) rows.push(...boxesToRows(await this.readPhoto(image)));
+    const photos = this.readPhoto ? images : [];
+    for (const [i, image] of photos.entries()) {
+      this.progress(job, 'phone', photos.length > 1 ? `Reading photo ${i + 1} of ${photos.length} on the phone` : 'Reading the photo on the phone', i / (photos.length + 1));
+      rows.push(...boxesToRows(await this.readPhoto!(image)));
+    }
+    this.progress(job, 'phone', 'Checking the reading on the phone', photos.length / (photos.length + 1));
     if (!rows.length) return null;
     const reading = parseBill(rows, { learning, captureDate: job.capture_date || todayISO(), conversions: loadConversions() });
     return { ...reading, ocrText: rows.join('\n') };
@@ -196,6 +219,8 @@ export class JobWorker {
       if (!extractor) return NO_KEY_MESSAGE;
       if (!this.status.online) return null;
       await setJobStatus(this.db, job.id, 'processing');
+      const model = this.getSettings().geminiModel;
+      this.progress(job, 'gemini', !phone ? 'Reading with Gemini' : phone.lines.length ? `Phone was unsure (${Math.round(phone.confidence * 100)}% sure), reading with Gemini` : 'Phone couldn’t read it, reading with Gemini', null, model);
       this.onDataChanged();
       if (job.quote_id) {
         // Sr. numbers are the BOQ's printed order; remember which item each one was.
@@ -253,6 +278,7 @@ export class JobWorker {
       }
       return null;
     } finally {
+      this.setStatus({ current: null });
       this.onDataChanged();
     }
   }
