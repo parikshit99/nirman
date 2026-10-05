@@ -2,6 +2,13 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 2.4 — Report a problem
+
+- **Settings → Problems and diagnostics**: the app now keeps a short log on the phone of errors, AI readings (success or failure, time taken, lines read), the steps you take and slow screens. It never records what you bought, prices, addresses, names or your API key.
+- **Report a problem** opens a GitHub issue with your phone details and recent errors already filled in; add a note or screenshot and submit. **Share log** sends the full log as a text file (WhatsApp, email).
+- **Automatic crash reports** (errors only) can be switched off in the same place.
+- If a screen ever crashes, the app shows *Reload* instead of a blank page, and the error is logged.
+
 ## 2.3 — Faster quotes and repeat orders
 
 - **Type a vendor's rates** without the AI: on a saved BOQ, *Add vendor quote → Type rates* lists each BOQ line with a rate box. Leave blank what they didn't quote, then review and confirm as usual. Works offline and without an API key.

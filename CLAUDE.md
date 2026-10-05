@@ -21,3 +21,9 @@ When unsure between two sizes, pick the smaller one. A test (`apps/mobile/test/w
 - Keep internal ids unchanged (app id, `nirmaan` database names, backup `APP_ID`), so existing installs keep their data.
 - Times shown to the user are in IST.
 - The app must work at 320–360 px wide without sideways scrolling.
+
+## Diagnostics
+
+- `apps/mobile/src/lib/diagnostics.ts` keeps the on-phone log. Log names, counts, timings and error messages only: never item names, prices, addresses, notes, vendor or receiver details, photos or keys.
+- Users send it with *Settings → Report a problem* (a pre-filled GitHub issue labelled `bug`) or *Share log*. Read those issues' logs when debugging.
+- Automatic crash reports go to Sentry when the `SENTRY_DSN` repository variable is set (Settings → Secrets and variables → Actions → Variables); without it they are off.

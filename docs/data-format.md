@@ -6,6 +6,7 @@ What Nirman stores and how, written so the data can be read by any future versio
 
 - **Phone:** one SQLite database named `nirmaan` (via `@capacitor-community/sqlite`).
 - **Browser (development):** the same SQLite database, run by sql.js and saved in IndexedDB as `nirmaan.db`.
+- **Diagnostic log:** not in the database or backups; the last 400 entries (errors, AI reading results, steps, timings, with no bill contents) are kept in the WebView's localStorage under `nirmaan_diagnostics`.
 - **Gemini API key:** not in the database. It is kept in the phone's secure storage and is never included in backups.
 
 The `nirmaan` names are the original internal ids. They stay unchanged so existing installs keep their data.

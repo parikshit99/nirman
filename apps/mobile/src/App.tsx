@@ -7,6 +7,7 @@ import { useDialogs } from './components/Dialogs.tsx';
 import { useBackHandler } from './lib/backButton.ts';
 import { prefs } from './lib/prefs.ts';
 import { workTypeKey } from './lib/workType.ts';
+import { logStep } from './lib/diagnostics.ts';
 import { hasUnseenNotes, latestNotes, markNotesSeen } from './lib/whatsNew.ts';
 import { WhatsNewModal } from './components/WhatsNewModal.tsx';
 import { backupOverdue, describeLastBackup, snoozeBackupReminder } from './lib/backupReminder.ts';
@@ -59,6 +60,7 @@ export default function App() {
   const dialogs = useDialogs();
 
   const [activeTab, setActiveTab] = useState<AppTab>('auditor');
+  useEffect(() => logStep('tab', { to: activeTab }), [activeTab]);
   // On another tab, back returns to the Purchases tab before leaving the app.
   useBackHandler(() => setActiveTab('auditor'), activeTab !== 'auditor');
   /** Vendor quotes screen: a saved BOQ's id, or 'pick' to choose the BOQ first. */
@@ -268,6 +270,7 @@ export default function App() {
   const clearCaptureShare = useCallback(() => setCaptureShare(null), []);
   const shareList = async (format: ExportFormat) => {
     if (!kind) return;
+    logStep('share', { what: kind, format, lines: activeItems.length });
     const notes = kind === 'boq' ? boqNotes : '';
     const name = `${titlePrefix(kind)}_${todayISO()}_${Date.now() % 100000}`;
     try {

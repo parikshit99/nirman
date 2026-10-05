@@ -7,6 +7,9 @@ import { testGeminiKey } from '../lib/gemini.ts';
 import { DEFAULT_MODEL } from '../lib/settings.ts';
 import { APP_VERSION } from '../lib/version.ts';
 import { latestNotes } from '../lib/whatsNew.ts';
+import { clearLog, getLog, issueUrl, logAsText, logStep } from '../lib/diagnostics.ts';
+import { crashReportsAvailable, crashReportsEnabled, setCrashReportsEnabled } from '../lib/crashReports.ts';
+import { isNative } from '../lib/platform.ts';
 import { loadConversions, resetConversions, saveConversions } from '../lib/conversionSettings.ts';
 import { parseSize, sizeLabel, type SheetSize } from '@nirman/shared';
 import { describeLastBackup, recordBackup } from '../lib/backupReminder.ts';
@@ -58,6 +61,7 @@ export function SettingsModal({ onClose, firstRun, onWhatsNew }: { onClose(): vo
           <>
             <BackupSection />
             <ConversionsSection />
+            <DiagnosticsSection />
             <StorageSection onWhatsNew={onWhatsNew} />
           </>
         )}
@@ -481,6 +485,87 @@ function ConversionsSection() {
             {saved && <span role="status" className="text-green-700 font-bold">Saved</span>}
           </div>
         </div>
+      )}
+    </section>
+  );
+}
+
+const REPO = 'parikshit99/nirman';
+
+/** The diagnostic log kept on this phone, and the ways to send it. */
+function DiagnosticsSection() {
+  const dialogs = useDialogs();
+  const [note, setNote] = useState('');
+  const [, refresh] = useState(0);
+  const [crash, setCrash] = useState(crashReportsEnabled);
+  const log = getLog();
+  const errors = log.filter((e) => e.kind === 'error').length;
+
+  const report = () => {
+    logStep('report problem');
+    const url = issueUrl(REPO, note.trim());
+    // On the phone, leaving the app's page opens the browser (signed in to GitHub there).
+    if (isNative) window.location.href = url;
+    else window.open(url, '_blank', 'noopener');
+  };
+  const shareLog = async () => {
+    try {
+      await shareFile(`nirman-diagnostics-${new Date().toISOString().slice(0, 10)}.txt`, textToBase64(logAsText()), 'text/plain');
+    } catch (err) {
+      await dialogs.alert('Could not share the log', (err as Error).message);
+    }
+  };
+
+  return (
+    <section className="space-y-2">
+      <SectionTitle>Problems and diagnostics</SectionTitle>
+      <p className="text-[11px] text-gray-500 leading-relaxed">
+        The app keeps a short log on this phone of errors, AI readings, the steps you take and slow screens, to help fix problems. It never records what you
+        bought, prices, addresses, names or your API key. {log.length} entries{errors ? `, ${errors} errors` : ''}.
+      </p>
+      <textarea
+        aria-label="Describe the problem"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="What happened? (optional, you can also add it on GitHub)"
+        className="w-full h-16 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-orange-400 resize-none"
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={report} className="py-2.5 bg-gray-900 text-white rounded-xl text-[11px] font-bold uppercase tracking-widest">
+          Report a problem
+        </button>
+        <button onClick={shareLog} className="py-2.5 bg-gray-100 text-gray-700 rounded-xl text-[11px] font-bold uppercase tracking-widest">
+          Share log
+        </button>
+      </div>
+      <p className="text-[11px] text-gray-500">Report a problem opens a GitHub issue with the phone details and recent errors filled in; you can add a screenshot there.</p>
+      {crashReportsAvailable() && (
+        <label className="flex items-start gap-2 text-xs text-gray-700">
+          <input
+            type="checkbox"
+            checked={crash}
+            onChange={(e) => {
+              setCrash(e.target.checked);
+              setCrashReportsEnabled(e.target.checked);
+            }}
+            className="mt-0.5"
+          />
+          <span>
+            Send crash reports automatically
+            <span className="block text-[11px] text-gray-500">Only errors, with the app version, phone model and recent steps. Takes effect after restarting the app.</span>
+          </span>
+        </label>
+      )}
+      {log.length > 0 && (
+        <button
+          onClick={() => {
+            clearLog();
+            refresh((n) => n + 1);
+          }}
+          className="text-[11px] text-blue-600 font-bold underline"
+        >
+          Clear the log
+        </button>
       )}
     </section>
   );

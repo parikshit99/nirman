@@ -13,6 +13,47 @@ import * as repo from '../data/repo.ts';
 import { DRAFT_IDS, type Job, type ListKind, type Snapshot } from '../data/repo.ts';
 import type { Db } from '../data/sql.ts';
 import type { JobWorker, WorkerStatus } from '../jobs/worker.ts';
+import { logError, logPerf, logStep, timed } from '../lib/diagnostics.ts';
+
+/**
+ * Log each action (its name and time taken, never its arguments) for the
+ * diagnostic log, and any error it throws.
+ */
+function instrument<T extends Record<string, unknown>>(actions: T, skip: string[]): T {
+  const out: Record<string, unknown> = { ...actions };
+  for (const [name, fn] of Object.entries(actions)) {
+    if (typeof fn !== 'function' || skip.includes(name)) continue;
+    out[name] = (...args: unknown[]) => {
+      const start = performance.now();
+      const done = () => {
+        const ms = performance.now() - start;
+        logStep(name, ms >= 50 ? { ms: Math.round(ms) } : undefined);
+        if (ms >= 800) logPerf(name, ms);
+      };
+      try {
+        const result = (fn as (...a: unknown[]) => unknown)(...args);
+        if (result instanceof Promise) {
+          return result.then(
+            (value) => {
+              done();
+              return value;
+            },
+            (err) => {
+              logError(err, name);
+              throw err;
+            },
+          );
+        }
+        done();
+        return result;
+      } catch (err) {
+        logError(err, name);
+        throw err;
+      }
+    };
+  }
+  return out as T;
+}
 import { settingsStore, type Settings } from '../lib/settings.ts';
 
 /** How long a deleted row can be undone. */
@@ -36,7 +77,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
   const [status, setStatus] = useState<WorkerStatus>(worker.status);
   const [settings, setSettings] = useState<Settings>(settingsRef.current);
 
-  const refresh = useCallback(async () => setSnapshot(await repo.loadSnapshot(db)), [db]);
+  const refresh = useCallback(async () => setSnapshot(await timed('loadSnapshot', () => repo.loadSnapshot(db))), [db]);
 
   // Deletes wait UNDO_MS so they can be undone; meanwhile the row shows struck through.
   const pending = useRef(new Map<string, { timer: ReturnType<typeof setTimeout>; commit: () => Promise<void> }>());
@@ -87,7 +128,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
   );
 
   const actions = useMemo(
-    () => ({
+    () => instrument({
       addItems: write(repo.addItems),
       createManualQuote: write(repo.createManualQuote),
       updateItem: write(repo.updateItem),
@@ -166,7 +207,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
         await restoreBackup(db, backup);
         await refresh();
       },
-    }),
+    }, ['flushDeletes', 'processQueue', 'parseBackup']),
     [db, worker, settingsRef, refresh, write, deleteLater, finishDelete, syncPending],
   );
 

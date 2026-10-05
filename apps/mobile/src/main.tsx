@@ -9,6 +9,9 @@ import '@fontsource/jetbrains-mono/500.css';
 import '@fontsource/playfair-display/400-italic.css';
 import App from './App.tsx';
 import { DialogProvider } from './components/Dialogs.tsx';
+import { ErrorBoundary } from './components/ErrorBoundary.tsx';
+import { startCrashReports } from './lib/crashReports.ts';
+import { installErrorHandlers, logError, logPerf } from './lib/diagnostics.ts';
 import { ensureDrafts, loadSnapshot, resetStuckJobs } from './data/repo.ts';
 import { migrateLocal } from './data/schema.ts';
 import { openCapacitorSqlite, openSqlJs, type Db } from './data/sql.ts';
@@ -27,6 +30,9 @@ async function openDatabase(): Promise<Db> {
 }
 
 async function bootstrap() {
+  installErrorHandlers();
+  void startCrashReports().catch((err) => logError(err, 'crash reports'));
+  const started = performance.now();
   const root = createRoot(document.getElementById('root')!);
   try {
     const db = await openDatabase();
@@ -57,20 +63,24 @@ async function bootstrap() {
       },
     };
     const initial = await loadSnapshot(db);
+    logPerf('startup', performance.now() - started, { lists: initial.lists.length, items: initial.items.length, rates: initial.rates.length });
 
     root.render(
       <StrictMode>
-        <DialogProvider>
-          <AppStateProvider services={services} initial={initial}>
-            <App />
-          </AppStateProvider>
-        </DialogProvider>
+        <ErrorBoundary>
+          <DialogProvider>
+            <AppStateProvider services={services} initial={initial}>
+              <App />
+            </AppStateProvider>
+          </DialogProvider>
+        </ErrorBoundary>
       </StrictMode>,
     );
     await installBackButton();
     await worker.start(connectivity);
   } catch (err) {
     console.error(err);
+    logError(err, 'startup');
     root.render(
       <div className="min-h-screen flex items-center justify-center p-6 text-center">
         <div>
