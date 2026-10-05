@@ -49,6 +49,8 @@ interface SheetProps {
   label?: string;
   /** False when the content scrolls inside itself (a fixed header over a scrolling list). */
   scroll?: boolean;
+  /** False keeps it hidden but loaded, so what was typed in it survives closing it. */
+  open?: boolean;
   /** Padding, spacing and layout of the panel. */
   className?: string;
   children: React.ReactNode;
@@ -74,12 +76,13 @@ export function Sheet({
   tall,
   layer,
   scroll = true,
+  open = true,
   labelledBy,
   label,
   className = '',
   children,
 }: SheetProps) {
-  useBackHandler(busy ? ignore : (onBack ?? onClose), backEnabled);
+  useBackHandler(busy ? ignore : (onBack ?? onClose), backEnabled && open);
   const enter = ENTER[kind];
   const height = kind === 'screen' ? (tall ? 'h-full md:h-[90vh]' : 'h-full md:h-auto') : '';
   return createPortal(
@@ -88,7 +91,7 @@ export function Sheet({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      className={`fixed inset-0 ${layer === 'under' ? 'z-40' : layer === 'top' ? 'z-[100]' : 'z-50'} flex justify-center bg-black/60 ${OVERLAY[kind]}`}
+      className={`${open ? 'flex' : 'hidden'} fixed inset-0 ${layer === 'under' ? 'z-40' : layer === 'top' ? 'z-[100]' : 'z-50'} justify-center bg-black/60 ${OVERLAY[kind]}`}
       // Keep clear of the status bar and the gesture bar (a bottom sheet makes room inside instead).
       style={kind === 'sheet' ? undefined : kind === 'dialog' ? DIALOG_INSETS : SCREEN_INSETS}
       onClick={closeOnBackdrop && !busy ? onClose : undefined}

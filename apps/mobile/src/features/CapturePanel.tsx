@@ -35,9 +35,18 @@ export function CapturePanel({
   onVendorQuote,
   incoming,
   onIncomingUsed,
+  onQueued,
+  showJobs = true,
+  inSheet = false,
 }: {
   kind: ListKind;
   onVendorQuote?(): void;
+  /** After an entry is sent to be read (the add sheet closes so the list shows). */
+  onQueued?(): void;
+  /** False when the readings in progress are shown beside the list instead. */
+  showJobs?: boolean;
+  /** Inside the Add sheet, which has its own title. */
+  inSheet?: boolean;
   /** Photos or text shared from another app, to put into this entry. */
   incoming?: IncomingShare | null;
   onIncomingUsed?(): void;
@@ -132,23 +141,21 @@ export function CapturePanel({
     });
     setInputText('');
     setImages([]);
+    onQueued?.();
   };
 
 
   return (
     <>
       {itemsFor(kind).length === 0 && (
-      <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-start gap-3">
-        <Database size={18} className="text-blue-500 mt-0.5 shrink-0" />
-        <div>
-          <p className="text-xs font-bold text-blue-900 mb-1">Works offline</p>
-          <p className="text-xs text-blue-700 leading-normal">
+        <div className="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-start gap-3">
+          <Database size={18} className="text-gray-500 mt-0.5 shrink-0" />
+          <p className="text-xs text-gray-600 leading-normal">
             {kind === 'audit'
-              ? 'Records are stored only on this phone. Type items in yourself with “Add item manually”, any time. Notes and photos are read by Google Gemini; when offline they wait until you are online.'
-              : 'Create a list for price quotation: type items in with “Add item manually”, or let the AI read a photo, voice note or text. Rate and total are left blank for vendor quotes.'}
+              ? 'Everything is stored only on this phone. Type items in with “Add item manually”, or add a bill photo, voice note or text: the phone reads it first, and Gemini helps with what it can’t read (when you are online).'
+              : 'A list for price quotes: type items in with “Add item manually”, or let a photo, voice note or text be read. Rate and total are left blank for vendors.'}
           </p>
         </div>
-      </div>
       )}
 
       {kind === 'boq' && onVendorQuote && (
@@ -167,9 +174,11 @@ export function CapturePanel({
       )}
 
       <div className="mb-8">
-        <h2 className="text-xs text-gray-500 mb-4 flex items-center gap-2 font-semibold">
-          <Plus size={12} /> New {kind === 'audit' ? 'Purchase' : 'BOQ'} Entry
-        </h2>
+        {!inSheet && (
+          <h2 className="text-xs text-gray-500 mb-4 flex items-center gap-2 font-semibold">
+            <Plus size={12} /> New {kind === 'audit' ? 'purchase' : 'BOQ'} entry
+          </h2>
+        )}
 
         <div className="space-y-4">
           {manual ? (
@@ -320,7 +329,7 @@ export function CapturePanel({
           </button>
           {!inputText.trim() && images.length === 0 && <p className="text-xs text-gray-500 text-center -mt-2">Add a bill photo or type what {kind === 'audit' ? 'was bought' : 'you need'} first.</p>}
 
-          {jobs.length > 0 && (
+          {showJobs && jobs.length > 0 && (
             <JobList jobs={jobs} offline={!status.online} hasKey={!!settings.geminiApiKey || settings.readingMode !== 'gemini'} onRetry={actions.retryJob} onDelete={(j) => actions.deleteJob(j.id)} />
           )}
         </div>
@@ -380,6 +389,16 @@ function BoqNotes({ notes, onChange }: { notes: string; onChange(n: string): voi
         className="w-full h-24 p-3 bg-blue-50/50 border border-blue-100 rounded-xl text-xs focus:ring-1 focus:ring-blue-400 outline-none transition-all resize-none"
       />
     </div>
+  );
+}
+
+/** Entries being read (or waiting to be), for the list's kind. */
+export function QueuedReadings({ kind }: { kind: ListKind }) {
+  const { actions, status, settings, jobsFor } = useAppState();
+  const jobs = jobsFor(kind);
+  if (jobs.length === 0) return null;
+  return (
+    <JobList jobs={jobs} offline={!status.online} hasKey={!!settings.geminiApiKey || settings.readingMode !== 'gemini'} onRetry={actions.retryJob} onDelete={(j) => actions.deleteJob(j.id)} />
   );
 }
 

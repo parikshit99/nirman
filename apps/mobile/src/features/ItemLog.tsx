@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { AlertTriangle, Calendar, Check, FileCode, HardHat, History, Pencil, Trash2, Truck, X, Zap } from 'lucide-react';
+import { AlertTriangle, Calendar, Check, FileCode, HardHat, History, Pencil, Plus, Trash2, Truck, Zap } from 'lucide-react';
 import { VARIANT_FIELDS, materialKey, parseAmount, todayISO, variantLabel, variantMatches, type ItemRow, type MaterialEntry } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { DeliveredToggle } from '../components/DeliveredToggle.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
 import { QuantityHelper } from '../components/QuantityHelper.tsx';
 import { VariantFields } from '../components/VariantFields.tsx';
+import { Button } from '../components/ui/Button.tsx';
 import { EmptyState } from '../components/ui/EmptyState.tsx';
 import type { ItemPatch, ListKind } from '../data/repo.ts';
 import { useBackHandler } from '../lib/backButton.ts';
@@ -16,14 +17,16 @@ interface Props {
   kind: ListKind;
   items: ItemRow[];
   searching: boolean;
-  /** Indexing saves the purchase list to History (asking its site and work type); Data reads prices from there. */
+  /** Saving a rate saves the purchase list (asking its site and work type); Rates reads prices from there. */
   onIndex(): void;
+  /** Opens the entry form (phones), offered when the list is empty. */
+  onAdd?(): void;
 }
 
 const rupees = (n: number) => `₹${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
 /** The current Audit or BOQ list: one card per item, sized for a phone screen. */
-export function ItemLog({ kind, items, searching, onIndex }: Props) {
+export function ItemLog({ kind, items, searching, onIndex, onAdd }: Props) {
   const { actions, itemDatabase, itemsFor, pendingDeletes } = useAppState();
   const dialogs = useDialogs();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -83,7 +86,18 @@ export function ItemLog({ kind, items, searching, onIndex }: Props) {
         <div className="divide-y divide-gray-100 min-h-[200px]">
           <AnimatePresence initial={false}>
             {items.length === 0 ? (
-              <EmptyState icon={isAudit ? HardHat : FileCode} title={searching ? 'No items match.' : 'No items yet.'}>
+              <EmptyState
+                icon={isAudit ? HardHat : FileCode}
+                title={searching ? 'No items match.' : 'No items yet.'}
+                action={
+                  !searching &&
+                  onAdd && (
+                    <Button variant="primary" onClick={onAdd}>
+                      <Plus size={16} /> Add {isAudit ? 'purchases' : 'items'}
+                    </Button>
+                  )
+                }
+              >
                 {searching ? 'Check the search.' : 'Add items with a photo, voice or text, or type one in.'}
               </EmptyState>
             ) : (
@@ -136,22 +150,30 @@ export function ItemLog({ kind, items, searching, onIndex }: Props) {
                           <input aria-label="Vendor" className={field} value={draft.vendor} onChange={set('vendor')} placeholder="Vendor" />
                         </label>
                       )}
-                      <div className="flex items-center justify-between gap-2 pt-1">
-                        {isAudit ? (
-                          <span className="text-sm font-mono font-bold text-orange-600">
-                            Total {rupees((parseAmount(draft.quantity) ?? 0) * (parseAmount(draft.unit_price) ?? 0))}
-                          </span>
-                        ) : (
-                          <span />
-                        )}
-                        <div className="flex gap-2">
-                          <button onClick={() => setEditingId(null)} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-bold flex items-center gap-1" aria-label="Cancel">
-                            <X size={16} /> Cancel
-                          </button>
-                          <button onClick={saveEdit} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold flex items-center gap-1" aria-label="Save changes">
-                            <Check size={16} /> Save
-                          </button>
-                        </div>
+                      {isAudit && (
+                        <p className="text-sm font-mono font-bold text-orange-600 pt-1">
+                          Total {rupees((parseAmount(draft.quantity) ?? 0) * (parseAmount(draft.unit_price) ?? 0))}
+                        </p>
+                      )}
+                      {/* Delete lives here, not on every row, so it isn't tapped by accident (Undo still follows). */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <Button
+                          variant="dangerOutline"
+                          size="sm"
+                          aria-label={`Delete ${item.item_name}`}
+                          onClick={() => {
+                            setEditingId(null);
+                            actions.deleteItemLater(item.id);
+                          }}
+                        >
+                          <Trash2 size={14} /> Delete
+                        </Button>
+                        <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setEditingId(null)} aria-label="Cancel">
+                          Cancel
+                        </Button>
+                        <Button variant="primary" size="sm" onClick={saveEdit} aria-label="Save changes">
+                          <Check size={14} /> Save
+                        </Button>
                       </div>
                     </div>
                   ) : (
@@ -163,7 +185,6 @@ export function ItemLog({ kind, items, searching, onIndex }: Props) {
                       onIndex={onIndex}
                       onDelivered={(date) => actions.setDelivered([item.id], date)}
                       pendingDelete={pendingDeletes.has(item.id)}
-                      onDelete={() => actions.deleteItemLater(item.id)}
                       onUndo={() => actions.undoDelete(item.id)}
                     />
                   )}
@@ -216,11 +237,10 @@ interface CardProps {
   onIndex(): void;
   onDelivered(date: string): void;
   pendingDelete: boolean;
-  onDelete(): void;
   onUndo(): void;
 }
 
-function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendingDelete, onDelete, onUndo }: CardProps) {
+function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendingDelete, onUndo }: CardProps) {
   if (pendingDelete) {
     return (
       <div className="flex items-center gap-3 min-h-[44px]">
@@ -274,9 +294,6 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendin
             )}
             {item.original_term && item.original_term !== item.item_name && <span className="italic text-gray-500 truncate">“{item.original_term}”</span>}
           </div>
-        </button>
-        <button onClick={onDelete} className="p-2 -mr-2 -mt-1 text-red-500 hover:bg-red-50 rounded-xl shrink-0" aria-label={`Delete ${item.item_name}`}>
-          <Trash2 size={18} />
         </button>
       </div>
 

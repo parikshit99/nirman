@@ -24,12 +24,15 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('sheets open on top and fit at 320 px', async ({ page }) => {
+  await page.getByRole('button', { name: 'Add purchases' }).click();
+  await expectOnTop(page, page.getByRole('dialog', { name: 'Add purchases' }));
   await page.getByRole('button', { name: /add item manually/i }).click();
   await page.getByLabel('Item name').fill('OPC Cement 53 grade');
   await page.getByLabel('Quantity').fill('50');
   await page.getByLabel('Rate', { exact: true }).fill('385');
   await page.getByRole('button', { name: /^add to/i }).click();
   await page.getByLabel('Close manual entry').click();
+  await page.getByRole('dialog', { name: 'Add purchases' }).getByRole('button', { name: 'Close' }).click();
 
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expectOnTop(page, page.getByRole('dialog'));

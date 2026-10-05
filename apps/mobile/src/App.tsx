@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { Database, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Save, Share2, ShoppingCart, Search, Trash2, Users, X } from 'lucide-react';
+import { Database, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Plus, Save, Share2, ShoppingCart, Search, Trash2, Users, X } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { filterMaterials, guessCategory, todayISO, type ContractRow, type MaterialFilter } from '@nirman/shared';
 import { useDialogs } from './components/Dialogs.tsx';
@@ -19,7 +19,9 @@ import { SaveModal } from './components/SaveModal.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
 import { StatusChip } from './components/StatusChip.tsx';
 import { DRAFT_IDS, type ListKind, type ListMeta } from './data/repo.ts';
-import { CapturePanel } from './features/CapturePanel.tsx';
+import { CapturePanel, QueuedReadings } from './features/CapturePanel.tsx';
+import { Sheet, SheetHeader } from './components/ui/Sheet.tsx';
+import { useMediaQuery } from './lib/useMediaQuery.ts';
 import { DatabaseView } from './features/DatabaseView.tsx';
 import { HistorySidebar, HistoryView } from './features/HistoryView.tsx';
 import { DeliveriesSheet } from './features/DeliveriesSheet.tsx';
@@ -297,6 +299,29 @@ export default function App() {
     setIncoming(null);
   };
   const clearCaptureShare = useCallback(() => setCaptureShare(null), []);
+  /** Phones and small tablets: the list fills the screen and the entry form opens from the Add button. */
+  const wide = useMediaQuery('(min-width: 1024px)');
+  const [addOpen, setAddOpen] = useState(false);
+  useEffect(() => setAddOpen(false), [activeTab]);
+  // Something shared from another app opens the entry form with it.
+  useEffect(() => {
+    if (captureShare) setAddOpen(true);
+  }, [captureShare]);
+  const capturePanel = kind && (
+    <CapturePanel
+      key={kind}
+      kind={kind}
+      onVendorQuote={() => {
+        setAddOpen(false);
+        setQuoteTarget('pick');
+      }}
+      incoming={captureShare?.kind === kind ? captureShare.share : null}
+      onIncomingUsed={clearCaptureShare}
+      showJobs={wide}
+      inSheet={!wide}
+      onQueued={() => setAddOpen(false)}
+    />
+  );
   const shareList = async (format: ExportFormat) => {
     if (!kind) return;
     logStep('share', { what: kind, format, lines: activeItems.length });
@@ -324,44 +349,38 @@ export default function App() {
   const canClear = kind ? activeItems.length > 0 : activeTab === 'history' && history.length > 0;
 
   return (
-    <div className="min-h-screen bg-[var(--color-brand-gray)] flex flex-col overflow-x-hidden">
-      <header className="border-b border-[var(--color-brand-concrete)] bg-white px-4 md:px-6 pb-4 pt-[max(1rem,env(safe-area-inset-top))] flex flex-col md:flex-row items-center justify-between sticky top-0 z-20 gap-4">
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="w-10 h-10 bg-[var(--color-brand-primary)] rounded flex items-center justify-center text-white font-bold shadow-md shadow-orange-100 shrink-0">
-            <HardHat size={22} />
+    <div className="min-h-screen lg:h-screen bg-[var(--color-brand-gray)] flex flex-col overflow-x-hidden lg:overflow-hidden">
+      <header className="bg-white border-b border-[var(--color-brand-concrete)] sticky top-0 z-20 pt-[env(safe-area-inset-top)]">
+        <div className="px-4 md:px-6 h-14 flex items-center gap-3">
+          <div className="w-8 h-8 bg-[var(--color-brand-primary)] rounded flex items-center justify-center text-white shrink-0">
+            <HardHat size={18} />
           </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold tracking-tight text-[var(--color-brand-dark)]">
-              NIRMAN <span className="font-serif italic font-normal text-base opacity-70">by Akohsa</span>
-            </h1>
-            <p className="text-gray-500 leading-none mt-1 text-xs font-semibold">Offline Material Management</p>
-          </div>
-          <div className="md:hidden">
+          <h1 className="text-lg font-bold tracking-tight text-[var(--color-brand-dark)] whitespace-nowrap">
+            NIRMAN <span className="hidden min-[400px]:inline font-serif italic font-normal text-sm opacity-70">by Akohsa</span>
+          </h1>
+          <nav className="hidden lg:flex bg-gray-100 p-1 rounded-lg border border-gray-200 ml-4" aria-label="Sections">
+            {TABS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                aria-label={label}
+                aria-current={activeTab === id ? 'page' : undefined}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap ${
+                  activeTab === id ? 'bg-white text-[var(--color-brand-dark)] shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Icon size={14} /> {label}
+              </button>
+            ))}
+          </nav>
+          <div className="ml-auto">
             <StatusChip onClick={() => setSettingsOpen(true)} />
           </div>
         </div>
-
-        <nav className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 w-full md:w-auto overflow-x-auto no-scrollbar" aria-label="Sections">
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              aria-label={label}
-              aria-current={activeTab === id ? 'page' : undefined}
-              className={`flex-1 md:flex-none flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-3 md:px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wide sm:tracking-wider transition-all whitespace-nowrap
-                ${activeTab === id ? 'bg-white text-[var(--color-brand-dark)] shadow-sm' : 'text-gray-500 hover:text-gray-600'}`}
-            >
-              <Icon size={14} className="hidden min-[440px]:inline" /> {label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto justify-between md:justify-end">
-          <div className="hidden md:block">
-            <StatusChip onClick={() => setSettingsOpen(true)} />
-          </div>
+        {(kind || canClear) && (
+          <div className="px-4 md:px-6 pb-2 flex items-center gap-2 justify-between">
           {kind && (
-            <div className="min-w-0 text-right pr-2 min-[360px]:pr-3 border-r border-gray-100 leading-tight">
+            <div className="min-w-0 leading-tight">
               <div className="text-xs text-gray-500 whitespace-nowrap font-semibold">{kind === 'audit' ? 'Spent' : 'Items'}</div>
               <div className="text-xs md:text-sm font-mono font-bold" data-testid="header-total">
                 {kind === 'audit' ? `₹${totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : `${filteredItems.length}`}
@@ -389,7 +408,8 @@ export default function App() {
               </button>
             )}
           </div>
-        </div>
+          </div>
+        )}
       </header>
 
       <p className="mx-4 md:mx-6 mt-3 text-xs text-gray-600 leading-snug">{TABS.find((t) => t.id === activeTab)!.about}</p>
@@ -415,17 +435,12 @@ export default function App() {
         </div>
       )}
 
-      <main className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden lg:h-[calc(100vh-73px)]">
-        {activeTab !== 'database' && (
+      {/* Phones: the bottom tab bar (and the Add button above it) need room under the page. */}
+      <main className={`flex-1 flex flex-col lg:flex-row lg:min-h-0 mt-3 lg:mt-0 lg:pb-0 ${kind ? 'pb-[calc(9rem+env(safe-area-inset-bottom))]' : 'pb-[calc(5rem+env(safe-area-inset-bottom))]'}`}>
+        {activeTab !== 'database' && (wide || !kind) && (
           <section className="w-full lg:w-[400px] bg-white border-r border-[var(--color-brand-concrete)] flex flex-col p-4 md:p-6 lg:overflow-y-auto">
             {kind ? (
-              <CapturePanel
-                key={kind}
-                kind={kind}
-                onVendorQuote={() => setQuoteTarget('pick')}
-                incoming={captureShare?.kind === kind ? captureShare.share : null}
-                onIncomingUsed={clearCaptureShare}
-              />
+              capturePanel
             ) : activeTab === 'labour' ? (
               <LabourSidebar contracts={filteredContracts} onNew={() => setContractForm({})} onSiteReport={() => setSiteReportOpen(true)} />
             ) : (
@@ -434,7 +449,7 @@ export default function App() {
           </section>
         )}
 
-        <section className="flex-1 flex flex-col technical-grid lg:overflow-hidden bg-white mt-4 lg:mt-0">
+        <section className={`flex-1 flex flex-col technical-grid lg:overflow-hidden bg-white ${kind && !wide ? '' : 'mt-4 lg:mt-0'}`}>
           <div className="p-4 md:p-6 pb-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <h2 className="text-xs md:text-xs text-gray-500 flex items-center gap-2 font-semibold">
               {activeTab === 'history' ? <History size={12} /> : activeTab === 'database' ? <Database size={12} /> : activeTab === 'labour' ? <Users size={12} /> : activeTab === 'auditor' ? <FileText size={12} /> : <FileCode size={12} />}
@@ -489,16 +504,51 @@ export default function App() {
                 onBuyAgain={buyAgain}
               />
             ) : (
-              <ItemLog
-                kind={kind!}
-                items={filteredItems}
-                searching={!!search}
-                onIndex={openSave}
-              />
+              <>
+                {!wide && <QueuedReadings kind={kind!} />}
+                <ItemLog kind={kind!} items={filteredItems} searching={!!search} onIndex={openSave} onAdd={wide ? undefined : () => setAddOpen(true)} />
+              </>
             )}
           </div>
         </section>
       </main>
+
+      {kind && !wide && listedItems.length > 0 && (
+        <button
+          onClick={() => setAddOpen(true)}
+          className="fixed right-4 z-30 bottom-[calc(5rem+env(safe-area-inset-bottom))] h-14 pl-4 pr-5 rounded-full bg-[var(--color-brand-primary)] text-white font-bold shadow-lg shadow-orange-200 flex items-center gap-2"
+        >
+          <Plus size={22} /> Add
+        </button>
+      )}
+
+      <nav
+        className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-[var(--color-brand-concrete)] grid grid-cols-5 pb-[env(safe-area-inset-bottom)]"
+        aria-label="Sections"
+      >
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            aria-label={label}
+            aria-current={activeTab === id ? 'page' : undefined}
+            className={`h-16 min-w-0 flex flex-col items-center justify-center gap-1 text-xs font-semibold ${activeTab === id ? 'text-[var(--color-brand-primary)]' : 'text-gray-500'}`}
+          >
+            <span className={`px-4 py-1 rounded-full ${activeTab === id ? 'bg-orange-100' : ''}`}>
+              <Icon size={20} />
+            </span>
+            <span className="max-w-full truncate px-0.5">{label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* Phones: the entry form opens over the list. It stays loaded when closed, so a half-typed entry isn't lost. */}
+      {kind && !wide && (
+        <Sheet key={`add-${kind}`} open={addOpen} size="lg" labelledBy="add-title" onClose={() => setAddOpen(false)} className="p-4 gap-4">
+          <SheetHeader id="add-title" title={kind === 'audit' ? 'Add purchases' : 'Add to BOQ'} onClose={() => setAddOpen(false)} />
+          {capturePanel}
+        </Sheet>
+      )}
 
       <AnimatePresence>
         {saveState && (

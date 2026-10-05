@@ -24,6 +24,9 @@ async function offScreen(page: Page): Promise<string[]> {
 }
 
 async function addItem(page: Page, name: string, quantity = '10', rate = '385') {
+  // Below 1024 px the entry form opens from the Add button.
+  const add = page.getByRole('button', { name: /^(add|add purchases|add items)$/i }).first();
+  if (await add.isVisible()) await add.click();
   await page.getByRole('button', { name: /add item manually/i }).click();
   await page.getByLabel('Item name').fill(name);
   await page.getByLabel('Quantity').fill(quantity);
@@ -31,6 +34,8 @@ async function addItem(page: Page, name: string, quantity = '10', rate = '385') 
   if (await rateField.count()) await rateField.fill(rate);
   await page.getByRole('button', { name: /^add to/i }).click();
   await page.getByLabel('Close manual entry').click();
+  const sheet = page.getByRole('dialog', { name: /^Add/ });
+  if (await sheet.isVisible()) await sheet.getByRole('button', { name: 'Close' }).click();
 }
 
 for (const width of WIDTHS) {
