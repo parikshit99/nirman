@@ -54,11 +54,14 @@ export const IMAGE_INSTRUCTION =
   'Extract every material item and quantity from all these images. Combine findings into a single list. Be precise with handwritten numbers across all pages.';
 export const TEXT_INSTRUCTION = 'Extract material items from the text provided.';
 
+/** JSON-quoted, so a term like 12" pipe (inches) or a stray newline can't break the rule line. */
+const quote = (text: string) => JSON.stringify(text);
+
 function learningContext(learning?: LearningMap): string {
   const entries = Object.entries(learning ?? {});
   return entries.length > 0
     ? `\n\nUSER PREFERENCES (Follow these rules strictly based on user's past corrections):
-       ${entries.map(([term, pref]) => `- When you see "${term}", always use name: "${pref.item_name}" and unit: "${pref.unit}"`).join('\n')}`
+       ${entries.map(([term, pref]) => `- When you see ${quote(term)}, always use name: ${quote(pref.item_name)} and unit: ${quote(pref.unit)}`).join('\n')}`
     : '';
 }
 
