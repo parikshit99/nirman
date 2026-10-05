@@ -9,6 +9,7 @@ import { pdfFile, pdfToJpegs, sheetToXlsx, siteReportSheet, type ExportFormat } 
 import { shareFiles } from '../lib/files.ts';
 import { buildSiteReportPdf } from '../lib/pdf.ts';
 import { useAppState } from '../state/AppState.tsx';
+import { logStep } from '../lib/diagnostics.ts';
 
 const rupees = (n: number) => `₹${Math.round(n || 0).toLocaleString('en-IN')}`;
 
@@ -47,6 +48,7 @@ export function SiteReport({ onClose }: { onClose(): void }) {
   const filters = [period, categories.length ? categories.join(', ') : 'All categories', deliveredOnly ? 'Delivered only' : 'All saved purchases'].join(' · ');
 
   const share = async (format: ExportFormat) => {
+    logStep('share', { what: 'site report', format, lines: report.lineCount, deliveredOnly, categories: categories.length, dated: !!(from || to) });
     const name = `Site_report_${address.replace(/[^\w-]+/g, '_').slice(0, 40)}_${todayISO()}`;
     try {
       if (format === 'xlsx') {

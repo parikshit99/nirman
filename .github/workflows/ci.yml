@@ -52,6 +52,9 @@ jobs:
           echo "Version $MAJOR_MINOR.$PATCH ($PATCH changes since $MAJOR_MINOR was set in ${BUMPED_AT::7})"
       - name: Build web bundle
         run: npm run build -w apps/mobile
+        env:
+          # Crash reporting (Sentry) is switched on by setting the SENTRY_DSN repository variable; blank leaves it off.
+          VITE_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
       - run: npx cap sync android
         working-directory: apps/mobile
       - name: Build debug APK

@@ -7,7 +7,7 @@ An Android app for tracking construction materials on site. You photograph bills
 - **saved sessions** per site;
 - a **material price database** built from everything you record.
 
-Everything is stored **only on your phone**. There is no server or account.
+Everything is stored **only on your phone**. There is no server or account. The app keeps a small diagnostic log (errors, AI reading results, steps taken, slow screens; never bill contents, prices, addresses or keys), which leaves the phone only when you send it from *Settings → Report a problem*, or as an automatic crash report when that is switched on.
 
 **[⬇ Download the latest APK](https://github.com/parikshit99/nirman/releases/download/latest-debug/nirmaan-auditor-debug.apk)**: rebuilt automatically every time a change is merged into `main`. While this repository is private, you need to be signed in to GitHub for the link to work.
 

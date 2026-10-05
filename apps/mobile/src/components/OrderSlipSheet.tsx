@@ -6,6 +6,7 @@ import { orderSlipSheet, pdfFile, pdfToJpegs, sheetToXlsx, type ExportFormat } f
 import { shareFiles } from '../lib/files.ts';
 import { buildOrderSlipPdf, type OrderSlipDetails } from '../lib/pdf.ts';
 import { prefs } from '../lib/prefs.ts';
+import { logStep } from '../lib/diagnostics.ts';
 import { useDialogs } from './Dialogs.tsx';
 
 const LAST_KEY = 'nirmaan_order_slip';
@@ -53,6 +54,7 @@ export function OrderSlipSheet({
 
   const share = async (format: ExportFormat) => {
     setBusy(format);
+    logStep('share', { what: 'order slip', format, lines: items.length, toVendor: !!details.vendor?.trim() });
     prefs.set(LAST_KEY, { address: details.address, receiverName: details.receiverName, receiverPhone: details.receiverPhone });
     const name = `Order_slip_${(details.vendor?.trim() || details.address || 'site').replace(/[^\w-]+/g, '_').slice(0, 30)}_${todayISO()}`;
     try {

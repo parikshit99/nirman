@@ -2,6 +2,7 @@ import { todayISO, variantLabel, type LearnedTermRow } from '@nirman/shared';
 import { completeJob, completeQuoteJob, getJobImages, learningMap, listItems, setJobStatus, type Job } from '../data/repo.ts';
 import type { Db } from '../data/sql.ts';
 import { classifyError, createGeminiExtractor, type Extractor } from '../lib/gemini.ts';
+import { log, scrub } from '../lib/diagnostics.ts';
 import type { Settings } from '../lib/settings.ts';
 
 export interface WorkerStatus {
@@ -117,8 +118,14 @@ export class JobWorker {
   private async process(job: Job, extractor: Extractor) {
     await setJobStatus(this.db, job.id, 'processing');
     this.onDataChanged();
+    // For the diagnostic log: what kind of reading, how big, how long, how it ended; never its contents.
+    const started = performance.now();
+    const facts: Record<string, string | number | boolean> = { kind: job.quote_id ? 'quote' : 'entry', textChars: job.text.length };
+    const logReading = (outcome: string, extra: Record<string, string | number | boolean> = {}) =>
+      log('ai', `reading ${outcome}`, { ...facts, ms: Math.round(performance.now() - started), model: this.getSettings().geminiModel, ...extra });
     try {
       const images = await getJobImages(this.db, job.id);
+      facts.photos = images.length;
       const learning = learningMap(await this.db.all<LearnedTermRow>('SELECT * FROM learned_terms'));
       if (job.quote_id) {
         // Sr. numbers are the BOQ's printed order; remember which item each one was.
@@ -131,8 +138,10 @@ export class JobWorker {
         });
         if (lines.length === 0) {
           await setJobStatus(this.db, job.id, 'failed', 'No quote lines detected. Make sure the photo or text is clear, then retry.');
+          logReading('empty');
         } else {
           await completeQuoteJob(this.db, job.id, lines, boq.map((b) => b.id));
+          logReading('ok', { lines: lines.length, matched: lines.filter((l) => l.boq_sr).length, boqItems: boq.length });
         }
         return;
       }
@@ -145,11 +154,14 @@ export class JobWorker {
       });
       if (items.length === 0) {
         await setJobStatus(this.db, job.id, 'failed', 'No items detected. Make sure the photo or text is clear, then retry.');
+        logReading('empty');
       } else {
         await completeJob(this.db, job.id, items);
+        logReading('ok', { lines: items.length, converted: items.filter((i) => i.ordered_as).length });
       }
     } catch (err) {
       const e = classifyError(err);
+      logReading('failed', { error: e.kind, message: scrub(e.message).slice(0, 120) });
       if (e.kind === 'invalid') {
         await setJobStatus(this.db, job.id, 'failed', e.message);
       } else {

@@ -7,6 +7,7 @@ import { ShareSheet } from '../components/ShareSheet.tsx';
 import { OrderSlipSheet } from '../components/OrderSlipSheet.tsx';
 import { comparisonSheet, pdfFile, pdfToJpegs, sheetToXlsx, type ExportFormat } from '../lib/exports.ts';
 import { shareFiles } from '../lib/files.ts';
+import { logStep } from '../lib/diagnostics.ts';
 import { buildQuoteComparisonPdf } from '../lib/pdf.ts';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
 
@@ -36,6 +37,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
   }
 
   const share = async (format: ExportFormat) => {
+    logStep('share', { what: 'comparison', format, vendors: comparison.vendors.length });
     const name = `${(boq.title || 'BOQ').replace(/[^\w-]+/g, '_')}_quotes`;
     try {
       if (format === 'xlsx') {
