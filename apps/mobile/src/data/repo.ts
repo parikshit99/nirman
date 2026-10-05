@@ -272,6 +272,7 @@ export async function saveDraftToHistory(db: Db, kind: ListKind, meta: ListMeta,
     if (existing) await tx.run('DELETE FROM items WHERE list_id = ?', [id]);
     await copyItems(tx, DRAFT_IDS[kind], id);
     if (existing) await rematchQuoteLines(tx, id, oldItems);
+    if ((existing?.kind ?? kind) === 'audit') await fillRateSites(tx, id, meta);
     return id;
   });
 }
@@ -280,7 +281,29 @@ export async function updateListMeta(db: Db, id: string, meta: ListMeta) {
   await db.transaction(async (tx) => {
     const list = await getRow(tx, 'lists', id);
     if (list) await touch(tx, 'lists', { ...list, ...meta, site_date: meta.site_date || null });
+    if (list?.kind === 'audit') await fillRateSites(tx, id, meta);
   });
+}
+
+/**
+ * Rates indexed from a purchase list before it was saved have no site; once
+ * the list is saved with one, give it to the matching rates.
+ */
+async function fillRateSites(tx: SqlExecutor, listId: string, meta: Pick<ListMeta, 'address' | 'category'>) {
+  if (!meta.address && !meta.category) return;
+  const items = await listItems(tx, listId);
+  const rates = await tx.all<IndexedRateRow>(`SELECT * FROM indexed_rates WHERE address = '' OR category = ''`);
+  for (const rate of rates) {
+    const match = items.some(
+      (i) =>
+        materialKey(i.item_name, i.unit) === materialKey(rate.item_name, rate.unit) &&
+        variantKey(i) === variantKey(rate) &&
+        (!i.date || i.date === rate.date) &&
+        i.unit_price === rate.price &&
+        (i.vendor || 'Unknown').toLowerCase() === rate.vendor.toLowerCase(),
+    );
+    if (match) await writeRow(tx, 'indexed_rates', { ...rate, address: rate.address || meta.address, category: rate.category || meta.category });
+  }
 }
 
 export async function renameList(db: Db, id: string, title: string) {
