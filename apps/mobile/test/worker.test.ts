@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ExtractedQuoteLine, ExtractionRequest, QuoteExtractionRequest } from '@nirman/shared';
-import { DRAFT_IDS, enqueueJob, enqueueQuote, loadSnapshot, saveDraftToHistory, updateItem, addItems } from '../src/data/repo.ts';
+import { DRAFT_IDS, enqueueJob, enqueueQuote, loadSnapshot, retryJob, saveDraftToHistory, updateItem, addItems } from '../src/data/repo.ts';
 import { ExtractionError, type Extractor } from '../src/lib/gemini.ts';
-import { JobWorker, NO_KEY_MESSAGE } from '../src/jobs/worker.ts';
+import { JobWorker, MAX_TIMEOUTS, NO_KEY_MESSAGE } from '../src/jobs/worker.ts';
 import { DEFAULT_SETTINGS, type Settings } from '../src/lib/settings.ts';
 import { freshDb } from './helpers.ts';
 
@@ -81,6 +81,26 @@ describe('JobWorker', () => {
     const snap = await loadSnapshot(db);
     expect(snap.jobs.map((j) => [j.status, j.attempts])).toEqual([['pending', 1], ['pending', 0]]);
     expect(worker.status.lastError).toMatch(/Could not reach Gemini/);
+  });
+
+  it('stops retrying an entry that keeps timing out, so the rest of the queue runs', async () => {
+    const { db, worker, calls } = await setup(async (req) => {
+      if (req.text === 'slow') throw new ExtractionError('Gemini timed out; will retry.', 'retry', true);
+      return [cement];
+    });
+    await queue(db, 'slow');
+    await queue(db, 'next');
+    for (let i = 1; i < MAX_TIMEOUTS; i++) await worker.run();
+    expect((await loadSnapshot(db)).jobs.map((j) => j.status)).toEqual(['pending', 'pending']);
+    await worker.run();
+    let snap = await loadSnapshot(db);
+    expect(snap.jobs.map((j) => [j.status, j.attempts])).toEqual([['failed', MAX_TIMEOUTS]]);
+    expect(snap.jobs[0].error).toMatch(/timed out 3 times/);
+    expect(calls.at(-1)!.text).toBe('next');
+    // Retry starts the count again.
+    await retryJob(db, snap.jobs[0].id);
+    snap = await loadSnapshot(db);
+    expect(snap.jobs.map((j) => [j.status, j.attempts, j.error])).toEqual([['pending', 0, null]]);
   });
 
   it('marks entries failed when the key is rejected, and when nothing is found', async () => {

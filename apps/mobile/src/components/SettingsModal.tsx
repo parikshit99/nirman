@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { CheckCircle2, Download, Eye, EyeOff, KeyRound, Loader2, Settings as SettingsIcon, Upload, X } from 'lucide-react';
 import { backupFilename, BackupError } from '../data/backup.ts';
 import { shareFile, textToBase64 } from '../lib/files.ts';
-import { testGeminiKey } from '../lib/gemini.ts';
+import { FALLBACK_MODELS, listReadingModels, testGeminiKey, type ModelOption } from '../lib/gemini.ts';
 import { DEFAULT_MODEL } from '../lib/settings.ts';
 import { APP_VERSION } from '../lib/version.ts';
 import { latestNotes } from '../lib/whatsNew.ts';
@@ -80,6 +80,21 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
   const [model, setModel] = useState(settings.geminiModel);
   const [show, setShow] = useState(false);
   const [state, setState] = useState<{ kind: 'idle' | 'testing' | 'ok' | 'error'; message?: string }>({ kind: 'idle' });
+  const [models, setModels] = useState<ModelOption[]>(FALLBACK_MODELS);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [typing, setTyping] = useState(false);
+  // The models this key can use, fetched once a key is entered.
+  const savedKey = settings.geminiApiKey;
+  const loadModels = async (apiKey: string) => {
+    if (!apiKey) return;
+    setLoadingModels(true);
+    setModels(await listReadingModels(apiKey));
+    setLoadingModels(false);
+  };
+  useEffect(() => {
+    void loadModels(savedKey);
+  }, [savedKey]);
+  const options = models.some((m) => m.id === model) || !model.trim() ? models : [{ id: model, label: model }, ...models];
   const dirty = key.trim() !== settings.geminiApiKey || (model.trim() || DEFAULT_MODEL) !== settings.geminiModel;
 
   const save = async () => {
@@ -99,6 +114,7 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
       } else {
         setState({ kind: 'ok', message: 'Key works' });
       }
+      void loadModels(key.trim());
     } catch (err) {
       setState({ kind: 'error', message: (err as Error).message });
     }
@@ -133,19 +149,38 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
           Get a free key at aistudio.google.com → “Get API key”. It is stored encrypted on this phone only.
         </p>
       </div>
-      <details className="text-[11px]">
-        <summary className="text-gray-400 cursor-pointer">Advanced</summary>
-        <label htmlFor="api-model" className="block font-bold text-gray-700 mt-2 mb-1">
-          Model
+      <div className="text-[11px]">
+        <label htmlFor="api-model" className="font-bold text-gray-700 mb-1 flex items-center gap-1.5">
+          Model {loadingModels && <Loader2 size={11} className="animate-spin text-gray-400" />}
         </label>
-        <input
-          id="api-model"
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          placeholder={DEFAULT_MODEL}
-          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none text-xs font-mono"
-        />
-      </details>
+        {typing ? (
+          <input
+            id="api-model"
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder={DEFAULT_MODEL}
+            autoFocus
+            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none text-xs font-mono"
+          />
+        ) : (
+          <select
+            id="api-model"
+            value={model || DEFAULT_MODEL}
+            onChange={(e) => (e.target.value === '__other' ? setTyping(true) : setModel(e.target.value))}
+            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none text-xs"
+          >
+            {options.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label === m.id ? m.id : `${m.label} (${m.id})`}
+              </option>
+            ))}
+            <option value="__other">Other (type a name)…</option>
+          </select>
+        )}
+        <p className="text-gray-400 mt-1 leading-relaxed">
+          Flash is fast and cheap (best for bills); Flash-Lite is fastest; Pro is slower but more careful. {savedKey ? 'The list shows the models your key can use.' : 'Save a key to see every model it can use.'}
+        </p>
+      </div>
       {state.kind === 'error' && <p className="text-[11px] text-red-600 bg-red-50 border border-red-100 rounded-lg p-2">{state.message}</p>}
       {state.kind === 'ok' && (
         <p className="text-[11px] text-green-700 flex items-center gap-1">

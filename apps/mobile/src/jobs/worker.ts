@@ -21,6 +21,9 @@ export interface Connectivity {
 const MIN_BACKOFF_MS = 10_000;
 const MAX_BACKOFF_MS = 10 * 60_000;
 
+/** Readings that time out this many times in a row stop retrying, so the queue can finish. */
+export const MAX_TIMEOUTS = 3;
+
 export const NO_KEY_MESSAGE = 'Add your Gemini API key in Settings to read queued entries.';
 
 /**
@@ -173,6 +176,14 @@ export class JobWorker {
       logReading('failed', { error: e.kind, message: scrub(e.message).slice(0, 120) });
       if (e.kind === 'invalid') {
         await setJobStatus(this.db, job.id, 'failed', e.message);
+      } else if (e.timedOut && job.attempts + 1 >= MAX_TIMEOUTS) {
+        // The photo itself may be the problem: stop here and let the next entries run.
+        await setJobStatus(
+          this.db,
+          job.id,
+          'failed',
+          `Gemini timed out ${MAX_TIMEOUTS} times on this entry. Tap Retry, or try a clearer photo, fewer photos, or another model in Settings.`,
+        );
       } else {
         await setJobStatus(this.db, job.id, 'pending');
         throw e;

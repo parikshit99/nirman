@@ -198,7 +198,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
         worker.schedule();
       },
       async retryJob(job: Job) {
-        await repo.setJobStatus(db, job.id, 'pending');
+        await repo.retryJob(db, job.id);
         await refresh();
         worker.schedule();
       },
