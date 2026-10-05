@@ -139,6 +139,54 @@ export function pickReplacementModel(models: { name?: string; supportedActions?:
   return sorted[0] ?? null;
 }
 
+export interface ModelOption {
+  id: string;
+  label: string;
+}
+
+/** Models offered in Settings when the list can't be fetched (no key yet, or offline). */
+export const FALLBACK_MODELS: ModelOption[] = [
+  { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash (preview)' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' },
+  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+];
+
+/**
+ * Gemini models that can read a bill (text and photos in, text out), newest
+ * first, Flash before Pro, stable before preview. Leaves out image, speech,
+ * live, embedding and experimental models.
+ */
+export function readingModelOptions(models: { name?: string; displayName?: string; supportedActions?: string[] }[]): ModelOption[] {
+  const version = (id: string) => Number(id.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] ?? 0);
+  const tier = (id: string) => (/flash-lite/.test(id) ? 1 : /flash/.test(id) ? 0 : 2);
+  const seen = new Set<string>();
+  return models
+    .filter((m) => !m.supportedActions || m.supportedActions.includes('generateContent'))
+    .map((m) => ({ id: (m.name ?? '').replace(/^models\//, ''), label: m.displayName || '' }))
+    .filter(({ id }) => /^gemini-/.test(id) && !/image|tts|audio|live|embed|exp|thinking|computer|robotics|native|aqa/.test(id))
+    .filter(({ id }) => !seen.has(id) && !!seen.add(id))
+    .map(({ id, label }) => ({ id, label: label || id }))
+    .sort((a, b) => {
+      const latest = Number(/latest/.test(b.id)) - Number(/latest/.test(a.id));
+      if (latest) return latest;
+      return version(b.id) - version(a.id) || tier(a.id) - tier(b.id) || Number(/preview/.test(a.id)) - Number(/preview/.test(b.id)) || a.id.localeCompare(b.id);
+    });
+}
+
+/** The models this key can use, for the Settings list; the fallback list if they can't be fetched. */
+export async function listReadingModels(apiKey: string): Promise<ModelOption[]> {
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const models: { name?: string; displayName?: string; supportedActions?: string[] }[] = [];
+    for await (const m of await ai.models.list({ config: { pageSize: 100 } })) models.push(m);
+    const options = readingModelOptions(models);
+    return options.length ? options : FALLBACK_MODELS;
+  } catch {
+    return FALLBACK_MODELS;
+  }
+}
+
 async function findReplacementModel(ai: GoogleGenAI): Promise<string | null> {
   try {
     const models: { name?: string; supportedActions?: string[] }[] = [];
