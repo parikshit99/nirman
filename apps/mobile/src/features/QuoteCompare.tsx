@@ -1,9 +1,12 @@
-import { Download, Plus, Trophy } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, Share2, Trophy } from 'lucide-react';
 import { compareQuotes, variantLabel, type QuoteCell, type QuoteRow } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { Sparkline, VsLastBadge, pct, rupees, shortDate } from '../components/PriceBadges.tsx';
-import { shareFile } from '../lib/files.ts';
-import { buildQuoteComparisonPdf, pdfToBase64 } from '../lib/pdf.ts';
+import { ShareSheet } from '../components/ShareSheet.tsx';
+import { comparisonSheet, pdfFile, pdfToJpegs, sheetToXlsx, type ExportFormat } from '../lib/exports.ts';
+import { shareFiles } from '../lib/files.ts';
+import { buildQuoteComparisonPdf } from '../lib/pdf.ts';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
 
 /**
@@ -14,6 +17,7 @@ import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
 export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quotes: QuoteRow[]; onAdd(): void }) {
   const { linesFor, itemDatabase, learning } = useAppState();
   const dialogs = useDialogs();
+  const [shareOpen, setShareOpen] = useState(false);
   const lines = quotes.flatMap((q) => linesFor(q.id));
   const comparison = compareQuotes(boq.items, quotes, lines, itemDatabase, learning);
 
@@ -28,10 +32,16 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
     );
   }
 
-  const exportPdf = async () => {
+  const share = async (format: ExportFormat) => {
+    const name = `${(boq.title || 'BOQ').replace(/[^\w-]+/g, '_')}_quotes`;
     try {
-      const doc = buildQuoteComparisonPdf(boq, comparison);
-      await shareFile(`${(boq.title || 'BOQ').replace(/[^\w-]+/g, '_')}_quotes.pdf`, pdfToBase64(doc), 'application/pdf');
+      if (format === 'xlsx') {
+        const widths = [5, 30, 12, 12, 12, 10, 8, 8, 12, 20, ...comparison.vendors.map(() => 16)];
+        await shareFiles([await sheetToXlsx(comparisonSheet(boq, comparison), `${name}.xlsx`, 'Comparison', widths)]);
+      } else {
+        const doc = buildQuoteComparisonPdf(boq, comparison);
+        await shareFiles(format === 'pdf' ? [pdfFile(doc, name)] : await pdfToJpegs(doc, name));
+      }
     } catch (err) {
       await dialogs.alert('Export failed', (err as Error).message);
     }
@@ -191,10 +201,11 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
         <button onClick={onAdd} className="flex-1 py-3 bg-white border border-gray-200 rounded-xl text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2">
           <Plus size={14} /> Add vendor quote
         </button>
-        <button onClick={exportPdf} className="flex-1 py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2">
-          <Download size={14} /> Comparison PDF
+        <button onClick={() => setShareOpen(true)} className="flex-1 py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+          <Share2 size={14} /> Share comparison
         </button>
       </div>
+      {shareOpen && <ShareSheet title="comparison" onShare={share} onClose={() => setShareOpen(false)} />}
     </div>
   );
 }
