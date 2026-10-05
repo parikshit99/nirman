@@ -460,3 +460,15 @@ describe('labour contracts', () => {
     expect([snap.contracts.length, snap.contractEntries.length]).toEqual([0, 0]);
   });
 });
+
+describe('transaction', () => {
+  it('throws the original error when the rollback fails too', async () => {
+    const db = await freshDb();
+    const failing = db.transaction(async (tx) => {
+      await tx.run('COMMIT'); // ends the transaction, so the rollback has nothing to undo and fails
+      throw new Error('original');
+    });
+    await expect(failing).rejects.toThrow('original');
+    expect(await db.all('SELECT 1 AS one')).toEqual([{ one: 1 }]);
+  });
+});

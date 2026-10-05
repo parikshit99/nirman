@@ -50,6 +50,11 @@ describe('parseQuoteOutput', () => {
     expect(text).toContain('1. Cement | qty 50 Bag');
     expect(text).toContain('"bori"');
   });
+
+  it('quotes learned terms so an inch mark cannot break the rule', () => {
+    const text = buildQuoteInstruction({ boq: [], learning: { '4" pipe': { item_name: 'PVC Pipe 4"', unit: 'Nos' } } });
+    expect(text).toContain('When you see "4\\" pipe", always use name: "PVC Pipe 4\\"" and unit: "Nos"');
+  });
 });
 
 describe('compareQuotes', () => {
