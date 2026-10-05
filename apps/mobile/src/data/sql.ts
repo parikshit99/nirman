@@ -67,7 +67,8 @@ function wrap(driver: RawDriver): Db {
           driver.afterWrite?.();
           return result;
         } catch (err) {
-          await driver.rollback();
+          // Throw the original error even if the rollback fails too (SQLite may already have ended the transaction).
+          await driver.rollback().catch(() => {});
           throw err;
         }
       }),
