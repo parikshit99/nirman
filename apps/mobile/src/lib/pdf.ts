@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { variantLabel, type ItemRow, type ListRow, type QuoteComparison } from '@nirman/shared';
+import { variantLabel, type ItemRow, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
 import appIcon from './pdf-icon.png?inline';
 
@@ -150,6 +150,82 @@ export function buildQuoteComparisonPdf(boq: ListRow, comparison: QuoteCompariso
         data.cell.styles.fillColor = [220, 245, 225];
       }
     },
+  });
+  return doc;
+}
+
+const qty = (n: number) => Number(n.toFixed(3)).toLocaleString('en-IN');
+const lastY = (doc: jsPDF) => (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+
+/**
+ * Everything bought for one site: a summary per work category and material,
+ * then every line with its date. `filters` describes what was included.
+ */
+export function buildSiteReportPdf(address: string, filters: string, report: SiteReport): jsPDF {
+  const doc = new jsPDF();
+  drawTitle(doc, 'SITE REPORT', 22);
+  doc.setFontSize(11);
+  doc.setTextColor(30);
+  doc.text(address, 14, 29);
+  doc.setFontSize(9);
+  doc.setTextColor(100);
+  doc.text(doc.splitTextToSize(filters, 180), 14, 34);
+  doc.text(`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`, 14, 43);
+
+  if (report.lineCount === 0) {
+    doc.setFontSize(11);
+    doc.text('No purchases match these filters.', 14, 55);
+    return doc;
+  }
+
+  // Summary: one row per material, a subtotal per category.
+  const summary: (string | { content: string; colSpan?: number; styles?: object })[][] = [];
+  for (const c of report.categories) {
+    summary.push([{ content: c.name.toUpperCase(), colSpan: 6, styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } }]);
+    for (const m of c.materials) {
+      summary.push([m.name, `${qty(m.quantity)} ${m.unit}`, m.avgRate ? rupees(Math.round(m.avgRate)) : '-', rupees(Math.round(m.amount)), m.vendors.join(', ') || '-', String(m.bills)]);
+    }
+    summary.push(['', '', { content: `${c.name} total`, styles: { fontStyle: 'bold', halign: 'right' } }, { content: rupees(Math.round(c.amount)), styles: { fontStyle: 'bold' } }, '', '']);
+  }
+  summary.push(['', '', { content: 'GRAND TOTAL', styles: { fontStyle: 'bold', halign: 'right' } }, { content: rupees(Math.round(report.total)), styles: { fontStyle: 'bold' } }, '', '']);
+  autoTable(doc, {
+    head: [['Material', 'Quantity', 'Avg rate', 'Amount', 'Vendors', 'Bills']],
+    body: summary,
+    startY: 48,
+    theme: 'grid',
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [18, 18, 18], textColor: [255, 255, 255] },
+    columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 5: { halign: 'center', cellWidth: 12 } },
+  });
+
+  // Appendix: every line, oldest first.
+  const lines = report.categories.flatMap((c) => c.materials.flatMap((m) => m.lines.map((l) => ({ ...l, category: c.name, material: m.name }))));
+  lines.sort((a, b) => a.date.localeCompare(b.date));
+  let y = lastY(doc) + 12;
+  if (y > 260) {
+    doc.addPage();
+    y = 20;
+  }
+  doc.setFontSize(12);
+  doc.setTextColor(30);
+  doc.text(`All lines (${lines.length})`, 14, y);
+  autoTable(doc, {
+    head: [['Date', 'Item', 'Qty', 'Rate', 'Amount', 'Vendor', 'Session', 'Delivered']],
+    body: lines.map((l) => [
+      l.date,
+      describe(l.item),
+      `${qty(l.item.quantity)} ${l.item.unit}`,
+      l.item.unit_price ? rupees(l.item.unit_price) : '-',
+      rupees(l.item.total_amount),
+      l.item.vendor || '-',
+      l.listTitle,
+      l.item.delivered_at ? 'Yes' : 'No',
+    ]),
+    startY: y + 4,
+    theme: 'grid',
+    styles: { fontSize: 7 },
+    headStyles: { fillColor: [18, 18, 18], textColor: [255, 255, 255] },
+    columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
   });
   return doc;
 }

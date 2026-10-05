@@ -171,17 +171,28 @@ async function insertMaterials(tx: SqlExecutor, listId: string, input: MaterialI
       vendor: m.vendor || '',
       date: m.date || '',
       ...variantOf(m),
+      delivered_at: '',
       created_at: ts,
       updated_at: ts,
     });
   }
 }
 
+/** Mark lines delivered on a date (YYYY-MM-DD), or not delivered with ''. */
+export async function setDelivered(db: Db, ids: string[], date: string) {
+  await db.transaction(async (tx) => {
+    for (const id of ids) {
+      const item = await getRow(tx, 'items', id);
+      if (item) await touch(tx, 'items', { ...item, delivered_at: date });
+    }
+  });
+}
+
 export async function addItems(db: Db, listId: string, materials: MaterialInput[]) {
   await db.transaction((tx) => insertMaterials(tx, listId, materials));
 }
 
-export type ItemPatch = Partial<Pick<ItemRow, 'item_name' | 'quantity' | 'unit' | 'unit_price' | 'vendor' | 'date' | VariantField>>;
+export type ItemPatch = Partial<Pick<ItemRow, 'item_name' | 'quantity' | 'unit' | 'unit_price' | 'vendor' | 'date' | 'delivered_at' | VariantField>>;
 
 /**
  * Save an edited item. When the name or unit changed, remember the correction

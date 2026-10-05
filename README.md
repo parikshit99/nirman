@@ -19,6 +19,7 @@ Everything is stored **only on your phone**. There is no server or account.
 - **Vendor quotes.** When a vendor replies to a BOQ with their own list, tap *Vendor quote received* on the BOQ tab, or *Quotes* on a saved BOQ in History, and photograph it. The AI matches each line to the BOQ, and you review the matches, see which items are missing, and confirm. Confirmed prices are saved under the BOQ's item names, so vendors line up side by side with the lowest rate marked, and every rate is compared with the last price you recorded for that item.
 - **Share in any format.** *Share* on a purchase list, BOQ or quote comparison offers a PDF, an Excel sheet (.xlsx) or a picture (JPG) of each page, then opens the phone's share sheet.
 - **Share into the app.** In WhatsApp (or any app), share a bill photo or a text message to *Nirman* and choose Purchases, BOQ or a vendor quote for a saved BOQ; the photos are put into that entry, ready to read.
+- **Deliveries and site reports.** Tick each purchase line when it reaches the site, on the open list or later under *History → Deliveries*. *History → Site report* lists everything bought for one address, for all time or any dates, for some or all work types, and optionally only what was delivered, as a PDF, Excel sheet or JPG.
 - **Backup.** *Settings → Save backup* shares one `.json` file with everything; save it to Google Drive, WhatsApp or email. *Restore* on any phone brings it all back. Queued, unread entries are not included.
 
 ## Using the app

@@ -90,6 +90,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
     () => ({
       addItems: write(repo.addItems),
       updateItem: write(repo.updateItem),
+      setDelivered: write(repo.setDelivered),
       deleteItem: write(repo.deleteItem),
       clearListItems: write(repo.clearListItems),
       setListNotes: write(repo.setListNotes),

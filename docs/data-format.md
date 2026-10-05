@@ -23,7 +23,7 @@ The `nirmaan` names are the original internal ids. They stay unchanged so existi
 | Table | One row per | Key columns |
 |---|---|---|
 | `lists` | purchase list or BOQ | `kind`: `audit` (Purchases) or `boq`; `status`: `draft` or `saved`; `title`, `address`, `category`, `site_date`, `notes` |
-| `items` | line in a list | `list_id`; `item_name` (standard English name); `original_term` (word as written or spoken, e.g. "bori"); `quantity`, `unit`, `unit_price`, `total_amount`, `vendor`, `date` |
+| `items` | line in a list | `list_id`; `item_name` (standard English name); `original_term` (word as written or spoken, e.g. "bori"); `quantity`, `unit`, `unit_price`, `total_amount`, `vendor`, `date`; `delivered_at`, the date a purchase line reached the site (blank = not marked) |
 | `indexed_rates` | single price added on its own ("Index rate", or a confirmed vendor quote) | `item_name`, `unit`, `date`, `price`, `vendor`, `indexed_at`; `category` and `address` of the BOQ a confirmed quote was for (blank for a rate added on its own) |
 | `learned_terms` | correction the app remembers | `id` is the original word, lower-cased; it maps to the `item_name` and `unit` to use instead |
 | `categories` | type of work (Civil, Electrical, …) | `name`; the built-in ones use the lower-cased name as `id` |
@@ -47,6 +47,10 @@ Each material's work categories and sites come from its saved lists and from its
 
 Renaming a material in the app rewrites `item_name` and `unit` on all of its items and rates, and records each original word in `learned_terms`. Renaming to the name and unit of another material therefore merges the two.
 
+### Site report
+
+*History → Site report* is also computed on the fly (`buildSiteReport`): the `audit` lists saved for one `address`, optionally limited to some categories, to a date range, and to lines with a `delivered_at`. A line's date is its `delivered_at`, else its `date`, else the list's `site_date`, else the day the list was created. Names and units go through `learned_terms` as above.
+
 ## Changing the schema
 
 Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one that has already shipped: phones apply only the migrations they haven't run yet.
@@ -58,7 +62,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
 ```json
 {
   "app": "nirmaan-auditor",
-  "version": 5,
+  "version": 6,
   "exported_at": "2026-10-03T19:13:38.586Z",
   "lists": [], "items": [], "indexed_rates": [], "learned_terms": [],
   "categories": [], "quotes": [], "quote_lines": [], "hidden_materials": []
@@ -71,6 +75,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
   - version 1 (before vendor quotes) has no `quotes` or `quote_lines`;
   - version 2 (before hidden materials) has no `hidden_materials`;
   - version 3 (before variant fields) has rows without `brand`, `model`, `spec`, `color`;
-  - version 4 (before rate categories) has `indexed_rates` rows without `category` and `address`.
+  - version 4 (before rate categories) has `indexed_rates` rows without `category` and `address`;
+  - version 5 (before delivery tracking) has `items` rows without `delivered_at`.
 - Restoring replaces everything on the phone.
 - Any reimplementation should read this format, so old backups keep working.

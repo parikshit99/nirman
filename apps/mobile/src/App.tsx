@@ -17,6 +17,8 @@ import type { ListKind, ListMeta } from './data/repo.ts';
 import { CapturePanel } from './features/CapturePanel.tsx';
 import { DatabaseView } from './features/DatabaseView.tsx';
 import { HistorySidebar, HistoryView } from './features/HistoryView.tsx';
+import { DeliveriesSheet } from './features/DeliveriesSheet.tsx';
+import { SiteReport } from './features/SiteReport.tsx';
 import { ItemLog } from './features/ItemLog.tsx';
 import { buildPdf } from './lib/pdf.ts';
 import { listSheet, pdfFile, pdfToJpegs, sheetToXlsx, type ExportFormat } from './lib/exports.ts';
@@ -193,6 +195,8 @@ export default function App() {
   };
 
   const [shareOpen, setShareOpen] = useState(false);
+  const [siteReportOpen, setSiteReportOpen] = useState(false);
+  const [deliveriesFor, setDeliveriesFor] = useState<string | null>(null);
 
   // Photos or text shared from another app: first ask where they go, then hand them to that entry form.
   const [incoming, setIncoming] = useState<IncomingShare | null>(null);
@@ -348,7 +352,7 @@ export default function App() {
                 incoming={captureShare?.kind === kind ? captureShare.share : null}
                 onIncomingUsed={clearCaptureShare}
               />
-            ) : <HistorySidebar onNewBoq={() => setActiveTab('boq')} />}
+            ) : <HistorySidebar onNewBoq={() => setActiveTab('boq')} onSiteReport={() => setSiteReportOpen(true)} />}
           </section>
         )}
 
@@ -392,6 +396,7 @@ export default function App() {
                 onEdit={editRecordDetails}
                 onOpen={openRecord}
                 onQuotes={(record) => setQuoteTarget(record.id)}
+                onDeliveries={(record) => setDeliveriesFor(record.id)}
               />
             ) : (
               <ItemLog kind={kind!} items={filteredItems} searching={!!search} />
@@ -447,6 +452,8 @@ export default function App() {
             }}
           />
         )}
+        {siteReportOpen && <SiteReport key="site-report" onClose={() => setSiteReportOpen(false)} />}
+        {deliveriesFor && <DeliveriesSheet key="deliveries" recordId={deliveriesFor} onClose={() => setDeliveriesFor(null)} />}
         {incoming && <ShareTargetSheet key="share-target" share={incoming} hasSavedBoqs={savedBoqs.length > 0} onPick={routeShare} onClose={() => setIncoming(null)} />}
       </AnimatePresence>
     </div>

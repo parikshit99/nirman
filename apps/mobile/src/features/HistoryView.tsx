@@ -1,11 +1,12 @@
 import { motion } from 'motion/react';
-import { Eye, History, Pencil, Plus, Trash2, Truck } from 'lucide-react';
+import { CheckSquare, ClipboardList, Eye, History, Pencil, Plus, Trash2, Truck } from 'lucide-react';
 import { FilterChips } from '../components/FilterChips.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
 
-export function HistorySidebar({ onNewBoq }: { onNewBoq(): void }) {
+export function HistorySidebar({ onNewBoq, onSiteReport }: { onNewBoq(): void; onSiteReport(): void }) {
   const { history } = useAppState();
+  const hasPurchases = history.some((h) => h.kind === 'audit' && h.address);
   return (
     <div className="space-y-6">
       <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl">
@@ -24,6 +25,14 @@ export function HistorySidebar({ onNewBoq }: { onNewBoq(): void }) {
       >
         <Plus size={14} /> Create New BOQ
       </button>
+      {hasPurchases && (
+        <button
+          onClick={onSiteReport}
+          className="w-full py-3 bg-[var(--color-brand-dark)] text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"
+        >
+          <ClipboardList size={14} /> Site report
+        </button>
+      )}
     </div>
   );
 }
@@ -37,9 +46,10 @@ interface Props {
   onEdit(record: HistoryRecord): void;
   onOpen(record: HistoryRecord): void;
   onQuotes(record: HistoryRecord): void;
+  onDeliveries(record: HistoryRecord): void;
 }
 
-export function HistoryView({ records, categoryFilter, onCategory, addressFilter, onAddress, onEdit, onOpen, onQuotes }: Props) {
+export function HistoryView({ records, categoryFilter, onCategory, addressFilter, onAddress, onEdit, onOpen, onQuotes, onDeliveries }: Props) {
   const { actions, categoryNames, uniqueAddresses, quotesFor } = useAppState();
   const dialogs = useDialogs();
 
@@ -95,7 +105,15 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
                   <div className="flex flex-col gap-0.5 mt-1">
                     <span className="text-[11px] font-mono text-gray-400">{new Date(record.created_at).toLocaleString('en-IN')}</span>
                     {record.address && <span className="text-[11px] text-gray-500 italic truncate">📍 {record.address}</span>}
-                    <span className="text-[11px] font-bold text-gray-500 uppercase">{record.items.length} Items</span>
+                    <span className="text-[11px] font-bold text-gray-500 uppercase">
+                      {record.items.length} Items
+                      {record.kind === 'audit' && record.items.length > 0 && (
+                        <span className={record.items.every((i) => i.delivered_at) ? 'text-green-700' : ''}>
+                          {' · '}
+                          {record.items.filter((i) => i.delivered_at).length} of {record.items.length} delivered
+                        </span>
+                      )}
+                    </span>
                   </div>
                 </button>
                 <div className="flex gap-1 items-center">
@@ -135,6 +153,14 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
                 >
                   <Eye size={12} /> Open & Restore
                 </button>
+                {record.kind === 'audit' && record.items.length > 0 && (
+                  <button
+                    onClick={() => onDeliveries(record)}
+                    className="flex-1 py-2 bg-green-50 text-green-800 border border-green-200 text-[11px] font-bold uppercase tracking-widest rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <CheckSquare size={12} /> Deliveries
+                  </button>
+                )}
                 {record.kind === 'boq' && (
                   <button
                     onClick={() => onQuotes(record)}

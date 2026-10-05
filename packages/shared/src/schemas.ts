@@ -76,6 +76,8 @@ export const itemRowSchema = z.object({
   vendor: z.string().max(200),
   date: z.string().max(20),
   ...storedVariant,
+  /** Date the material reached the site (YYYY-MM-DD); blank until ticked as delivered. */
+  delivered_at: z.string().max(20).default(''),
   created_at: isoTimestamp,
   updated_at: isoTimestamp,
 });
