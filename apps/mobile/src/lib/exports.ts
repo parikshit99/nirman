@@ -82,7 +82,7 @@ export function comparisonSheet(boq: ListRow, comparison: QuoteComparison): Shee
 /** Site report for Excel: the per-material summary, then every line. */
 export function siteReportSheet(address: string, filters: string, report: SiteReport, labour?: LabourReport): SheetData {
   const rows: SheetData = [[bold('Site report')], [address], [filters], [`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`], []];
-  rows.push(['Category', 'Material', 'Quantity', 'Unit', 'Avg rate', 'Amount', 'Vendors', 'Bills'].map(bold));
+  rows.push(['Work type', 'Material', 'Quantity', 'Unit', 'Avg rate', 'Amount', 'Vendors', 'Bills'].map(bold));
   for (const c of report.categories) {
     for (const m of c.materials) rows.push([c.name, m.name, m.quantity, m.unit, m.avgRate ? money(m.avgRate) : null, money(m.amount), m.vendors.join(', '), m.bills]);
     rows.push([bold(`${c.name} total`), null, null, null, null, { ...money(c.amount), fontWeight: 'bold' }, null, null]);
@@ -90,13 +90,13 @@ export function siteReportSheet(address: string, filters: string, report: SiteRe
   const hasLabour = !!labour?.rows.length;
   rows.push([bold(hasLabour ? 'MATERIALS TOTAL' : 'GRAND TOTAL'), null, null, null, null, { ...money(report.total), fontWeight: 'bold' }, null, null]);
   if (hasLabour) {
-    rows.push([], [bold('Labour')], ['Contractor', 'Work', 'Category', 'Work done', 'Paid', 'Balance now'].map(bold));
+    rows.push([], [bold('Labour')], ['Contractor', 'Work', 'Work type', 'Work done', 'Paid', 'Balance now'].map(bold));
     for (const r of labour!.rows) rows.push([r.contract.contractor, r.contract.work, r.contract.category, money(r.workDone), money(r.paid), money(r.balance)]);
     rows.push([null, null, bold('Labour total'), { ...money(labour!.workDone), fontWeight: 'bold' }, { ...money(labour!.paid), fontWeight: 'bold' }, { ...money(labour!.balance), fontWeight: 'bold' }]);
     rows.push([bold('GRAND TOTAL (materials + labour work done)'), null, null, null, null, { ...money(report.total + labour!.workDone), fontWeight: 'bold' }]);
   }
   rows.push([], [bold('All lines')]);
-  rows.push(['Date', 'Category', 'Item', 'Brand', 'Model / code', 'Size / spec', 'Color', 'Qty', 'Unit', 'Ordered as', 'Rate', 'Amount', 'Vendor', 'Session', 'Delivered on'].map(bold));
+  rows.push(['Date', 'Work type', 'Item', 'Brand', 'Model / code', 'Size / spec', 'Color', 'Qty', 'Unit', 'Ordered as', 'Rate', 'Amount', 'Vendor', 'List', 'Delivered on'].map(bold));
   const lines = report.categories.flatMap((c) => c.materials.flatMap((m) => m.lines.map((l) => ({ ...l, category: c.name }))));
   lines.sort((a, b) => a.date.localeCompare(b.date));
   for (const { date, item, listTitle, category } of lines) {

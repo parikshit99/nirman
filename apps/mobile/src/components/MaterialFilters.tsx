@@ -26,7 +26,7 @@ export function MaterialFilters({
       <div className="grid grid-cols-2 gap-2">
         {shown.map(({ key, label }) => (
           <label key={key} className="block min-w-0">
-            <span className="text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold">{label}</span>
+            <span className="text-xs text-gray-500 font-bold">{label}</span>
             <select
               aria-label={`Filter by ${label.toLowerCase()}`}
               value={value[key] ?? ''}

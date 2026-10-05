@@ -34,12 +34,12 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
 
   return (
     <Sheet labelledBy="save-title" onClose={onClose} className="p-6 space-y-4">
-      <SheetHeader id="save-title" icon={<ClipboardCheck size={18} className="text-orange-500" />} title={editing ? 'Edit Site Info' : 'Site Metadata'} onClose={onClose} />
+      <SheetHeader id="save-title" icon={<ClipboardCheck size={18} className="text-orange-500" />} title={editing ? 'List details' : 'Save list'} onClose={onClose} />
 
       <div className="space-y-4 pt-2">
         <div>
-          <label htmlFor="save-name" className="text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1">
-            Session Title
+          <label htmlFor="save-name" className="text-xs text-gray-500 font-bold block mb-1">
+            Name
           </label>
           <input
             id="save-name"
@@ -52,11 +52,11 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
         </div>
 
         <div>
-          <label htmlFor="save-address" className="text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1">
-            Address / Location
+          <label htmlFor="save-address" className="text-xs text-gray-500 font-bold block mb-1">
+            Site address
           </label>
           <div className="relative">
-            <MapPin size={14} className="absolute left-3 top-3.5 text-gray-400" />
+            <MapPin size={14} className="absolute left-3 top-3.5 text-gray-500" />
             <input
               id="save-address"
               value={meta.address}
@@ -71,7 +71,7 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
                 <button
                   key={addr}
                   onClick={() => setMeta((p) => ({ ...p, address: addr }))}
-                  className="px-2 py-1 bg-gray-100 hover:bg-orange-100 text-[11px] text-gray-600 rounded-md transition-colors border border-gray-200 flex items-center gap-1"
+                  className="px-2 py-1 bg-gray-100 hover:bg-orange-100 text-xs text-gray-600 rounded-md transition-colors border border-gray-200 flex items-center gap-1"
                 >
                   <MapPin size={8} /> {addr}
                 </button>
@@ -82,8 +82,8 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label htmlFor="save-category" className="text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1">
-              Work Category
+            <label htmlFor="save-category" className="text-xs text-gray-500 font-bold block mb-1">
+              Work type
             </label>
             <select
               id="save-category"
@@ -99,8 +99,8 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
             </select>
           </div>
           <div>
-            <label htmlFor="save-date" className="text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1">
-              Site Date
+            <label htmlFor="save-date" className="text-xs text-gray-500 font-bold block mb-1">
+              Date
             </label>
             <input
               id="save-date"
@@ -119,12 +119,12 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
             Cancel
           </Button>
           <Button variant="primary" className="flex-[2]" onClick={() => submit(false)}>
-            <Save size={14} /> {editing ? 'Update Existing Record' : 'Confirm Save'}
+            <Save size={14} /> {editing ? 'Update saved list' : 'Save'}
           </Button>
         </div>
         {allowSaveAsNew && (
           <Button block onClick={() => submit(true)}>
-            <Copy size={14} /> Save as New Record
+            <Copy size={14} /> Save as a new list
           </Button>
         )}
       </div>

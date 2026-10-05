@@ -77,7 +77,7 @@ export function QuantityHelper({ itemName, spec, onApply, fieldClassName }: { it
   return (
     <div className="p-3 rounded-xl border border-orange-200 bg-orange-50/60 space-y-2" role="group" aria-label="Unit calculator">
       <div className="flex justify-between items-center">
-        <span className="text-[11px] font-mono uppercase tracking-widest text-orange-700 font-bold flex items-center gap-1">
+        <span className="text-xs text-orange-700 font-bold flex items-center gap-1">
           <Calculator size={12} /> {KINDS.find((k) => k.kind === kind)!.label}
         </span>
         <button onClick={close} className="text-xs font-bold text-gray-500">
@@ -162,7 +162,7 @@ function TmtForm({ spec, field, onApply }: { spec: string; field: string; onAppl
           {diff.toFixed(1)}% vs standard weight
         </p>
       )}
-      <button onClick={apply} disabled={!est || (!est.kg && !w)} className="w-full py-2 rounded-lg bg-orange-500 text-white text-xs font-bold uppercase tracking-widest disabled:opacity-50">
+      <button onClick={apply} disabled={!est || (!est.kg && !w)} className="w-full py-2 rounded-lg bg-orange-500 text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50">
         Use {w > 0 ? `${w} kg` : est ? `${est.kg} kg` : ''}
       </button>
     </div>
@@ -244,7 +244,7 @@ function PieceForm({ kind, spec, field, onApply }: { kind: 'tile' | 'acp'; spec:
           onApply({ quantity: result.billedSqft, unit: 'sqft', spec: sizeLabel(size), ordered_as: describePieceOrder(kind, result.pieces, size, a, w) })
         }
         disabled={!result || result.pieces === 0}
-        className="w-full py-2 rounded-lg bg-orange-500 text-white text-xs font-bold uppercase tracking-widest disabled:opacity-50"
+        className="w-full py-2 rounded-lg bg-orange-500 text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50"
       >
         Use {result && result.pieces > 0 ? `${result.billedSqft} sqft` : ''}
       </button>

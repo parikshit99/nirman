@@ -41,7 +41,7 @@ function render(lines: string[]) {
     const heading = /^\*\*(.+)\*\*$/.exec(line);
     out.push(
       heading ? (
-        <h4 key={out.length} className="text-xs font-bold uppercase tracking-widest text-orange-600 pt-2">
+        <h4 key={out.length} className="text-xs font-bold text-orange-600 pt-2">
           {heading[1]}
         </h4>
       ) : (
@@ -61,14 +61,14 @@ export function WhatsNewModal({ notes, onClose }: { notes: ReleaseNotes; onClose
     <Sheet kind="dialog" size="lg" scroll={false} labelledBy="whats-new-title" onClose={onClose}>
       <div className="p-5 pb-3 flex justify-between items-start gap-3 border-b border-gray-100">
         <div>
-          <p className="text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold flex items-center gap-1">
+          <p className="text-xs text-gray-500 font-bold flex items-center gap-1">
             <Sparkles size={12} className="text-orange-500" /> What's new · version {notes.version}
           </p>
           <h3 id="whats-new-title" className="font-bold text-lg text-gray-900 mt-0.5">
             {notes.title || `Nirman ${notes.version}`}
           </h3>
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-black" aria-label="Close">
+        <button onClick={onClose} className="text-gray-500 hover:text-black" aria-label="Close">
           <X size={20} />
         </button>
       </div>

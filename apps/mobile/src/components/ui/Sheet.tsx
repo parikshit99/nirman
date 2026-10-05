@@ -134,7 +134,7 @@ export function SheetHeader({
   return (
     <div className="flex justify-between items-start gap-2">
       <div className="min-w-0">
-        <h3 id={id} className="font-bold text-gray-900 uppercase tracking-widest text-sm flex items-center gap-2">
+        <h3 id={id} className="font-bold text-gray-900 text-sm flex items-center gap-2">
           {icon}
           {title}
         </h3>
@@ -143,7 +143,7 @@ export function SheetHeader({
       <div className="flex items-center gap-1 shrink-0">
         {children}
         {onClose && (
-          <button onClick={onClose} disabled={closeDisabled} className="p-1 -m-1 text-gray-400 hover:text-black disabled:opacity-40" aria-label="Close">
+          <button onClick={onClose} disabled={closeDisabled} className="p-1 -m-1 text-gray-500 hover:text-black disabled:opacity-40" aria-label="Close">
             <X size={20} />
           </button>
         )}
@@ -154,7 +154,7 @@ export function SheetHeader({
 
 /** Small heading over a sheet's choices ("Share BOQ as"). */
 export function SheetLabel({ children }: { children: React.ReactNode }) {
-  return <p className="text-[11px] font-mono uppercase tracking-widest text-gray-500 font-bold px-1 pb-1">{children}</p>;
+  return <p className="text-xs text-gray-500 font-bold px-1 pb-1">{children}</p>;
 }
 
 /** One choice in a sheet: icon, name and a line about it. */
@@ -179,7 +179,7 @@ export function SheetOption({
       {busy ? <Loader2 size={20} className="animate-spin text-orange-500 shrink-0" /> : <Icon size={20} className="text-orange-500 shrink-0" />}
       <span>
         {label}
-        {about && <span className="block text-[11px] font-normal text-gray-500">{about}</span>}
+        {about && <span className="block text-xs font-normal text-gray-500">{about}</span>}
       </span>
     </button>
   );

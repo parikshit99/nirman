@@ -17,7 +17,7 @@ export function EmptyState({
 }) {
   return (
     <div className={`py-12 px-4 text-center ${className}`}>
-      <Icon size={36} strokeWidth={1.5} className="mx-auto mb-3 text-gray-300" />
+      <Icon size={36} strokeWidth={1.5} className="mx-auto mb-3 text-gray-400" />
       <p className="text-sm font-bold text-gray-600">{title}</p>
       {children && <div className="text-xs text-gray-500 mt-1 max-w-xs mx-auto leading-relaxed">{children}</div>}
       {action && <div className="mt-4 flex justify-center">{action}</div>}

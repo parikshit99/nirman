@@ -48,11 +48,11 @@ export function QuotesView({ boqId, initial, onClose }: { boqId: string; initial
         )}
         <div className="min-w-0 flex-1">
             <h3 id="quotes-title" className="text-sm font-bold truncate">Vendor quotes · {boq.title || 'Untitled BOQ'}</h3>
-          <p className="text-[11px] text-gray-500 font-mono truncate">
+          <p className="text-xs text-gray-500 font-mono truncate">
             {boq.items.length} BOQ items{boq.address ? ` · ${boq.address}` : ''}
           </p>
         </div>
-        <button onClick={onClose} className="p-1 text-gray-400 hover:text-black" aria-label="Close">
+        <button onClick={onClose} className="p-1 text-gray-500 hover:text-black" aria-label="Close">
           <X size={22} />
         </button>
       </div>
@@ -97,7 +97,7 @@ function QuoteList({ boq, quotes, onAdd, onOpen }: { boq: HistoryRecord; quotes:
 
   const remove = async (q: QuoteRow) => {
     const ok = await dialogs.confirm(`Delete ${q.vendor}'s quote?`, {
-      message: q.status === 'confirmed' ? 'Prices already added to the material database stay there; remove them from the Data tab if needed.' : undefined,
+      message: q.status === 'confirmed' ? 'Prices already added to the material database stay there; remove them from the Rates tab if needed.' : undefined,
       confirmLabel: 'Delete',
       danger: true,
     });
@@ -108,11 +108,11 @@ function QuoteList({ boq, quotes, onAdd, onOpen }: { boq: HistoryRecord; quotes:
     <div className="space-y-3">
       <button
         onClick={onAdd}
-        className="w-full py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"
+        className="w-full py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2"
       >
         <Plus size={14} /> Add vendor quote
       </button>
-      {quotes.length === 0 && <p className="text-xs text-gray-400 text-center p-6">No quotes yet for this BOQ.</p>}
+      {quotes.length === 0 && <p className="text-xs text-gray-500 text-center p-6">No quotes yet for this BOQ.</p>}
       {quotes.map((q) => {
         const job = jobForQuote(q.id);
         const lines = linesFor(q.id);
@@ -147,16 +147,16 @@ function QuoteList({ boq, quotes, onAdd, onOpen }: { boq: HistoryRecord; quotes:
             <div className="flex justify-between items-start gap-2">
               <div className="min-w-0">
                 <div className="font-bold text-sm text-gray-900 truncate">{q.vendor || 'Unnamed vendor'}</div>
-                <div className="text-[11px] font-mono text-gray-400">{new Date(q.quote_date).toLocaleDateString('en-IN')}</div>
+                <div className="text-xs font-mono text-gray-500">{new Date(q.quote_date).toLocaleDateString('en-IN')}</div>
               </div>
-              <button onClick={() => remove(q)} className="p-1.5 text-gray-300 hover:text-red-500" aria-label={`Delete ${q.vendor}'s quote`}>
+              <button onClick={() => remove(q)} className="p-1.5 text-gray-400 hover:text-red-500" aria-label={`Delete ${q.vendor}'s quote`}>
                 <Trash2 size={16} />
               </button>
             </div>
-            <div className="text-[11px] mt-2">{state}</div>
+            <div className="text-xs mt-2">{state}</div>
             <div className="flex gap-2 mt-3">
               {job?.status === 'failed' && (
-                <button onClick={() => actions.retryJob(job)} className="flex-1 py-2 bg-gray-100 rounded-lg text-[11px] font-bold uppercase flex items-center justify-center gap-1">
+                <button onClick={() => actions.retryJob(job)} className="flex-1 py-2 bg-gray-100 rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1">
                   <RotateCcw size={12} /> Retry
                 </button>
               )}
@@ -234,20 +234,20 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
             role="tab"
             aria-selected={mode === m}
             onClick={() => setMode(m)}
-            className={`py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider ${mode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+            className={`py-2 rounded-lg text-xs font-bold uppercase tracking-wider ${mode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
           >
             {m === 'read' ? 'Photo / text (AI)' : 'Type rates'}
           </button>
         ))}
       </div>
-      <p className="text-[11px] text-gray-500 leading-relaxed">
+      <p className="text-xs text-gray-500 leading-relaxed">
         {mode === 'read'
           ? "Photograph the vendor's reply as it is, even if they wrote their own list. The AI matches each line to this BOQ, and you check the matches before anything is saved."
           : "Enter the vendor's rate against each BOQ line; leave blank what they didn't quote. Works without internet or an API key."}
       </p>
       <div className="grid grid-cols-[1fr_auto] gap-3">
         <label className="block">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Vendor</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Vendor</span>
           <input
             value={vendor}
             onChange={(e) => setVendor(e.target.value)}
@@ -262,7 +262,7 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
           </datalist>
         </label>
         <label className="block">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Quote date</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Quote date</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none" />
         </label>
       </div>
@@ -297,16 +297,16 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
           <button
             onClick={submitTyped}
             disabled={!vendor.trim() || typed.length === 0 || badRate || busy}
-            className="w-full h-12 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-widest text-xs"
+            className="w-full h-12 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wider text-xs"
           >
             {busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Review {typed.length} {typed.length === 1 ? 'rate' : 'rates'}
           </button>
-          {badRate && <p className="text-[11px] text-red-600 text-center">Use digits for rates, e.g. 380 or 1,500.</p>}
+          {badRate && <p className="text-xs text-red-600 text-center">Use digits for rates, e.g. 380 or 1,500.</p>}
         </>
       ) : (
         <>
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Photos of the quote</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Photos of the quote</span>
             <div className="mt-1 grid grid-cols-3 gap-2">
               {images.map((src, idx) => (
                 <div key={idx} className="relative aspect-square rounded-lg border border-gray-200 overflow-hidden">
@@ -323,10 +323,10 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
               {images.length < MAX_IMAGES && (
                 <button
                   onClick={addPhoto}
-                  className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-gray-500"
+                  className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 text-gray-500 hover:border-gray-500"
                 >
                   {isNative ? <Camera size={20} /> : <ImageIcon size={20} />}
-                  <span className="text-[11px] font-bold uppercase">Add page</span>
+                  <span className="text-xs font-bold uppercase">Add page</span>
                 </button>
               )}
             </div>
@@ -346,7 +346,7 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
           </div>
 
           <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Or type / paste the quote (optional)</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Or type / paste the quote (optional)</span>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -359,13 +359,13 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
           <button
             onClick={submit}
             disabled={!ready || busy}
-            className="w-full h-12 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-widest text-xs"
+            className="w-full h-12 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wider text-xs"
           >
             {busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Read quote
           </button>
         </>
       )}
-      {!vendor.trim() && <p className="text-[11px] text-gray-400 text-center">Enter the vendor's name to continue.</p>}
+      {!vendor.trim() && <p className="text-xs text-gray-500 text-center">Enter the vendor's name to continue.</p>}
       {sourceMenu && <PhotoSourceSheet remaining={MAX_IMAGES - images.length} onPick={pickFrom} onClose={() => setSourceMenu(false)} />}
     </div>
   );

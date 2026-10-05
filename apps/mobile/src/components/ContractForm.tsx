@@ -125,7 +125,7 @@ export function ContractForm({
     }
   };
 
-  const label = 'text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1';
+  const label = 'text-xs text-gray-600 font-bold block mb-1';
   const input = 'w-full min-w-0 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-1 focus:ring-orange-400';
   const money = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
 
@@ -170,7 +170,7 @@ export function ContractForm({
           </datalist>
         </label>
         <label className="block min-w-0">
-          <span className={label}>Category</span>
+          <span className={label}>Work type</span>
           <select aria-label="Category" value={f.category} onChange={set('category')} className={input}>
             {[...new Set([f.category, ...categories])].filter(Boolean).map((c) => (
               <option key={c}>{c}</option>

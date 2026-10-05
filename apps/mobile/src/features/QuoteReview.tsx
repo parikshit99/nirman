@@ -50,7 +50,7 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
     <div className="space-y-5">
       <div className="flex flex-wrap gap-3 items-end">
         <label className="block flex-1 min-w-[10rem]">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Vendor</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Vendor</span>
           <input
             defaultValue={quote.vendor}
             disabled={readOnly}
@@ -59,7 +59,7 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
           />
         </label>
         <label className="block">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Date</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Date</span>
           <input
             type="date"
             defaultValue={quote.quote_date}
@@ -81,12 +81,12 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
 
       {summary.missing.length > 0 && (
         <section>
-          <h4 className="text-[11px] font-bold uppercase tracking-widest text-red-600 mb-2">Missing from this quote</h4>
+          <h4 className="text-xs font-bold text-red-600 mb-2">Missing from this quote</h4>
           <ul className="space-y-1">
             {summary.missing.map((item) => (
               <li key={item.id} className="text-xs flex justify-between gap-2 px-3 py-2 bg-red-50/60 rounded-lg">
                 <span>
-                  <span className="font-mono text-gray-400 mr-1">{itemsById.get(item.id)?.sr}.</span>
+                  <span className="font-mono text-gray-500 mr-1">{itemsById.get(item.id)?.sr}.</span>
                   {item.item_name}
                   {variantLabel(item) && <span className="text-gray-500"> · {variantLabel(item)}</span>}
                 </span>
@@ -96,12 +96,12 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
               </li>
             ))}
           </ul>
-          {!readOnly && <p className="text-[11px] text-gray-500 mt-1">Ask the vendor for these, or match one of their lines below to the right item.</p>}
+          {!readOnly && <p className="text-xs text-gray-500 mt-1">Ask the vendor for these, or match one of their lines below to the right item.</p>}
         </section>
       )}
 
       <section>
-        <h4 className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-2">What the vendor wrote ({lines.length} lines)</h4>
+        <h4 className="text-xs font-bold text-gray-500 mb-2">What the vendor wrote ({lines.length} lines)</h4>
         <div className="space-y-2">
           {allLines.map((line) => {
             if (pendingDeletes.has(line.id)) {
@@ -134,7 +134,7 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
       {!readOnly && (
         <button
           onClick={confirm}
-          className="w-full h-12 bg-green-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 uppercase tracking-widest text-xs sticky bottom-0 shadow-lg"
+          className="w-full h-12 bg-green-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 uppercase tracking-wider text-xs sticky bottom-0 shadow-lg"
         >
           <CheckCircle2 size={16} /> Confirm quote
         </button>
@@ -168,14 +168,14 @@ function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDel
       <div className="flex justify-between gap-2">
         <div className="min-w-0">
           <div className="text-sm font-bold text-gray-900">“{line.original_term || line.item_name}”</div>
-          <div className="text-[11px] text-gray-500">
+          <div className="text-xs text-gray-500">
             {line.item_name !== line.original_term && line.original_term ? `${line.item_name} · ` : ''}
             {line.quantity > 0 && `${line.quantity} ${line.unit}`}
           </div>
           {variantLabel(line) && <div className="text-xs font-bold text-gray-700">{variantLabel(line)}</div>}
         </div>
         {!readOnly && (
-          <button onClick={onDelete} className="p-1 text-gray-300 hover:text-red-500 self-start" aria-label={`Delete line ${line.original_term || line.item_name}`}>
+          <button onClick={onDelete} className="p-1 text-gray-400 hover:text-red-500 self-start" aria-label={`Delete line ${line.original_term || line.item_name}`}>
             <Trash2 size={14} />
           </button>
         )}
@@ -199,7 +199,7 @@ function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDel
       </label>
 
       <div className="flex gap-2 mt-2 items-center">
-        <span className="text-gray-400 text-sm">₹</span>
+        <span className="text-gray-500 text-sm">₹</span>
         <input
           inputMode="decimal"
           value={rate}
@@ -214,7 +214,7 @@ function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDel
           placeholder="Rate"
           className={`w-28 ${field} font-mono`}
         />
-        <span className="text-gray-400 text-xs">per</span>
+        <span className="text-gray-500 text-xs">per</span>
         <input
           value={unit}
           disabled={readOnly}
@@ -273,7 +273,7 @@ function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDel
 function Flag({ tone, children }: { tone: 'red' | 'orange' | 'gray'; children: React.ReactNode }) {
   const cls = { red: 'bg-red-50 text-red-600', orange: 'bg-orange-50 text-orange-700', gray: 'bg-gray-100 text-gray-600' }[tone];
   return (
-    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-bold ${cls}`}>
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold ${cls}`}>
       {tone !== 'gray' && <AlertTriangle size={9} />}
       {children}
     </span>

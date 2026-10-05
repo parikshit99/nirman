@@ -13,13 +13,13 @@ export function HistorySidebar({ onNewBoq, onSiteReport }: { onNewBoq(): void; o
     <div className="space-y-3 lg:space-y-6">
       <div className="hidden lg:block p-4 bg-orange-50 border border-orange-100 rounded-xl">
         <h3 className="text-sm font-bold text-orange-900 flex items-center gap-2">
-          <History size={16} /> Saved Sessions
+          <History size={16} /> Saved lists
         </h3>
-        <p className="text-[11px] text-orange-700 mt-1">Manage and restore your past purchase lists and Bills of Quantities.</p>
+        <p className="text-xs text-orange-700 mt-1">Manage and restore your past purchase lists and Bills of Quantities.</p>
       </div>
-      <div className="hidden lg:flex p-3 bg-gray-50 rounded-lg border border-gray-100 justify-between items-center text-[11px] font-bold">
+      <div className="hidden lg:flex p-3 bg-gray-50 rounded-lg border border-gray-100 justify-between items-center text-xs font-bold">
         <span>On this phone</span>
-        <span>{history.length} Sessions</span>
+        <span>{history.length} {history.length === 1 ? 'list' : 'lists'}</span>
       </div>
       <div className={`grid gap-2 ${hasPurchases ? 'grid-cols-2 lg:grid-cols-1' : 'grid-cols-1'}`}>
         <Button variant="secondary" block onClick={onNewBoq}>
@@ -78,7 +78,7 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {records.length === 0 ? (
           <EmptyState icon={History} title={history.length ? 'No saved lists match.' : 'Nothing saved yet.'} className="col-span-full">
-            {history.length ? 'Check the filters or search.' : 'Lists you save from Spend or BOQ (the Save button) appear here.'}
+            {history.length ? 'Check the filters or search.' : 'Lists you save from Purchases or BOQ (the Save button) appear here.'}
           </EmptyState>
         ) : (
           records.map((record) => (
@@ -95,13 +95,13 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
                     {record.title}
                   </h3>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[11px] font-bold rounded uppercase shrink-0">{record.category || 'Civil'}</span>
-                    <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-[11px] font-bold rounded uppercase shrink-0">{record.kind === 'audit' ? 'Purchases' : 'BOQ'}</span>
+                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded uppercase shrink-0">{record.category || 'Civil'}</span>
+                    <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs font-bold rounded uppercase shrink-0">{record.kind === 'audit' ? 'Purchases' : 'BOQ'}</span>
                   </div>
                   <div className="flex flex-col gap-0.5 mt-1">
-                    <span className="text-[11px] font-mono text-gray-400">{new Date(record.created_at).toLocaleString('en-IN')}</span>
-                    {record.address && <span className="text-[11px] text-gray-500 italic truncate">📍 {record.address}</span>}
-                    <span className="text-[11px] font-bold text-gray-500 uppercase">
+                    <span className="text-xs font-mono text-gray-500">{new Date(record.created_at).toLocaleString('en-IN')}</span>
+                    {record.address && <span className="text-xs text-gray-500 italic truncate">📍 {record.address}</span>}
+                    <span className="text-xs font-bold text-gray-500 uppercase">
                       {record.items.length} Items
                       {record.kind === 'audit' && record.items.length > 0 && (
                         <span className={record.items.every((i) => i.delivered_at) ? 'text-green-700' : ''}>
@@ -115,13 +115,13 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
                 <div className="flex gap-1 items-center">
                   <button
                     onClick={() => onEdit(record)}
-                    className="p-2 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all flex items-center"
+                    className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all flex items-center"
                     aria-label="Edit record info"
                   >
                     <Pencil size={14} />
-                    <span className="text-[11px] font-bold uppercase ml-1">Edit</span>
+                    <span className="text-xs font-bold uppercase ml-1">Edit</span>
                   </button>
-                  <button onClick={() => remove(record)} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" aria-label="Delete record">
+                  <button onClick={() => remove(record)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" aria-label="Delete record">
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -129,27 +129,27 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
 
               <div className="space-y-1 mb-4 max-h-20 overflow-hidden relative">
                 {record.items.slice(0, 3).map((item) => (
-                  <div key={item.id} className="text-[11px] text-gray-500 flex justify-between">
+                  <div key={item.id} className="text-xs text-gray-500 flex justify-between">
                     <span>• {item.item_name}</span>
                     <span className="font-mono">
                       {item.quantity} {item.unit}
                     </span>
                   </div>
                 ))}
-                {record.items.length > 3 && <div className="text-[11px] text-gray-400 italic mt-1">+ {record.items.length - 3} more items...</div>}
+                {record.items.length > 3 && <div className="text-xs text-gray-500 italic mt-1">+ {record.items.length - 3} more items...</div>}
                 <div className="absolute bottom-0 inset-x-0 h-4 bg-gradient-to-t from-white to-transparent" />
               </div>
 
-              {record.notes && <div className="mb-4 text-[11px] text-gray-400 italic line-clamp-1 border-l border-gray-200 pl-2">"{record.notes}"</div>}
+              {record.notes && <div className="mb-4 text-xs text-gray-500 italic line-clamp-1 border-l border-gray-200 pl-2">"{record.notes}"</div>}
 
               <div className="flex gap-2">
                 <Button variant="primary" size="sm" className="flex-1" onClick={() => onOpen(record)}>
-                  <Eye size={12} /> Open & Restore
+                  <Eye size={12} /> Open
                 </Button>
                 {record.kind === 'audit' && record.items.length > 0 && (
                   <button
                     onClick={() => onBuyAgain(record)}
-                    className="py-2 px-3 bg-white text-gray-700 border border-gray-300 text-[11px] font-bold uppercase tracking-widest rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
+                    className="py-2 px-3 bg-white text-gray-700 border border-gray-300 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
                     aria-label={`Buy again: ${record.title}`}
                   >
                     <RotateCcw size={12} /> Again
@@ -158,7 +158,7 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
                 {record.kind === 'audit' && record.items.length > 0 && (
                   <button
                     onClick={() => onDeliveries(record)}
-                    className="flex-1 py-2 bg-green-50 text-green-800 border border-green-200 text-[11px] font-bold uppercase tracking-widest rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 py-2 bg-green-50 text-green-800 border border-green-200 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center gap-2"
                   >
                     <CheckSquare size={12} /> Deliveries
                   </button>
@@ -166,7 +166,7 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
                 {record.kind === 'boq' && (
                   <button
                     onClick={() => onQuotes(record)}
-                    className="flex-1 py-2 bg-orange-50 text-orange-700 border border-orange-200 text-[11px] font-bold uppercase tracking-widest rounded-lg hover:bg-orange-100 transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 py-2 bg-orange-50 text-orange-700 border border-orange-200 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-orange-100 transition-colors flex items-center justify-center gap-2"
                   >
                     <Truck size={12} /> Quotes ({quotesFor(record.id).length})
                   </button>

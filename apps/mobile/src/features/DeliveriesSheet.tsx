@@ -14,7 +14,7 @@ export function DeliveriesSheet({ recordId, onClose }: { recordId: string; onClo
   return (
     <Sheet labelledBy="deliveries-title" size="lg" onClose={onClose} closeOnBackdrop className="p-5">
       <SheetHeader id="deliveries-title" title="Deliveries" subtitle={`${record.title}${record.address ? ` · ${record.address}` : ''}`} onClose={onClose} />
-      <p className="text-[11px] text-gray-500 mt-2">Tick each line when it reaches the site. Site reports can count only delivered material.</p>
+      <p className="text-xs text-gray-500 mt-2">Tick each line when it reaches the site. Site reports can count only delivered material.</p>
       <ul className="mt-3 divide-y divide-gray-100 overflow-y-auto flex-1">
         {record.items.map((item) => (
           <li key={item.id} className="py-2 space-y-1">
@@ -36,7 +36,7 @@ export function DeliveriesSheet({ recordId, onClose }: { recordId: string; onClo
               todayISO(),
             )
           }
-          className="mt-3 w-full py-3 bg-green-700 text-white text-xs font-bold uppercase tracking-widest rounded-xl flex items-center justify-center gap-2"
+          className="mt-3 w-full py-3 bg-green-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl flex items-center justify-center gap-2"
         >
           <Check size={14} /> Mark all {pending.length} delivered today
         </button>

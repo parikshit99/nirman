@@ -41,11 +41,11 @@ type AppTab = 'auditor' | 'boq' | 'labour' | 'history' | 'database';
 
 /** `about` is the one line shown under the tabs saying what the open tab does. */
 const TABS: { id: AppTab; label: string; icon: typeof LayoutDashboard; about: string }[] = [
-  { id: 'auditor', label: 'Spend', icon: ShoppingCart, about: 'Photograph bills or type what was bought; get a spending log with the rate paid for each item.' },
+  { id: 'auditor', label: 'Purchases', icon: ShoppingCart, about: 'Photograph bills or type what was bought; get a purchase list with the rate paid for each item.' },
   { id: 'boq', label: 'BOQ', icon: FileCode, about: 'Photograph a drawing or list; get a blank BOQ (no rates) to send vendors, then compare their quotes.' },
   { id: 'labour', label: 'Labour', icon: Users, about: 'Labour contracts: record work measured, payments and deductions; see what each contractor is owed and share statements.' },
-  { id: 'database', label: 'Data', icon: Database, about: 'Every price you have recorded, per material, to see how rates change over time.' },
-  { id: 'history', label: 'History', icon: History, about: 'Saved purchase lists and BOQs. Open one to edit it, export it, or add vendor quotes.' },
+  { id: 'database', label: 'Rates', icon: Database, about: 'Every price you have recorded, per material, to see how rates change over time.' },
+  { id: 'history', label: 'Saved', icon: History, about: 'Saved purchase lists and BOQs. Open one to edit it, export it, or add vendor quotes.' },
 ];
 
 interface SaveState {
@@ -256,15 +256,15 @@ export default function App() {
   const clearCurrent = async () => {
     if (kind) {
       const ok = await dialogs.confirm(`Clear the ${titlePrefix(kind)} draft?`, {
-        message: `All ${activeItems.length} items in the current draft will be removed. Saved history is not affected.`,
+        message: `${activeItems.length === 1 ? 'The 1 item' : `All ${activeItems.length} items`} in the current draft will be removed. Saved lists are not affected.`,
         confirmLabel: 'Clear',
         danger: true,
       });
       if (!ok) return;
       await startNewList(kind);
     } else if (activeTab === 'history') {
-      const ok = await dialogs.confirm('Delete all saved sessions?', {
-        message: `${history.length} sessions will be permanently deleted from this phone.`,
+      const ok = await dialogs.confirm('Delete all saved lists?', {
+        message: `${history.length} saved ${history.length === 1 ? 'list' : 'lists'} will be permanently deleted from this phone.`,
         confirmLabel: 'Delete all',
         danger: true,
       });
@@ -334,7 +334,7 @@ export default function App() {
             <h1 className="text-xl font-bold tracking-tight text-[var(--color-brand-dark)]">
               NIRMAN <span className="font-serif italic font-normal text-base opacity-70">by Akohsa</span>
             </h1>
-            <p className="text-gray-500 font-mono uppercase tracking-widest leading-none mt-1 text-[11px]">Offline Material Management</p>
+            <p className="text-gray-500 leading-none mt-1 text-xs font-semibold">Offline Material Management</p>
           </div>
           <div className="md:hidden">
             <StatusChip onClick={() => setSettingsOpen(true)} />
@@ -348,8 +348,8 @@ export default function App() {
               onClick={() => setActiveTab(id)}
               aria-label={label}
               aria-current={activeTab === id ? 'page' : undefined}
-              className={`flex-1 md:flex-none flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-3 md:px-4 py-2 rounded-md text-[11px] font-bold uppercase tracking-wide sm:tracking-wider transition-all whitespace-nowrap
-                ${activeTab === id ? 'bg-white text-[var(--color-brand-dark)] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`flex-1 md:flex-none flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-3 md:px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wide sm:tracking-wider transition-all whitespace-nowrap
+                ${activeTab === id ? 'bg-white text-[var(--color-brand-dark)] shadow-sm' : 'text-gray-500 hover:text-gray-600'}`}
             >
               <Icon size={14} className="hidden min-[440px]:inline" /> {label}
             </button>
@@ -362,9 +362,9 @@ export default function App() {
           </div>
           {kind && (
             <div className="min-w-0 text-right pr-2 min-[360px]:pr-3 border-r border-gray-100 leading-tight">
-              <div className="text-[11px] uppercase tracking-wider text-gray-400 font-mono whitespace-nowrap">{kind === 'audit' ? 'Spent' : 'Items'}</div>
+              <div className="text-xs text-gray-500 whitespace-nowrap font-semibold">{kind === 'audit' ? 'Spent' : 'Items'}</div>
               <div className="text-xs md:text-sm font-mono font-bold" data-testid="header-total">
-                {kind === 'audit' ? `₹${totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : `${filteredItems.length} Recs`}
+                {kind === 'audit' ? `₹${totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : `${filteredItems.length}`}
               </div>
             </div>
           )}
@@ -384,7 +384,7 @@ export default function App() {
               </>
             )}
             {canClear && (
-              <button onClick={clearCurrent} className="p-2 rounded-lg transition-all text-gray-300 hover:text-red-500 hover:bg-red-50" aria-label="Clear">
+              <button onClick={clearCurrent} className="p-2 rounded-lg transition-all text-gray-400 hover:text-red-500 hover:bg-red-50" aria-label="Clear">
                 <Trash2 size={16} />
               </button>
             )}
@@ -436,19 +436,19 @@ export default function App() {
 
         <section className="flex-1 flex flex-col technical-grid lg:overflow-hidden bg-white mt-4 lg:mt-0">
           <div className="p-4 md:p-6 pb-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <h2 className="text-[11px] md:text-xs font-mono uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2">
+            <h2 className="text-xs md:text-xs text-gray-500 flex items-center gap-2 font-semibold">
               {activeTab === 'history' ? <History size={12} /> : activeTab === 'database' ? <Database size={12} /> : activeTab === 'labour' ? <Users size={12} /> : activeTab === 'auditor' ? <FileText size={12} /> : <FileCode size={12} />}
-              {activeTab === 'history' ? 'Saved Sessions' : activeTab === 'database' ? 'Material Database' : activeTab === 'labour' ? 'Labour Contracts' : activeTab === 'auditor' ? 'Purchase Log' : 'BOQ Draft'}
+              {activeTab === 'history' ? 'Saved lists' : activeTab === 'database' ? 'Rates by material' : activeTab === 'labour' ? 'Labour contracts' : activeTab === 'auditor' ? 'Purchase list' : 'BOQ draft'}
             </h2>
             <div className="relative w-full md:w-auto">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 aria-label="Search"
-                placeholder={activeTab === 'history' ? 'Search sessions...' : activeTab === 'database' ? 'Search materials...' : activeTab === 'labour' ? 'Search contractors...' : 'Filter items...'}
-                className="w-full md:w-64 pl-8 pr-4 py-2 bg-gray-50 border border-[var(--color-brand-concrete)] rounded-full text-xs font-mono outline-none focus:border-gray-400 transition-all"
+                placeholder={activeTab === 'history' ? 'Search saved lists…' : activeTab === 'database' ? 'Search materials…' : activeTab === 'labour' ? 'Search contractors…' : 'Search items…'}
+                className="w-full md:w-64 pl-8 pr-4 py-2 bg-gray-50 border border-[var(--color-brand-concrete)] rounded-full text-sm outline-none focus:border-gray-400 transition-all"
               />
             </div>
           </div>

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 /** CLAUDE.md: the app must work at 320–360 px wide without sideways scrolling (412 px: a common larger phone). */
 const WIDTHS = [320, 360, 412];
-const TABS = ['Spend', 'BOQ', 'Labour', 'Data', 'History'];
+const TABS = ['Purchases', 'BOQ', 'Labour', 'Rates', 'Saved'];
 
 /** Buttons, links and fields that end past the right edge, except inside rows meant to scroll sideways (filter chips). */
 async function offScreen(page: Page): Promise<string[]> {
@@ -27,7 +27,7 @@ async function addItem(page: Page, name: string, quantity = '10', rate = '385') 
   await page.getByRole('button', { name: /add item manually/i }).click();
   await page.getByLabel('Item name').fill(name);
   await page.getByLabel('Quantity').fill(quantity);
-  const rateField = page.getByLabel('Rate');
+  const rateField = page.getByLabel('Rate', { exact: true });
   if (await rateField.count()) await rateField.fill(rate);
   await page.getByRole('button', { name: /^add to/i }).click();
   await page.getByLabel('Close manual entry').click();
@@ -45,7 +45,7 @@ for (const width of WIDTHS) {
     }
 
     // With items, the header also shows the total and Save / Preview / Share / Clear.
-    for (const tab of ['Spend', 'BOQ']) {
+    for (const tab of ['Purchases', 'BOQ']) {
       await page.getByRole('button', { name: tab, exact: true }).click();
       // A crore-sized total is the widest the header gets.
       await addItem(page, 'OPC Cement 53 grade', '32067', '385');

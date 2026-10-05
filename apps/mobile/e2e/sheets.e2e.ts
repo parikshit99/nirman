@@ -27,7 +27,7 @@ test('sheets open on top and fit at 320 px', async ({ page }) => {
   await page.getByRole('button', { name: /add item manually/i }).click();
   await page.getByLabel('Item name').fill('OPC Cement 53 grade');
   await page.getByLabel('Quantity').fill('50');
-  await page.getByLabel('Rate').fill('385');
+  await page.getByLabel('Rate', { exact: true }).fill('385');
   await page.getByRole('button', { name: /^add to/i }).click();
   await page.getByLabel('Close manual entry').click();
 

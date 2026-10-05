@@ -72,7 +72,7 @@ export function OrderSlipSheet({
     }
   };
 
-  const label = 'text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1';
+  const label = 'text-xs text-gray-600 font-bold block mb-1';
   const input = 'w-full min-w-0 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-1 focus:ring-orange-400';
 
   return (

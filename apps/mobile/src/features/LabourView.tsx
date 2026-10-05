@@ -29,20 +29,20 @@ export function LabourSidebar({ contracts, onNew, onSiteReport }: { contracts: C
         <h3 className="text-sm font-bold text-orange-900 flex items-center gap-2">
           <Users size={16} /> Labour contracts
         </h3>
-        <p className="text-[11px] text-orange-700 mt-1">Record work measured, payments and deductions for each contractor; the balance due is worked out for you.</p>
+        <p className="text-xs text-orange-700 mt-1">Record work measured, payments and deductions for each contractor; the balance due is worked out for you.</p>
       </div>
       {contracts.length > 0 && (
         <div className="grid grid-cols-3 gap-2 text-center" role="status" aria-label="Totals for the contracts shown">
           <div className={box}>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Work done</div>
+            <div className="text-xs text-gray-500 font-semibold">Work done</div>
             <div className="text-xs font-mono font-bold">{rupees(totals.workDone)}</div>
           </div>
           <div className={box}>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Paid</div>
+            <div className="text-xs text-gray-500 font-semibold">Paid</div>
             <div className="text-xs font-mono font-bold">{rupees(totals.paid)}</div>
           </div>
           <div className={box}>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Balance</div>
+            <div className="text-xs text-gray-500 font-semibold">Balance</div>
             <div className="text-xs font-mono font-bold">
               <BalanceText balance={totals.balance} />
             </div>
@@ -137,10 +137,10 @@ function ContractCard({ contract: c, totals: t, pending, onOpen }: { contract: C
         <div className="min-w-0">
           <div className="font-bold text-gray-900 truncate">{c.contractor}</div>
           <div className="text-xs text-gray-600 truncate">{c.work || 'Work not described'}</div>
-          <div className="text-[11px] text-gray-400 truncate">{[c.address, c.category].filter(Boolean).join(' · ')}</div>
+          <div className="text-xs text-gray-500 truncate">{[c.address, c.category].filter(Boolean).join(' · ')}</div>
         </div>
         <span
-          className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${c.status === 'closed' ? 'bg-gray-100 text-gray-500' : 'bg-orange-50 text-orange-700'}`}
+          className={`shrink-0 text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded ${c.status === 'closed' ? 'bg-gray-100 text-gray-500' : 'bg-orange-50 text-orange-700'}`}
         >
           {c.status === 'closed' ? 'Closed' : c.kind === 'rate' ? `₹${c.rate}/${c.unit || 'unit'}` : 'Lump sum'}
         </span>
@@ -150,13 +150,13 @@ function ContractCard({ contract: c, totals: t, pending, onOpen }: { contract: C
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full bg-orange-500" style={{ width: `${progress * 100}%` }} />
           </div>
-          <div className="text-[10px] text-gray-400 mt-0.5">
+          <div className="text-xs text-gray-500 mt-0.5">
             {Math.round((t.progress ?? 0) * 100)}% done
             {c.kind === 'rate' && ` · ${t.doneQty.toLocaleString('en-IN')} of ${c.est_quantity.toLocaleString('en-IN')} ${c.unit}`}
           </div>
         </div>
       )}
-      <div className="mt-2 grid grid-cols-3 gap-1 text-[11px] font-mono">
+      <div className="mt-2 grid grid-cols-3 gap-1 text-xs font-mono">
         <span className="text-gray-500">
           Work <b className="text-gray-800">{rupees(t.workDone)}</b>
         </span>

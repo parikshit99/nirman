@@ -175,13 +175,13 @@ export function ItemLog({ kind, items, searching, onIndex }: Props) {
       </div>
 
       <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-[var(--color-brand-concrete)] rounded-full text-xs uppercase font-mono tracking-widest text-gray-500 shadow-sm order-2 sm:order-1">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-[var(--color-brand-concrete)] rounded-full text-xs text-gray-500 shadow-sm order-2 sm:order-1 font-semibold">
           <History size={12} /> {items.length} {items.length === 1 ? 'item' : 'items'}
         </div>
         {isAudit && undelivered.length > 0 && (
           <button
             onClick={() => actions.setDelivered(undelivered.map((i) => i.id), todayISO())}
-            className="w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-4 py-3 bg-white border border-green-300 text-green-800 text-xs font-bold uppercase tracking-widest rounded-xl"
+            className="w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-4 py-3 bg-white border border-green-300 text-green-800 text-xs font-bold uppercase tracking-wider rounded-xl"
           >
             <Check size={14} /> Mark all delivered
           </button>
@@ -189,10 +189,10 @@ export function ItemLog({ kind, items, searching, onIndex }: Props) {
         {isAudit && indexable.length > 0 && (
           <button
             onClick={onIndex}
-            className="w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-br from-orange-500 to-orange-600 text-white text-xs font-bold uppercase tracking-widest rounded-xl shadow-lg shadow-orange-100 transition-all active:scale-95"
-            title="Save this purchase list to History; its rates go into Data"
+            className="w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-br from-orange-500 to-orange-600 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-lg shadow-orange-100 transition-all active:scale-95"
+            title="Save this purchase list; its rates go into Rates"
           >
-            <Zap size={14} fill="currentColor" /> Index all rates
+            <Zap size={14} fill="currentColor" /> Save all rates
           </button>
         )}
       </div>
@@ -251,7 +251,7 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendin
           <div className="flex items-start justify-between gap-2">
             <span className="font-bold text-sm text-[var(--color-brand-dark)] flex items-center gap-1.5 min-w-0">
               <span className="truncate">{item.item_name}</span>
-              <Pencil size={12} className="text-gray-300 shrink-0" />
+              <Pencil size={12} className="text-gray-400 shrink-0" />
             </span>
             {isAudit && <span className="font-mono font-bold text-sm text-[var(--color-brand-dark)] shrink-0">{rupees(item.total_amount)}</span>}
           </div>
@@ -272,7 +272,7 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendin
                 <Calendar size={12} /> {item.date}
               </span>
             )}
-            {item.original_term && item.original_term !== item.item_name && <span className="italic text-gray-400 truncate">“{item.original_term}”</span>}
+            {item.original_term && item.original_term !== item.item_name && <span className="italic text-gray-500 truncate">“{item.original_term}”</span>}
           </div>
         </button>
         <button onClick={onDelete} className="p-2 -mr-2 -mt-1 text-red-500 hover:bg-red-50 rounded-xl shrink-0" aria-label={`Delete ${item.item_name}`}>
@@ -285,15 +285,15 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendin
           <DeliveredToggle name={item.item_name} deliveredAt={item.delivered_at} onChange={onDelivered} />
           {isIndexed ? (
             <span className="flex items-center gap-1 text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100">
-              <Check size={12} /> Indexed
+              <Check size={12} /> Rate saved
             </span>
           ) : (
             <button
               onClick={onIndex}
               className="flex items-center gap-1 text-xs font-bold text-orange-700 hover:text-white hover:bg-orange-500 px-2 py-0.5 rounded border border-orange-200 transition-all"
-              title="Save this purchase list to History; its rates go into Data"
+              title="Save this purchase list; its rates go into Rates"
             >
-              <Zap size={12} /> Index rate
+              <Zap size={12} /> Save rate
             </button>
           )}
           {dbMatch && dbMatch.latestPrice > 0 && !isIndexed && (

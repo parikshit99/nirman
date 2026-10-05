@@ -19,7 +19,7 @@ export function ShareTargetSheet({ share, hasSavedBoqs, onPick, onClose }: { sha
         </div>
       )}
       {share.text && <p className="text-xs text-gray-600 bg-gray-50 rounded-lg p-2 line-clamp-3">“{share.text}”</p>}
-      <p className="text-[11px] text-gray-500 px-1 pb-1">Add to:</p>
+      <p className="text-xs text-gray-500 px-1 pb-1">Add to:</p>
       <SheetOption icon={ShoppingCart} label="Purchases" about="A bill or note of what was bought" onClick={() => onPick('audit')} />
       <SheetOption icon={FileCode} label="BOQ" about="A list of what you need, to send to vendors" onClick={() => onPick('boq')} />
       <SheetOption

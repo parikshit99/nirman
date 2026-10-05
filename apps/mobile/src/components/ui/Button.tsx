@@ -16,7 +16,7 @@ const VARIANT: Record<ButtonVariant, string> = {
   dangerOutline: 'bg-white border border-red-200 text-red-600 shadow-sm hover:bg-red-50',
   ghost: 'text-gray-500 hover:bg-gray-100',
 };
-const SIZE = { sm: 'h-9 px-3 text-[11px]', md: 'h-11 px-4 text-[11px]' };
+const SIZE = { sm: 'h-9 px-3 text-xs', md: 'h-11 px-4 text-xs' };
 
 export function Button({
   variant = 'secondary',
@@ -33,7 +33,7 @@ export function Button({
   return (
     <button
       {...props}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-xl font-bold uppercase tracking-wider whitespace-nowrap transition-colors disabled:opacity-50 disabled:pointer-events-none ${VARIANT[variant]} ${SIZE[size]} ${block ? 'w-full' : ''} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-xl font-bold uppercase tracking-wide whitespace-nowrap transition-colors disabled:opacity-50 disabled:pointer-events-none ${VARIANT[variant]} ${SIZE[size]} ${block ? 'w-full' : ''} ${className}`}
     />
   );
 }

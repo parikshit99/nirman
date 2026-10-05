@@ -78,8 +78,8 @@ export function SiteReport({ onClose }: { onClose(): void }) {
   };
 
   const chip = (on: boolean) =>
-    `px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${on ? 'bg-orange-500 text-white' : 'bg-white border border-gray-200 text-gray-500'}`;
-  const label = 'text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1';
+    `px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${on ? 'bg-orange-500 text-white' : 'bg-white border border-gray-200 text-gray-500'}`;
+  const label = 'text-xs text-gray-600 font-bold block mb-1';
   const input = 'w-full min-w-0 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-1 focus:ring-orange-400';
 
   return (
@@ -125,7 +125,7 @@ export function SiteReport({ onClose }: { onClose(): void }) {
             </div>
 
             <div>
-              <span className={label}>Category</span>
+              <span className={label}>Work type</span>
               <div className="flex flex-wrap gap-2">
                 <button className={chip(categories.length === 0)} onClick={() => setCategories([])}>All</button>
                 {siteCategories.map((c) => (
@@ -168,7 +168,7 @@ export function SiteReport({ onClose }: { onClose(): void }) {
             </Button>
             {empty && (
               <p className="text-xs text-gray-500 text-center">
-                Nothing matches.{deliveredOnly ? ' Tick deliveries in History → Deliveries, or include all saved purchases.' : ''}
+                Nothing matches.{deliveredOnly ? ' Tick deliveries in Saved → Deliveries, or include all saved purchases.' : ''}
               </p>
             )}
           </div>

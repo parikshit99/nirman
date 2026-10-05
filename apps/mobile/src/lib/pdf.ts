@@ -278,7 +278,7 @@ export function buildSiteReportPdf(address: string, filters: string, report: Sit
   doc.setTextColor(30);
   doc.text(`All lines (${lines.length})`, 14, y);
   autoTable(doc, {
-    head: [['Date', 'Item', 'Qty', 'Rate', 'Amount', 'Vendor', 'Session', 'Delivered']],
+    head: [['Date', 'Item', 'Qty', 'Rate', 'Amount', 'Vendor', 'List', 'Delivered']],
     body: lines.map((l) => [
       l.date,
       describe(l.item),
@@ -309,7 +309,7 @@ function drawLabour(doc: jsPDF, labour: LabourReport, materials: number, y: numb
   doc.text('Labour', 14, y);
   const bold = (content: string) => ({ content, styles: { fontStyle: 'bold' as const } });
   autoTable(doc, {
-    head: [['Contractor', 'Work', 'Category', 'Work done', 'Paid', 'Balance now']],
+    head: [['Contractor', 'Work', 'Work type', 'Work done', 'Paid', 'Balance now']],
     body: [
       ...labour.rows.map((r) => [r.contract.contractor, r.contract.work || '-', r.contract.category || '-', rupees(Math.round(r.workDone)), rupees(Math.round(r.paid)), rupees(Math.round(r.balance))]),
       ['', '', bold('Labour total'), bold(rupees(Math.round(labour.workDone))), bold(rupees(Math.round(labour.paid))), bold(rupees(Math.round(labour.balance)))],
