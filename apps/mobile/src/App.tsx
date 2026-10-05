@@ -203,6 +203,25 @@ export default function App() {
     setActiveTab(record.kind === 'audit' ? 'auditor' : 'boq');
   };
 
+  /** Repeat order: the session's lines go into the purchase list, dated today and not yet delivered. */
+  const buyAgain = async (record: HistoryRecord) => {
+    const current = itemsFor('audit').length;
+    if (current > 0) {
+      const ok = await dialogs.confirm(`Add ${record.items.length} items to the current list?`, {
+        message: `The purchase list already has ${current} items. Save or clear it first to keep the bills separate.`,
+        confirmLabel: 'Add them',
+      });
+      if (!ok) return;
+    } else {
+      linkRecord('audit', null);
+    }
+    await actions.addItems(
+      DRAFT_IDS.audit,
+      record.items.map((i) => ({ ...i, date: todayISO() })),
+    );
+    setActiveTab('auditor');
+  };
+
   const clearCurrent = async () => {
     if (kind) {
       const ok = await dialogs.confirm(`Clear the ${titlePrefix(kind)} draft?`, {
@@ -428,6 +447,7 @@ export default function App() {
                 onOpen={openRecord}
                 onQuotes={(record) => setQuoteTarget(record.id)}
                 onDeliveries={(record) => setDeliveriesFor(record.id)}
+                onBuyAgain={buyAgain}
               />
             ) : (
               <ItemLog kind={kind!} items={filteredItems} searching={!!search} />

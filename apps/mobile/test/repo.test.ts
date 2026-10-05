@@ -368,3 +368,22 @@ describe('local repository', () => {
     });
   });
 });
+
+describe('typed vendor quotes', () => {
+  it('records a rate against each BOQ line for review, skipping blanks', async () => {
+    const { createManualQuote } = await import('../src/data/repo.ts');
+    const db = await freshDb();
+    await addItems(db, DRAFT_IDS.boq, [{ ...sand, unit_price: 0 }, { ...cement, unit_price: 0, brand: 'UltraTech' }]);
+    const boqId = await saveDraftToHistory(db, 'boq', { title: 'Tower A', address: 'Sector 44', category: 'Civil', site_date: '2026-10-01' });
+    const boqItems = (await loadSnapshot(db)).items.filter((i) => i.list_id === boqId);
+    const id = await createManualQuote(db, {
+      boqId, vendor: ' Gupta ', quoteDate: '2026-10-05',
+      rates: boqItems.map((i) => ({ boqItemId: i.id, unitPrice: i.item_name === 'Cement' ? 385 : 0 })),
+    });
+    const snap = await loadSnapshot(db);
+    expect(snap.quotes.find((q) => q.id === id)).toMatchObject({ vendor: 'Gupta', status: 'review' });
+    expect(snap.quoteLines.map((l) => [l.item_name, l.quantity, l.unit_price, l.total_amount, l.brand])).toEqual([['Cement', 15, 385, 5775, 'UltraTech']]);
+    await confirmQuote(db, id);
+    expect((await loadSnapshot(db)).rates.map((r) => [r.item_name, r.price, r.vendor])).toEqual([['Cement', 385, 'Gupta']]);
+  });
+});

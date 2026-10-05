@@ -2,6 +2,15 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 2.3 — Faster quotes and repeat orders
+
+- **Type a vendor's rates** without the AI: on a saved BOQ, *Add vendor quote → Type rates* lists each BOQ line with a rate box. Leave blank what they didn't quote, then review and confirm as usual. Works offline and without an API key.
+- **Order from this vendor**: each vendor on the quote comparison has a button that opens an order slip already addressed to them, with only the items they quoted.
+- **Buy again**: a saved purchase session has an *Again* button that copies its lines into a new purchase list, dated today, for repeat orders like cement and sand.
+- Order slips have an optional **To (vendor)** line.
+
+Also in this version: prices aren't counted twice when "Index rate" is used on a saved line; after saving you're asked to start a new list so bills don't merge; the chosen Work Type carries into Save; manual entry sits at the top; History and the backup reminder take less space.
+
 ## 2.2 — Order slips
 
 - **Share → Order slip** on the BOQ tab: send a vendor the order itself instead of a blank BOQ. It lists each item with brand, size and quantity, and how it's ordered (e.g. "5 bundles of 12 mm"), with no rates.

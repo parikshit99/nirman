@@ -34,6 +34,7 @@ export function listSheet(kind: ListKind, items: ItemRow[], notes: string): Shee
 /** Order slip for Excel: delivery details, then items with sizes and quantities, no rates. */
 export function orderSlipSheet(items: ItemRow[], d: OrderSlipDetails): SheetData {
   const rows: SheetData = [[bold('Order slip')], [`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`], []];
+  if (d.vendor?.trim()) rows.push([bold('To'), d.vendor.trim()]);
   if (d.address) rows.push([bold('Deliver to'), d.address]);
   if (d.deliveryDate) rows.push([bold('Delivery by'), d.deliveryDate]);
   if (d.receiverName || d.receiverPhone) rows.push([bold('Receiver'), [d.receiverName, d.receiverPhone].filter(Boolean).join(' - ')]);

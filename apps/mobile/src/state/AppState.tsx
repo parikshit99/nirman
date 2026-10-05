@@ -89,6 +89,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
   const actions = useMemo(
     () => ({
       addItems: write(repo.addItems),
+      createManualQuote: write(repo.createManualQuote),
       updateItem: write(repo.updateItem),
       setDelivered: write(repo.setDelivered),
       deleteItem: write(repo.deleteItem),

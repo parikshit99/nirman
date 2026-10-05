@@ -156,6 +156,8 @@ export function buildQuoteComparisonPdf(boq: ListRow, comparison: QuoteCompariso
 
 /** Where and to whom an order slip's material goes. */
 export interface OrderSlipDetails {
+  /** Vendor the order goes to; optional. */
+  vendor?: string;
   address: string;
   /** YYYY-MM-DD, or blank. */
   deliveryDate: string;
@@ -175,6 +177,7 @@ export function buildOrderSlipPdf(items: ItemRow[], d: OrderSlipDetails): jsPDF 
   doc.text(`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`, 14, 28);
 
   const rows: [string, string][] = [];
+  if (d.vendor?.trim()) rows.push(['To', d.vendor.trim()]);
   if (d.address) rows.push(['Deliver to', d.address]);
   if (d.deliveryDate) rows.push(['Delivery by', formatDate(d.deliveryDate)]);
   const receiver = [d.receiverName, d.receiverPhone].filter(Boolean).join(' - ');
