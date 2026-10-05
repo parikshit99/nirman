@@ -1,7 +1,7 @@
-import { AlertTriangle, CheckCircle2, CloudOff, KeyRound, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CloudOff, KeyRound, Loader2, Settings } from 'lucide-react';
 import { useAppState } from '../state/AppState.tsx';
 
-/** Connection and AI-queue status; tapping it opens Settings. */
+/** Connection and AI-queue status, with a Settings button beside it; both open Settings. */
 export function StatusChip({ onClick }: { onClick(): void }) {
   const { status, settings, snapshot } = useAppState();
   const queued = snapshot.jobs.filter((j) => j.status !== 'failed').length;
@@ -23,13 +23,23 @@ export function StatusChip({ onClick }: { onClick(): void }) {
   }
 
   return (
-    <button
-      onClick={onClick}
-      title={status.lastError ?? undefined}
-      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[var(--color-brand-concrete)] rounded-full text-[11px] md:text-[11px] uppercase font-mono tracking-widest text-gray-500 shadow-sm whitespace-nowrap"
-      aria-label={`Settings. Status: ${label}`}
-    >
-      {icon} {label}
-    </button>
+    <div className="flex items-center gap-1.5">
+      <button
+        onClick={onClick}
+        title={status.lastError ?? undefined}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[var(--color-brand-concrete)] rounded-full text-[11px] md:text-[11px] uppercase font-mono tracking-widest text-gray-500 shadow-sm whitespace-nowrap"
+        aria-label={`Status: ${label}`}
+      >
+        {icon} {label}
+      </button>
+      <button
+        onClick={onClick}
+        className="p-2 bg-white border border-[var(--color-brand-concrete)] rounded-full text-gray-600 shadow-sm hover:text-[var(--color-brand-dark)]"
+        aria-label="Settings"
+        title="Settings"
+      >
+        <Settings size={16} />
+      </button>
+    </div>
   );
 }
