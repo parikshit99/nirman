@@ -248,6 +248,7 @@ function BackupSection() {
 function StorageSection() {
   const { history, snapshot, learningCount, hiddenMaterials, actions } = useAppState();
   const dialogs = useDialogs();
+  const [showLearned, setShowLearned] = useState(false);
   const resetLearning = async () => {
     const ok = await dialogs.confirm(`Forget ${learningCount} learned corrections?`, {
       message: 'The AI will go back to its default reading of these terms.',
@@ -272,14 +273,15 @@ function StorageSection() {
         <dd className="font-bold text-right">
           {learningCount}
           {learningCount > 0 && (
-            <button onClick={resetLearning} className="ml-2 text-blue-600 font-bold underline">
-              Reset
+            <button onClick={() => setShowLearned((v) => !v)} className="ml-2 text-blue-600 font-bold underline" aria-expanded={showLearned}>
+              {showLearned ? 'Hide' : 'Manage'}
             </button>
           )}
         </dd>
         <dt className="text-gray-500">App version</dt>
         <dd className="font-bold text-right font-mono">{APP_VERSION}</dd>
       </dl>
+      {showLearned && learningCount > 0 && <LearnedCorrections onForgetAll={resetLearning} />}
       {hiddenMaterials.length > 0 && (
         <div className="pt-2">
           <div className="flex justify-between items-center text-[11px] text-gray-500 mb-1">
@@ -305,5 +307,83 @@ function StorageSection() {
         </div>
       )}
     </section>
+  );
+}
+
+/** Each remembered correction: the word as written or spoken, and the name and unit it is read as. */
+function LearnedCorrections({ onForgetAll }: { onForgetAll(): void }) {
+  const { snapshot, actions } = useAppState();
+  const [query, setQuery] = useState('');
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState({ item_name: '', unit: '' });
+  const q = query.trim().toLowerCase();
+  const terms = [...snapshot.learned]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .filter((t) => !q || t.id.includes(q) || t.item_name.toLowerCase().includes(q));
+  const field = 'w-full min-w-0 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-blue-400';
+
+  return (
+    <div className="pt-2 space-y-2">
+      <p className="text-[11px] text-gray-500 leading-snug">
+        Words the app has learned to read your way, from your edits. Change what a word is read as, or delete it so the AI reads it fresh.
+      </p>
+      {snapshot.learned.length > 6 && (
+        <input aria-label="Search learned corrections" className={field} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search words or names" />
+      )}
+      <ul className="space-y-1 max-h-72 overflow-y-auto">
+        {terms.map((t) =>
+          editing === t.id ? (
+            <li key={t.id} className="text-xs bg-blue-50 rounded-lg p-2 space-y-1.5">
+              <div className="font-mono text-gray-600">“{t.id}” is read as</div>
+              <div className="grid grid-cols-[1fr_5rem] gap-1.5">
+                <input aria-label="Read as name" className={field} value={draft.item_name} onChange={(e) => setDraft((d) => ({ ...d, item_name: e.target.value }))} />
+                <input aria-label="Read as unit" className={field} value={draft.unit} onChange={(e) => setDraft((d) => ({ ...d, unit: e.target.value }))} />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setEditing(null)} className="text-gray-500 font-bold">
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    await actions.updateLearnedTerm(t.id, draft);
+                    setEditing(null);
+                  }}
+                  disabled={!draft.item_name.trim()}
+                  className="text-blue-600 font-bold underline disabled:opacity-40"
+                  aria-label={`Save correction for ${t.id}`}
+                >
+                  Save
+                </button>
+              </div>
+            </li>
+          ) : (
+            <li key={t.id} className="flex items-center justify-between gap-2 text-xs bg-gray-50 rounded-lg px-3 py-1.5">
+              <span className="min-w-0 break-words">
+                <span className="font-mono text-gray-600">{t.id}</span> → <b>{t.item_name}</b> <span className="text-gray-500">· {t.unit}</span>
+              </span>
+              <span className="flex gap-3 shrink-0">
+                <button
+                  onClick={() => {
+                    setEditing(t.id);
+                    setDraft({ item_name: t.item_name, unit: t.unit });
+                  }}
+                  className="text-blue-600 font-bold underline"
+                  aria-label={`Edit correction for ${t.id}`}
+                >
+                  Edit
+                </button>
+                <button onClick={() => actions.deleteLearnedTerm(t.id)} className="text-red-600 font-bold underline" aria-label={`Delete correction for ${t.id}`}>
+                  Delete
+                </button>
+              </span>
+            </li>
+          ),
+        )}
+        {terms.length === 0 && <li className="text-xs text-gray-500 px-1">No match.</li>}
+      </ul>
+      <button onClick={onForgetAll} className="text-[11px] text-red-600 font-bold underline">
+        Forget all learned corrections
+      </button>
+    </div>
   );
 }

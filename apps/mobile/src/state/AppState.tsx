@@ -108,6 +108,8 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       unhideMaterial: write(repo.unhideMaterial),
       setPrice: write(repo.setPrice),
       clearLearning: write(repo.clearLearning),
+      updateLearnedTerm: write(repo.updateLearnedTerm),
+      deleteLearnedTerm: write(repo.deleteLearnedTerm),
       indexRates: write(repo.indexRates),
       deleteIndexedRate: write(repo.deleteIndexedRate),
       addCategory: write(repo.addCategory),

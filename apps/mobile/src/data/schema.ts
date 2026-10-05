@@ -126,6 +126,18 @@ const MIGRATIONS: string[] = [
   ALTER TABLE quote_lines ADD COLUMN spec TEXT NOT NULL DEFAULT '';
   ALTER TABLE quote_lines ADD COLUMN color TEXT NOT NULL DEFAULT '';
   `,
+  // 5: work category and site on rates from confirmed vendor quotes, filled in from their BOQ.
+  `
+  ALTER TABLE indexed_rates ADD COLUMN category TEXT NOT NULL DEFAULT '';
+  ALTER TABLE indexed_rates ADD COLUMN address TEXT NOT NULL DEFAULT '';
+  UPDATE indexed_rates SET
+    category = COALESCE((SELECT l.category FROM quotes q JOIN lists l ON l.id = q.boq_id
+      WHERE q.status = 'confirmed' AND q.quote_date = indexed_rates.date AND (q.vendor = indexed_rates.vendor OR (q.vendor = '' AND indexed_rates.vendor = 'Unknown'))
+      ORDER BY q.updated_at DESC LIMIT 1), ''),
+    address = COALESCE((SELECT l.address FROM quotes q JOIN lists l ON l.id = q.boq_id
+      WHERE q.status = 'confirmed' AND q.quote_date = indexed_rates.date AND (q.vendor = indexed_rates.vendor OR (q.vendor = '' AND indexed_rates.vendor = 'Unknown'))
+      ORDER BY q.updated_at DESC LIMIT 1), '');
+  `,
 ];
 
 /** Default categories sort before anything the user adds. */

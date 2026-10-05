@@ -436,8 +436,23 @@ export async function clearLearning(db: Db) {
   await db.run('DELETE FROM learned_terms');
 }
 
+/** Change what an original word is read as. */
+export async function updateLearnedTerm(db: Db, id: string, next: { item_name: string; unit: string }) {
+  const item_name = next.item_name.trim();
+  if (!item_name) return;
+  await db.transaction(async (tx) => {
+    if (!(await getRow(tx, 'learned_terms', id))) return;
+    await touch(tx, 'learned_terms', { id, item_name, unit: next.unit.trim() || 'unit', updated_at: '' });
+  });
+}
+
+/** Forget one correction: the word is read as the AI reads it again. */
+export async function deleteLearnedTerm(db: Db, id: string) {
+  await db.run('DELETE FROM learned_terms WHERE id = ?', [id]);
+}
+
 /** Index item rates; an identical rate (same material, date and price) is replaced. */
-type RateInput = Pick<ItemRow, 'item_name' | 'unit' | 'unit_price' | 'vendor' | 'date'> & Partial<Variant>;
+type RateInput = Pick<ItemRow, 'item_name' | 'unit' | 'unit_price' | 'vendor' | 'date'> & Partial<Variant> & { category?: string; address?: string };
 
 export async function indexRates(db: Db, items: RateInput[]) {
   await db.transaction((tx) => indexRatesTx(tx, items));
@@ -462,6 +477,8 @@ async function indexRatesTx(tx: SqlExecutor, items: RateInput[]) {
       price: item.unit_price || 0,
       vendor: item.vendor || 'Unknown',
       ...variantOf(item),
+      category: item.category ?? '',
+      address: item.address ?? '',
       indexed_at: indexedAt,
     });
   }
@@ -679,6 +696,7 @@ export async function confirmQuote(db: Db, id: string) {
     const quote = await getRow(tx, 'quotes', id);
     if (!quote) return;
     const boq = new Map((await listItems(tx, quote.boq_id)).map((i) => [i.id, i]));
+    const boqList = await getRow(tx, 'lists', quote.boq_id);
     const lines = await tx.all<QuoteLineRow>(`SELECT ${tableColumns.quote_lines.join(', ')} FROM quote_lines WHERE quote_id = ?`, [id]);
     const rates: RateInput[] = [];
     for (const line of lines) {
@@ -694,6 +712,8 @@ export async function confirmQuote(db: Db, id: string) {
         date: quote.quote_date,
         // What the vendor priced: their brand/model/spec/colour where written, else what the BOQ asked for.
         ...Object.fromEntries(VARIANT_FIELDS.map((f) => [f, line[f] || item?.[f] || ''])),
+        category: boqList?.category ?? '',
+        address: boqList?.address ?? '',
       });
       const term = normalizeTerm(line.original_term);
       if (item && unitMatches && term && term !== normalizeTerm(item.item_name)) {
