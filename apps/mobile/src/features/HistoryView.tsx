@@ -8,31 +8,33 @@ export function HistorySidebar({ onNewBoq, onSiteReport }: { onNewBoq(): void; o
   const { history } = useAppState();
   const hasPurchases = history.some((h) => h.kind === 'audit' && h.address);
   return (
-    <div className="space-y-6">
-      <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl">
+    <div className="space-y-3 lg:space-y-6">
+      <div className="hidden lg:block p-4 bg-orange-50 border border-orange-100 rounded-xl">
         <h3 className="text-sm font-bold text-orange-900 flex items-center gap-2">
           <History size={16} /> Saved Sessions
         </h3>
         <p className="text-[11px] text-orange-700 mt-1">Manage and restore your past purchase lists and Bills of Quantities.</p>
       </div>
-      <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 flex justify-between items-center text-[11px] font-bold">
+      <div className="hidden lg:flex p-3 bg-gray-50 rounded-lg border border-gray-100 justify-between items-center text-[11px] font-bold">
         <span>On this phone</span>
         <span>{history.length} Sessions</span>
       </div>
-      <button
-        onClick={onNewBoq}
-        className="w-full py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
-      >
-        <Plus size={14} /> Create New BOQ
-      </button>
-      {hasPurchases && (
+      <div className={`grid gap-2 ${hasPurchases ? 'grid-cols-2 lg:grid-cols-1' : 'grid-cols-1'}`}>
         <button
-          onClick={onSiteReport}
-          className="w-full py-3 bg-[var(--color-brand-dark)] text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"
+          onClick={onNewBoq}
+          className="w-full py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
         >
-          <ClipboardList size={14} /> Site report
+          <Plus size={14} /> New BOQ
         </button>
-      )}
+        {hasPurchases && (
+          <button
+            onClick={onSiteReport}
+            className="w-full py-3 bg-[var(--color-brand-dark)] text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"
+          >
+            <ClipboardList size={14} /> Site report
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -95,10 +97,10 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
             >
               <div className="flex justify-between items-start mb-4">
                 <button className="flex-1 min-w-0 text-left" onClick={() => onEdit(record)}>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-gray-900 group-hover:text-orange-600 transition-colors uppercase tracking-tight truncate underline decoration-dotted decoration-gray-300 underline-offset-4">
-                      {record.title}
-                    </h3>
+                  <h3 className="font-bold text-gray-900 group-hover:text-orange-600 transition-colors uppercase tracking-tight break-words underline decoration-dotted decoration-gray-300 underline-offset-4">
+                    {record.title}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1">
                     <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[11px] font-bold rounded uppercase shrink-0">{record.category || 'Civil'}</span>
                     <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-[11px] font-bold rounded uppercase shrink-0">{record.kind === 'audit' ? 'Purchases' : 'BOQ'}</span>
                   </div>

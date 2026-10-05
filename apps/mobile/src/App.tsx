@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { Database, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Save, Share2, ShoppingCart, Search, Trash2 } from 'lucide-react';
+import { Database, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Save, Share2, ShoppingCart, Search, Trash2, X } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { filterMaterials, guessCategory, todayISO, type MaterialFilter } from '@nirman/shared';
 import { useDialogs } from './components/Dialogs.tsx';
@@ -352,24 +352,23 @@ export default function App() {
       <p className="mx-4 md:mx-6 mt-3 text-xs text-gray-600 leading-snug">{TABS.find((t) => t.id === activeTab)!.about}</p>
 
       {showBackupReminder && (
-        <div role="status" className="mx-4 md:mx-6 mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl flex flex-wrap items-center gap-2 justify-between">
-          <p className="text-xs text-orange-900">
-            <b>Back up your data.</b> It is stored only on this phone. Last backup: {describeLastBackup()}.
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                snoozeBackupReminder();
-                setReminderTick((t) => t + 1);
-              }}
-              className="px-3 py-2 text-xs font-bold text-orange-800"
-            >
-              Later
-            </button>
-            <button onClick={() => setSettingsOpen(true)} className="px-3 py-2 bg-orange-500 text-white rounded-lg text-xs font-bold">
-              Back up now
-            </button>
-          </div>
+        <div role="status" className="mx-4 md:mx-6 mt-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-lg flex items-center gap-2 text-xs text-orange-900">
+          <span className="flex-1 min-w-0 truncate" title="Your data is stored only on this phone.">
+            Last backup: <b>{describeLastBackup()}</b>
+          </span>
+          <button onClick={() => setSettingsOpen(true)} className="font-bold text-orange-700 underline shrink-0">
+            Back up
+          </button>
+          <button
+            onClick={() => {
+              snoozeBackupReminder();
+              setReminderTick((t) => t + 1);
+            }}
+            className="p-1 text-orange-700 shrink-0"
+            aria-label="Remind me later"
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 
