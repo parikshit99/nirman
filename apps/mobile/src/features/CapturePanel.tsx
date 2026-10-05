@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   CloudOff,
   Database,
+  Keyboard,
   Image as ImageIcon,
   Loader2,
   Mic,
@@ -24,6 +25,7 @@ import { compressImage, dataUrlToBase64, readFileAsDataUrl } from '../lib/images
 import { isNative } from '../lib/platform.ts';
 import { startDictation, type SpeechLanguage } from '../lib/speech.ts';
 import { useAppState } from '../state/AppState.tsx';
+import { ManualEntry } from './ManualEntry.tsx';
 
 export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendorQuote?(): void }) {
   const { actions, status, settings, boqNotes, categoryNames, jobsFor, itemsFor } = useAppState();
@@ -34,6 +36,7 @@ export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendor
   const [sourceMenu, setSourceMenu] = useState(false);
   const [category, setCategory] = useState(categoryNames[0] ?? 'Civil');
   const [listening, setListening] = useState(false);
+  const [manual, setManual] = useState(false);
   const [language, setLanguage] = useState<SpeechLanguage>('en-IN');
   const stopDictation = useRef<(() => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -113,8 +116,8 @@ export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendor
           <p className="text-xs font-bold text-blue-900 mb-1">Works offline</p>
           <p className="text-[11px] text-blue-700 leading-normal">
             {kind === 'audit'
-              ? 'Records are stored only on this phone and work offline. Notes and photos are sent to Google Gemini to be read; offline entries wait until you are online.'
-              : 'Create a list for price quotation. Rate and total are left blank for vendor quotes.'}
+              ? 'Records are stored only on this phone. Type items in yourself with “Add item manually”, any time. Notes and photos are read by Google Gemini; when offline they wait until you are online.'
+              : 'Create a list for price quotation: type items in with “Add item manually”, or let the AI read a photo, voice note or text. Rate and total are left blank for vendor quotes.'}
           </p>
         </div>
       </div>
@@ -276,6 +279,17 @@ export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendor
             <ClipboardCheck size={20} />
             <span className="uppercase tracking-widest text-[16px]">AI Extraction</span>
           </button>
+
+          {manual ? (
+            <ManualEntry kind={kind} onClose={() => setManual(false)} />
+          ) : (
+            <button
+              onClick={() => setManual(true)}
+              className="w-full h-11 bg-white border border-[var(--color-brand-concrete)] text-[var(--color-brand-dark)] font-bold rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-gray-50"
+            >
+              <Keyboard size={16} /> Add item manually
+            </button>
+          )}
 
           {jobs.length > 0 && (
             <JobList jobs={jobs} offline={!status.online} hasKey={!!settings.geminiApiKey} onRetry={actions.retryJob} onDelete={(j) => actions.deleteJob(j.id)} />
