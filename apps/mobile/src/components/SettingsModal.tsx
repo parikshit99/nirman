@@ -15,6 +15,8 @@ import { describeLastBackup, recordBackup } from '../lib/backupReminder.ts';
 import { useAppState } from '../state/AppState.tsx';
 import { useDialogs } from './Dialogs.tsx';
 import { Sheet, SheetHeader } from './ui/Sheet.tsx';
+import { Tabs } from './ui/Tabs.tsx';
+import { setThemeChoice, themeChoice, type ThemeChoice } from '../lib/theme.ts';
 import { Button } from './ui/Button.tsx';
 
 /**
@@ -38,6 +40,7 @@ export function SettingsModal({ onClose, firstRun, onWhatsNew }: { onClose(): vo
         </button>
       ) : (
         <>
+          <AppearanceSection />
           <ReadingSection />
           <BackupSection />
           <ConversionsSection />
@@ -192,6 +195,29 @@ const READING_MODES: { mode: ReadingMode; label: string; about: string }[] = [
   { mode: 'gemini', label: 'Gemini always', about: 'Best for handwritten bills; needs internet and an API key.' },
 ];
 
+function AppearanceSection() {
+  const [choice, setChoice] = useState<ThemeChoice>(themeChoice);
+  return (
+    <section className="space-y-2">
+      <SectionTitle>Appearance</SectionTitle>
+      <Tabs<ThemeChoice>
+        label="Appearance"
+        value={choice}
+        onChange={(c) => {
+          setChoice(c);
+          setThemeChoice(c);
+        }}
+        options={[
+          { id: 'system', label: 'Phone' },
+          { id: 'light', label: 'Light' },
+          { id: 'dark', label: 'Dark' },
+        ]}
+      />
+      <p className="text-xs text-gray-500">Dark is easier on the eyes at night; Phone follows the phone's setting.</p>
+    </section>
+  );
+}
+
 function ReadingSection() {
   const { settings, actions } = useAppState();
   const dialogs = useDialogs();
@@ -291,7 +317,7 @@ function BackupSection() {
       if (!ok) return;
       setBusy(true);
       await actions.restoreBackup(backup);
-      await dialogs.alert('Backup restored');
+      dialogs.toast('Backup restored');
     } catch (err) {
       await dialogs.alert('Could not restore', err instanceof BackupError ? err.message : (err as Error).message);
     } finally {

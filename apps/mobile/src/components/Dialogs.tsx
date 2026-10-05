@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { AnimatePresence } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { AlertTriangle, Info } from 'lucide-react';
 import { Button } from './ui/Button.tsx';
 import { Sheet } from './ui/Sheet.tsx';
@@ -19,6 +19,8 @@ export interface Dialogs {
   alert(title: string, message?: string): Promise<void>;
   confirm(title: string, opts?: { message?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }): Promise<boolean>;
   prompt(title: string, defaultValue?: string): Promise<string | null>;
+  /** A short note that something worked, which fades by itself (nothing to choose). */
+  toast(message: string): void;
 }
 
 const DialogContext = createContext<Dialogs | null>(null);
@@ -33,6 +35,12 @@ export function useDialogs(): Dialogs {
 export function DialogProvider({ children }: { children: React.ReactNode }) {
   const [queue, setQueue] = useState<DialogRequest[]>([]);
   const [input, setInput] = useState('');
+  const [toast, setToast] = useState<{ id: number; message: string } | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2500);
+    return () => clearTimeout(t);
+  }, [toast]);
   const current = queue[0];
 
   useEffect(() => setInput(current?.defaultValue ?? ''), [current]);
@@ -49,6 +57,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
     },
     confirm: async (title, opts = {}) => (await open({ kind: 'confirm', title, ...opts })) === true,
     prompt: async (title, defaultValue = '') => (await open({ kind: 'prompt', title, defaultValue })) as string | null,
+    toast: (message) => setToast({ id: Date.now(), message }),
   }).current;
 
   const close = (value: boolean | string | null) => {
@@ -100,6 +109,23 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
           </Sheet>
         )}
       </AnimatePresence>
+      {/* Above the phone's bottom tab bar; polite, so a screen reader reads it without interrupting. */}
+      <div aria-live="polite" className="fixed inset-x-0 z-[110] flex justify-center px-4 pointer-events-none bottom-[calc(5.5rem+env(safe-area-inset-bottom))] lg:bottom-6">
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              key={toast.id}
+              role="status"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="max-w-sm px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-semibold shadow-lg"
+            >
+              {toast.message}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </DialogContext.Provider>
   );
 }

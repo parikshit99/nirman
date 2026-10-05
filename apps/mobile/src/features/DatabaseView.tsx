@@ -299,7 +299,7 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
                             <Tooltip
                               labelFormatter={(_, payload) => payload?.[0]?.payload?.date ?? ''}
                               labelStyle={{ fontSize: '12px' }}
-                              contentStyle={{ fontSize: '12px', borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                              contentStyle={{ fontSize: '12px', borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', backgroundColor: 'var(--color-white)', color: 'var(--color-gray-900)' }}
                               formatter={(value) => [`₹${value}`, 'Price']}
                             />
                           </AreaChart>
@@ -329,7 +329,7 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
                         </button>
                         <button
                           onClick={() => actions.deleteMaterialLater({ key: item.key, name: item.name, unit: item.unit })}
-                          className="ml-auto p-1 -mr-1 text-red-500 hover:bg-red-50 rounded-lg"
+                          className="p-2.5 -m-1.5 ml-auto text-red-500 hover:bg-red-50 rounded-lg"
                           aria-label={`Delete ${item.name}`}
                         >
                           <Trash2 size={16} />
@@ -476,10 +476,10 @@ function PriceRow({ point: p }: { point: MaterialEntry['priceHistory'][number] }
         ) : (
           draft === null && (
             <div className="flex shrink-0 -mr-1">
-              <button onClick={() => setDraft(String(p.price))} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg" aria-label={`Change price ${label}`}>
+              <button onClick={() => setDraft(String(p.price))} className="p-2.5 -m-1.5 text-gray-500 hover:bg-gray-100 rounded-lg" aria-label={`Change price ${label}`}>
                 <Pencil size={15} />
               </button>
-              <button onClick={remove} className="p-2 text-red-500 hover:bg-red-50 rounded-lg" aria-label={`Remove price ${label}`}>
+              <button onClick={remove} className="p-2.5 -m-1.5 text-red-500 hover:bg-red-50 rounded-lg" aria-label={`Remove price ${label}`}>
                 <Trash2 size={16} />
               </button>
             </div>

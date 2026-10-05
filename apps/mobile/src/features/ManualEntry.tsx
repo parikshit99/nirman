@@ -63,7 +63,7 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
     <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2" role="group" aria-label="Add item manually">
       <div className="flex items-center justify-between">
         <span className="text-xs text-gray-500 font-bold">Add item manually</span>
-        <button onClick={onClose} className="p-1 text-gray-500 hover:text-gray-600" aria-label="Close manual entry">
+        <button onClick={onClose} className="p-2.5 -m-1.5 text-gray-500 hover:text-gray-600" aria-label="Close manual entry">
           <X size={16} />
         </button>
       </div>

@@ -83,7 +83,7 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
                 <Phone size={16} />
               </a>
             )}
-            <button onClick={onClose} className="p-2 text-gray-500 hover:text-black" aria-label="Close">
+            <button onClick={onClose} className="p-2.5 -m-1.5 text-gray-500 hover:text-black" aria-label="Close">
               <X size={20} />
             </button>
           </div>
@@ -151,7 +151,7 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
                     {pending ? (
                       <UndoButton onUndo={() => actions.undoDelete(e.id)} label={KIND_LABEL[e.kind]} />
                     ) : (
-                      <button onClick={() => actions.deleteContractEntryLater(e.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg shrink-0" aria-label={`Delete ${KIND_LABEL[e.kind]} of ${e.date}`}>
+                      <button onClick={() => actions.deleteContractEntryLater(e.id)} className="p-2.5 -m-1.5 text-red-400 hover:bg-red-50 rounded-lg shrink-0" aria-label={`Delete ${KIND_LABEL[e.kind]} of ${e.date}`}>
                         <Trash2 size={14} />
                       </button>
                     )}
@@ -215,7 +215,7 @@ function EntryForm({ contract, kind, entry, onDone }: { contract: ContractRow; k
         <span className="text-xs text-gray-600 font-bold">
           {entry ? 'Edit' : 'Add'} {KIND_LABEL[kind].toLowerCase()}
         </span>
-        <button onClick={onDone} className="p-1 text-gray-500" aria-label="Cancel">
+        <button onClick={onDone} className="p-2.5 -m-1.5 text-gray-500" aria-label="Cancel">
           <X size={16} />
         </button>
       </div>

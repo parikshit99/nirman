@@ -38,7 +38,7 @@ export function QuotesView({ boqId, initial, onClose }: { boqId: string; initial
     <Sheet kind="screen" size="xl" tall scroll={false} labelledBy="quotes-title" onClose={onClose} onBack={stepBack}>
       <div className="p-4 border-b border-gray-200 bg-gray-50 flex items-center gap-3">
         {screen.name === 'review' || screen.name === 'add' ? (
-          <button onClick={back} className="p-1 text-gray-500 hover:text-black" aria-label="Back to quotes">
+          <button onClick={back} className="p-2.5 -m-1.5 text-gray-500 hover:text-black" aria-label="Back to quotes">
             <ArrowLeft size={20} />
           </button>
         ) : (
@@ -52,7 +52,7 @@ export function QuotesView({ boqId, initial, onClose }: { boqId: string; initial
             {boq.items.length} BOQ items{boq.address ? ` · ${boq.address}` : ''}
           </p>
         </div>
-        <button onClick={onClose} className="p-1 text-gray-500 hover:text-black" aria-label="Close">
+        <button onClick={onClose} className="p-2.5 -m-1.5 text-gray-500 hover:text-black" aria-label="Close">
           <X size={22} />
         </button>
       </div>
@@ -149,7 +149,7 @@ function QuoteList({ boq, quotes, onAdd, onOpen }: { boq: HistoryRecord; quotes:
                 <div className="font-bold text-sm text-gray-900 truncate">{q.vendor || 'Unnamed vendor'}</div>
                 <div className="text-xs font-mono text-gray-500">{new Date(q.quote_date).toLocaleDateString('en-IN')}</div>
               </div>
-              <button onClick={() => remove(q)} className="p-1.5 text-gray-400 hover:text-red-500" aria-label={`Delete ${q.vendor}'s quote`}>
+              <button onClick={() => remove(q)} className="p-2.5 -m-1.5 text-gray-400 hover:text-red-500" aria-label={`Delete ${q.vendor}'s quote`}>
                 <Trash2 size={16} />
               </button>
             </div>

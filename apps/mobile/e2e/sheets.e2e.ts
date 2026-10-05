@@ -61,3 +61,14 @@ test('a sheet opened from another covers the screen', async ({ page }) => {
   await contract.getByRole('button', { name: /statement/i }).click();
   await expectOnTop(page, page.getByRole('dialog', { name: 'Statement' }));
 });
+
+test('Settings → Appearance → Dark darkens the app and is remembered', async ({ page }) => {
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('tab', { name: 'Dark' }).click();
+  // The light page background is #f5f5f5.
+  const darkBackground = () =>
+    page.evaluate(() => document.documentElement.classList.contains('dark') && getComputedStyle(document.body).backgroundColor !== 'rgb(245, 245, 245)');
+  expect(await darkBackground()).toBe(true);
+  await page.reload();
+  expect(await darkBackground()).toBe(true);
+});

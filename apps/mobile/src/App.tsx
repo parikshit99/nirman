@@ -319,7 +319,10 @@ export default function App() {
       onIncomingUsed={clearCaptureShare}
       showJobs={wide}
       inSheet={!wide}
-      onQueued={() => setAddOpen(false)}
+      onQueued={() => {
+        setAddOpen(false);
+        dialogs.toast('Sent to be read. The items will appear in the list.');
+      }}
     />
   );
   const shareList = async (format: ExportFormat) => {
@@ -403,7 +406,7 @@ export default function App() {
               </>
             )}
             {canClear && (
-              <button onClick={clearCurrent} className="p-2 rounded-lg transition-all text-gray-400 hover:text-red-500 hover:bg-red-50" aria-label="Clear">
+              <button onClick={clearCurrent} className="p-2.5 rounded-lg transition-all text-gray-400 hover:text-red-500 hover:bg-red-50" aria-label="Clear">
                 <Trash2 size={16} />
               </button>
             )}
@@ -427,7 +430,7 @@ export default function App() {
               snoozeBackupReminder();
               setReminderTick((t) => t + 1);
             }}
-            className="p-1 text-orange-700 shrink-0"
+            className="p-2.5 -m-1.5 text-orange-700 shrink-0"
             aria-label="Remind me later"
           >
             <X size={14} />

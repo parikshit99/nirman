@@ -12,7 +12,7 @@ export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'dangerOutline'
 const VARIANT: Record<ButtonVariant, string> = {
   primary: 'bg-[var(--color-brand-primary)] text-white shadow-sm hover:brightness-105',
   secondary: 'bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50',
-  danger: 'bg-red-600 text-white shadow-sm hover:bg-red-700',
+  danger: 'bg-red-600 text-[#fff] shadow-sm hover:bg-red-700',
   dangerOutline: 'bg-white border border-red-200 text-red-600 shadow-sm hover:bg-red-50',
   ghost: 'text-gray-500 hover:bg-gray-100',
 };

@@ -17,7 +17,7 @@ export function PdfPreviewModal({ kind, items, notes, onDownload, onClose }: Pro
   const isAudit = kind === 'audit';
   const total = items.reduce((sum, i) => sum + (i.total_amount || 0), 0);
   return (
-    <Sheet kind="screen" size="xl" tall scroll={false} label="Document preview" onClose={onClose}>
+    <Sheet kind="screen" size="xl" tall scroll={false} label="Document preview" onClose={onClose} className="paper">
       <div className="p-4 border-b flex items-center justify-between bg-gray-50 border-gray-200 gap-2">
         <div className="flex items-center gap-3 min-w-0">
           <div className="p-2 bg-[var(--color-brand-primary)] text-white rounded-lg shrink-0">

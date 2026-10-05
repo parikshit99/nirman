@@ -146,7 +146,7 @@ export function SheetHeader({
       <div className="flex items-center gap-1 shrink-0">
         {children}
         {onClose && (
-          <button onClick={onClose} disabled={closeDisabled} className="p-1 -m-1 text-gray-500 hover:text-black disabled:opacity-40" aria-label="Close">
+          <button onClick={onClose} disabled={closeDisabled} className="p-2.5 -m-1.5 text-gray-500 hover:text-black disabled:opacity-40" aria-label="Close">
             <X size={20} />
           </button>
         )}

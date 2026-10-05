@@ -446,11 +446,11 @@ function JobList({
             {job.status !== 'processing' && (
               <div className="flex gap-1 shrink-0">
                 {job.status === 'failed' && (
-                  <button onClick={() => onRetry(job)} className="p-1.5 text-gray-500 hover:text-orange-600" aria-label="Retry">
+                  <button onClick={() => onRetry(job)} className="p-2.5 -m-1.5 text-gray-500 hover:text-orange-600" aria-label="Retry">
                     <RotateCcw size={14} />
                   </button>
                 )}
-                <button onClick={() => onDelete(job)} className="p-1.5 text-gray-500 hover:text-red-500" aria-label="Remove from queue">
+                <button onClick={() => onDelete(job)} className="p-2.5 -m-1.5 text-gray-500 hover:text-red-500" aria-label="Remove from queue">
                   <Trash2 size={14} />
                 </button>
               </div>

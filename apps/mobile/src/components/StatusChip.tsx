@@ -35,7 +35,7 @@ export function StatusChip({ onClick }: { onClick(): void }) {
       </button>
       <button
         onClick={onClick}
-        className="p-2 bg-white border border-[var(--color-brand-concrete)] rounded-full text-gray-600 shadow-sm hover:text-[var(--color-brand-dark)]"
+        className="p-2.5 bg-white border border-[var(--color-brand-concrete)] rounded-full text-gray-600 shadow-sm hover:text-[var(--color-brand-dark)]"
         aria-label="Settings"
         title="Settings"
       >
