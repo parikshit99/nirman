@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ExtractedQuoteLine, ExtractionRequest, QuoteExtractionRequest } from '@nirman/shared';
-import { DRAFT_IDS, enqueueJob, enqueueQuote, loadSnapshot, retryJob, saveDraftToHistory, updateItem, addItems } from '../src/data/repo.ts';
+import type { ExtractedQuoteLine, ExtractionRequest, QuoteExtractionRequest, TextBox } from '@nirman/shared';
+import { DRAFT_IDS, countTrainingSamples, enqueueJob, exportTrainingData, enqueueQuote, loadSnapshot, retryJob, saveDraftToHistory, updateItem, addItems } from '../src/data/repo.ts';
 import { ExtractionError, type Extractor } from '../src/lib/gemini.ts';
 import { JobWorker, MAX_TIMEOUTS, NO_KEY_MESSAGE } from '../src/jobs/worker.ts';
 import { DEFAULT_SETTINGS, type Settings } from '../src/lib/settings.ts';
@@ -10,8 +10,9 @@ const cement = { item_name: 'Cement', original_term: 'bori', quantity: 15, unit:
 
 function setup(
   behaviour: (req: ExtractionRequest) => Promise<typeof cement[]>,
-  settings: Settings = { ...DEFAULT_SETTINGS, geminiApiKey: 'AIza-test' },
+  settings: Settings = { ...DEFAULT_SETTINGS, geminiApiKey: 'AIza-test', readingMode: 'gemini' },
   quoteBehaviour: (req: QuoteExtractionRequest) => Promise<ExtractedQuoteLine[]> = async () => [],
+  readPhoto: ((image: string) => Promise<TextBox[]>) | null = null,
 ) {
   return freshDb().then((db) => {
     const calls: ExtractionRequest[] = [];
@@ -21,7 +22,7 @@ function setup(
       extract: (req) => (calls.push(req), behaviour(req)),
       extractQuote: (req) => (quoteCalls.push(req), quoteBehaviour(req)),
     };
-    const worker = new JobWorker(db, () => settings, () => {}, (key) => (keys.push(key), extractor));
+    const worker = new JobWorker(db, () => settings, () => {}, (key) => (keys.push(key), extractor), undefined, readPhoto);
     return { db, worker, calls, quoteCalls, keys, settings };
   });
 }
@@ -53,7 +54,7 @@ describe('JobWorker', () => {
   });
 
   it('waits without a key and does not call Gemini', async () => {
-    const { db, worker, calls } = await setup(async () => [cement], DEFAULT_SETTINGS);
+    const { db, worker, calls } = await setup(async () => [cement], { ...DEFAULT_SETTINGS, readingMode: 'gemini' });
     await queue(db);
     await worker.run();
     expect(calls).toHaveLength(0);
@@ -81,6 +82,62 @@ describe('JobWorker', () => {
     const snap = await loadSnapshot(db);
     expect(snap.jobs.map((j) => [j.status, j.attempts])).toEqual([['pending', 1], ['pending', 0]]);
     expect(worker.status.lastError).toMatch(/Could not reach Gemini/);
+  });
+
+  describe('reading on the phone', () => {
+    const bill = ['SHARMA TRADERS', 'Cement  50 Bags  380  19000', 'Sand  2 MT  1500  3000', 'Total  22000'];
+    const boxes = (rows: string[]): TextBox[] => rows.map((text, i) => ({ text, left: 0, top: i * 30, right: 300, bottom: i * 30 + 20 }));
+    const phoneFirst = { ...DEFAULT_SETTINGS, geminiApiKey: 'AIza-test', readingMode: 'auto' as const };
+
+    it('reads a clear printed bill on the phone, without Gemini, and keeps it for training when allowed', async () => {
+      const { db, worker, calls } = await setup(async () => [cement], { ...phoneFirst, collectTraining: true }, undefined, async () => boxes(bill));
+      worker.status.online = false;
+      await enqueueJob(db, { listId: DRAFT_IDS.audit, text: '', images: ['IMG'], category: 'Civil', captureDate: '2026-10-05' });
+      await worker.run();
+      const snap = await loadSnapshot(db);
+      expect(calls).toHaveLength(0);
+      expect(snap.jobs).toHaveLength(0);
+      expect(snap.items.map((i) => [i.item_name, i.quantity, i.unit_price, i.vendor]).sort()).toEqual([
+        ['Cement', 50, 380, 'SHARMA TRADERS'],
+        ['Sand', 2, 1500, 'SHARMA TRADERS'],
+      ]);
+      expect(await countTrainingSamples(db)).toBe(1);
+      // The export has the photo, the text read and the lines as corrected later.
+      await updateItem(db, snap.items.find((i) => i.item_name === 'Cement')!.id, { item_name: 'OPC Cement' });
+      const { jsonl, count } = await exportTrainingData(db);
+      expect(count).toBe(1);
+      const sample = JSON.parse(jsonl);
+      expect(sample).toMatchObject({ read_by: 'phone', images: ['IMG'], category: 'Civil' });
+      expect(sample.phone_text).toContain('Cement  50 Bags');
+      expect(sample.lines.map((l: { item_name: string }) => l.item_name).sort()).toEqual(['OPC Cement', 'Sand']);
+    });
+
+    it('asks Gemini when the phone is unsure, and waits for a connection to do so', async () => {
+      const { db, worker, calls } = await setup(async () => [cement], phoneFirst, undefined, async () => boxes(['scribbles', 'Cmnt 5O bgs']));
+      worker.status.online = false;
+      await enqueueJob(db, { listId: DRAFT_IDS.audit, text: '', images: ['IMG'], category: '', captureDate: '2026-10-05' });
+      await worker.run();
+      expect((await loadSnapshot(db)).jobs).toMatchObject([{ status: 'pending', attempts: 0 }]);
+      worker.status.online = true;
+      await worker.run();
+      expect(calls).toHaveLength(1);
+      expect((await loadSnapshot(db)).items.map((i) => i.item_name)).toEqual(['Cement']);
+      expect(await countTrainingSamples(db)).toBe(0);
+    });
+
+    it('uses what the phone read when there is no key, and says so when it read nothing', async () => {
+      const { db, worker, calls } = await setup(async () => [cement], { ...DEFAULT_SETTINGS, readingMode: 'auto' });
+      await queue(db, 'cement 50 bags 380');
+      await worker.run();
+      let snap = await loadSnapshot(db);
+      expect(snap.items.map((i) => [i.item_name, i.quantity, i.unit, i.unit_price])).toEqual([['Cement', 50, 'Bag', 380]]);
+      expect(calls).toHaveLength(0);
+      await enqueueJob(db, { listId: DRAFT_IDS.audit, text: 'something unclear', images: [], category: '', captureDate: '2026-10-05' });
+      await worker.run();
+      snap = await loadSnapshot(db);
+      expect(snap.jobs).toMatchObject([{ status: 'failed' }]);
+      expect(snap.jobs[0].error).toMatch(/add a Gemini API key/);
+    });
   });
 
   it('stops retrying an entry that keeps timing out, so the rest of the queue runs', async () => {

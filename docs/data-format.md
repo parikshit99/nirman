@@ -34,6 +34,7 @@ The `nirmaan` names are the original internal ids. They stay unchanged so existi
 | `contracts` | labour contract | `contractor`, `phone`, `address`, `category`, `work`; `kind`: `rate` (paid `rate` per `unit`, optional `est_quantity`) or `lump_sum` (`amount`); `retention_pct`; `start_date`; `status`: `active` or `closed`; `retention_released_at` (blank while held); `notes` |
 | `contract_entries` | something recorded on a contract | `contract_id`, `date`; `kind`: `work` (`quantity` in the contract's unit, or % of a lump sum), `payment` (`amount`, `mode`: cash / upi / bank / cheque) or `deduction` (`amount`); `note` |
 | `jobs`, `job_images` | entry waiting to be read by Gemini (with its photos as base64) | temporary; deleted once read |
+| `training_samples` | opt-in (*Keep bill photos for training*): a photographed bill kept for training an on-phone model | `engine` (`phone` or `gemini`, what read it), `ocr_text` (text the phone read), `images` (JSON array of base64 JPEGs), `item_ids` (JSON array of the `items` it became), `category`. Not in backups; exported from Settings as JSON Lines with each bill's current lines |
 | `schema_version` | — | number of migrations applied |
 
 Every list and item row also has `created_at` and `updated_at`.

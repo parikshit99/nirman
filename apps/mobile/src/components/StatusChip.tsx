@@ -1,3 +1,4 @@
+import { NO_KEY_MESSAGE } from '../jobs/worker.ts';
 import { AlertTriangle, CheckCircle2, CloudOff, KeyRound, Loader2, Settings } from 'lucide-react';
 import { useAppState } from '../state/AppState.tsx';
 
@@ -14,7 +15,7 @@ export function StatusChip({ onClick }: { onClick(): void }) {
   } else if (status.processing) {
     icon = <Loader2 size={12} className="animate-spin text-orange-500" />;
     label = 'Reading…';
-  } else if (queued && !settings.geminiApiKey) {
+  } else if (queued && !settings.geminiApiKey && status.lastError === NO_KEY_MESSAGE) {
     icon = <KeyRound size={12} className="text-orange-500" />;
     label = 'Add API key';
   } else if (status.lastError) {

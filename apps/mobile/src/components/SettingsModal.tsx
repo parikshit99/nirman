@@ -4,7 +4,7 @@ import { CheckCircle2, Download, Eye, EyeOff, KeyRound, Loader2, Settings as Set
 import { backupFilename, BackupError } from '../data/backup.ts';
 import { shareFile, textToBase64 } from '../lib/files.ts';
 import { FALLBACK_MODELS, listReadingModels, testGeminiKey, type ModelOption } from '../lib/gemini.ts';
-import { DEFAULT_MODEL } from '../lib/settings.ts';
+import { DEFAULT_MODEL, type ReadingMode } from '../lib/settings.ts';
 import { APP_VERSION } from '../lib/version.ts';
 import { latestNotes } from '../lib/whatsNew.ts';
 import { clearLog, getLog, issueUrl, logAsText, logStep } from '../lib/diagnostics.ts';
@@ -48,8 +48,8 @@ export function SettingsModal({ onClose, firstRun, onWhatsNew }: { onClose(): vo
         </div>
         {firstRun && (
           <p className="text-[11px] text-gray-500 leading-relaxed">
-            Everything you record is stored only on this phone and works offline. To read bills, notes and voice with AI, add your own
-            Google Gemini API key below. You can skip this and add it later from Settings.
+            Everything you record is stored only on this phone and works offline. Printed bills and typed lists are read on the phone. For
+            handwritten bills and vendor quotes, add your own Google Gemini API key below. You can skip this and add it later from Settings.
           </p>
         )}
         <ApiKeySection onSaved={firstRun ? onClose : undefined} />
@@ -59,6 +59,7 @@ export function SettingsModal({ onClose, firstRun, onWhatsNew }: { onClose(): vo
           </button>
         ) : (
           <>
+            <ReadingSection />
             <BackupSection />
             <ConversionsSection />
             <DiagnosticsSection />
@@ -98,7 +99,7 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
   const dirty = key.trim() !== settings.geminiApiKey || (model.trim() || DEFAULT_MODEL) !== settings.geminiModel;
 
   const save = async () => {
-    await actions.saveSettings({ geminiApiKey: key.trim(), geminiModel: model.trim() || DEFAULT_MODEL });
+    await actions.saveSettings({ ...settings, geminiApiKey: key.trim(), geminiModel: model.trim() || DEFAULT_MODEL });
     setState({ kind: 'ok', message: 'Saved' });
     onSaved?.();
   };
@@ -203,6 +204,77 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
           Save
         </button>
       </div>
+    </section>
+  );
+}
+
+const READING_MODES: { mode: ReadingMode; label: string; about: string }[] = [
+  { mode: 'auto', label: 'Phone first (recommended)', about: 'Printed bills and typed lists are read on the phone, offline and instantly; Gemini only when the phone is unsure.' },
+  { mode: 'phone', label: 'Phone only', about: 'Never sends anything to Gemini. Handwritten bills may need fixing by hand.' },
+  { mode: 'gemini', label: 'Gemini always', about: 'Best for handwritten bills; needs internet and an API key.' },
+];
+
+function ReadingSection() {
+  const { settings, actions } = useAppState();
+  const dialogs = useDialogs();
+  const [samples, setSamples] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    void actions.countTrainingSamples().then(setSamples);
+  }, [actions]);
+  const set = (patch: Partial<typeof settings>) => actions.saveSettings({ ...settings, ...patch });
+
+  const exportData = async () => {
+    setBusy(true);
+    try {
+      const { jsonl, count } = await actions.exportTrainingData();
+      if (!count) return void (await dialogs.alert('Nothing to export yet', 'Bills are kept as you read them with this switch on.'));
+      await shareFile(`nirman-training-${new Date().toISOString().slice(0, 10)}.jsonl`, textToBase64(jsonl), 'application/jsonl');
+    } catch (err) {
+      await dialogs.alert('Could not export', (err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const clear = async () => {
+    const ok = await dialogs.confirm('Delete the kept bill photos?', { message: `${samples} bills kept for training will be deleted. Your purchase lists are not affected.`, confirmLabel: 'Delete', danger: true });
+    if (!ok) return;
+    await actions.clearTrainingSamples();
+    setSamples(0);
+  };
+
+  return (
+    <section className="space-y-2">
+      <SectionTitle>How bills are read</SectionTitle>
+      <div className="space-y-1.5" role="radiogroup" aria-label="How bills are read">
+        {READING_MODES.map(({ mode, label, about }) => (
+          <label key={mode} className={`flex gap-2 p-2 rounded-xl border cursor-pointer ${settings.readingMode === mode ? 'border-orange-400 bg-orange-50' : 'border-gray-200'}`}>
+            <input type="radio" name="reading-mode" className="mt-0.5" checked={settings.readingMode === mode} onChange={() => set({ readingMode: mode })} />
+            <span className="text-[11px] text-gray-600">
+              <b className="block text-xs text-gray-800">{label}</b>
+              {about}
+            </span>
+          </label>
+        ))}
+      </div>
+      <label className="flex items-start gap-2 text-[11px] text-gray-600 pt-1">
+        <input type="checkbox" className="mt-0.5" checked={settings.collectTraining} onChange={(e) => set({ collectTraining: e.target.checked })} />
+        <span>
+          <b className="text-gray-800">Keep bill photos for training.</b> Each photographed bill is kept on this phone with the lines it became (as you correct
+          them), to train an AI that runs on the phone later. Not included in backups.
+        </span>
+      </label>
+      {!!samples && (
+        <div className="flex items-center gap-2 text-[11px]">
+          <span className="flex-1 text-gray-600">{samples} bills kept</span>
+          <button onClick={exportData} disabled={busy} className="px-3 py-1.5 bg-gray-100 rounded-lg font-bold text-gray-700 flex items-center gap-1 disabled:opacity-50">
+            {busy ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />} Export
+          </button>
+          <button onClick={clear} className="px-3 py-1.5 bg-red-50 rounded-lg font-bold text-red-600">
+            Delete
+          </button>
+        </div>
+      )}
     </section>
   );
 }
