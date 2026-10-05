@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { Download, FileCode, X } from 'lucide-react';
+import { FileCode, Share2, X } from 'lucide-react';
 import { variantLabel, type ItemRow } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
 import { useBackHandler } from '../lib/backButton.ts';
@@ -48,7 +48,7 @@ export function PdfPreviewModal({ kind, items, notes, onDownload, onClose }: Pro
               onClick={onDownload}
               className="flex items-center gap-2 px-4 py-2 bg-[var(--color-brand-primary)] text-white text-xs font-bold rounded-lg hover:brightness-110 shadow-md shadow-orange-100"
             >
-              <Download size={14} /> PDF
+              <Share2 size={14} /> Share
             </button>
             <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-lg transition-colors text-gray-500" aria-label="Close preview">
               <X size={20} />

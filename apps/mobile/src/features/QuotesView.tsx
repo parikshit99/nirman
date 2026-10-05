@@ -5,6 +5,7 @@ import { MAX_IMAGES, compareQuotes, todayISO, type QuoteRow } from '@nirman/shar
 import { useDialogs } from '../components/Dialogs.tsx';
 import { PhotoSourceSheet } from '../components/PhotoSourceSheet.tsx';
 import { chooseFromGallery, takePhoto } from '../lib/camera.ts';
+import type { IncomingShare } from '../lib/sharedFiles.ts';
 import { compressImage, dataUrlToBase64, readFileAsDataUrl } from '../lib/images.ts';
 import { isNative } from '../lib/platform.ts';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
@@ -15,14 +16,16 @@ import { useBackHandler } from '../lib/backButton.ts';
 type Screen = { name: 'list' | 'add' | 'compare' } | { name: 'review'; quoteId: string };
 
 /** Vendor quotes for one saved BOQ: add, review the AI's matching, compare vendors and past prices. */
-export function QuotesView({ boqId, onClose }: { boqId: string; onClose(): void }) {
+export function QuotesView({ boqId, initial, onClose }: { boqId: string; initial?: IncomingShare; onClose(): void }) {
   const { history, quotesFor } = useAppState();
   const boq = history.find((h) => h.id === boqId);
   const quotes = quotesFor(boqId);
   const confirmed = quotes.filter((q) => q.status === 'confirmed');
   const [screen, setScreen] = useState<Screen>(() =>
-    quotes.length === 0 ? { name: 'add' } : confirmed.length > 0 ? { name: 'compare' } : { name: 'list' },
+    quotes.length === 0 || initial ? { name: 'add' } : confirmed.length > 0 ? { name: 'compare' } : { name: 'list' },
   );
+  // Shared photos fill in the first quote only.
+  const [shared, setShared] = useState(initial);
   // Back steps out of a quote or the add form first, then closes.
   useBackHandler(() => (screen.name === 'review' || screen.name === 'add' ? setScreen({ name: 'list' }) : onClose()));
   if (!boq) return null;
@@ -75,7 +78,16 @@ export function QuotesView({ boqId, onClose }: { boqId: string; onClose(): void 
         )}
 
         <div className="flex-1 overflow-y-auto p-4">
-          {screen.name === 'add' && <AddQuote boqId={boqId} onDone={back} />}
+          {screen.name === 'add' && (
+            <AddQuote
+              boqId={boqId}
+              initial={shared}
+              onDone={() => {
+                setShared(undefined);
+                back();
+              }}
+            />
+          )}
           {screen.name === 'list' && <QuoteList boq={boq} quotes={quotes} onAdd={() => setScreen({ name: 'add' })} onOpen={(q) => setScreen({ name: 'review', quoteId: q.id })} />}
           {screen.name === 'review' && (reviewing ? <QuoteReview boq={boq} quote={reviewing} onDone={() => setScreen({ name: 'compare' })} /> : <p className="text-xs text-gray-500">This quote was deleted.</p>)}
           {screen.name === 'compare' && <QuoteCompare boq={boq} quotes={confirmed} onAdd={() => setScreen({ name: 'add' })} />}
@@ -167,13 +179,13 @@ function QuoteList({ boq, quotes, onAdd, onOpen }: { boq: HistoryRecord; quotes:
   );
 }
 
-function AddQuote({ boqId, onDone }: { boqId: string; onDone(): void }) {
+function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: IncomingShare; onDone(): void }) {
   const { actions, knownVendors } = useAppState();
   const dialogs = useDialogs();
   const [vendor, setVendor] = useState('');
   const [date, setDate] = useState(todayISO());
-  const [text, setText] = useState('');
-  const [images, setImages] = useState<string[]>([]);
+  const [text, setText] = useState(initial?.text ?? '');
+  const [images, setImages] = useState<string[]>(initial?.images.slice(0, MAX_IMAGES) ?? []);
   const [sourceMenu, setSourceMenu] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);

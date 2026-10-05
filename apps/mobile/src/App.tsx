@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { Database, Download, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Save, ShoppingCart, Search, Trash2 } from 'lucide-react';
+import { Database, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Save, Share2, ShoppingCart, Search, Trash2 } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { filterMaterials, guessCategory, todayISO, type MaterialFilter } from '@nirman/shared';
 import { useDialogs } from './components/Dialogs.tsx';
@@ -18,8 +18,12 @@ import { CapturePanel } from './features/CapturePanel.tsx';
 import { DatabaseView } from './features/DatabaseView.tsx';
 import { HistorySidebar, HistoryView } from './features/HistoryView.tsx';
 import { ItemLog } from './features/ItemLog.tsx';
-import { shareFile } from './lib/files.ts';
-import { buildPdf, pdfToBase64 } from './lib/pdf.ts';
+import { buildPdf } from './lib/pdf.ts';
+import { listSheet, pdfFile, pdfToJpegs, sheetToXlsx, type ExportFormat } from './lib/exports.ts';
+import { shareFiles } from './lib/files.ts';
+import { ShareSheet } from './components/ShareSheet.tsx';
+import { ShareTargetSheet, type ShareTarget } from './components/ShareTargetSheet.tsx';
+import { onIncomingShare, type IncomingShare } from './lib/sharedFiles.ts';
 import { useAppState, type HistoryRecord } from './state/AppState.tsx';
 
 type AppTab = 'auditor' | 'boq' | 'history' | 'database';
@@ -45,7 +49,7 @@ const kindOf = (tab: AppTab): ListKind | null => (tab === 'auditor' ? 'audit' : 
 
 export default function App() {
   const state = useAppState();
-  const { actions, history, itemDatabase, itemsFor, boqNotes, categoryNames, uniqueAddresses, settings, pendingDeletes } = state;
+  const { actions, history, itemDatabase, itemsFor, boqNotes, categoryNames, uniqueAddresses, settings, pendingDeletes, savedBoqs } = state;
   const dialogs = useDialogs();
 
   const [activeTab, setActiveTab] = useState<AppTab>('auditor');
@@ -188,13 +192,38 @@ export default function App() {
     }
   };
 
-  const downloadPdf = async () => {
+  const [shareOpen, setShareOpen] = useState(false);
+
+  // Photos or text shared from another app: first ask where they go, then hand them to that entry form.
+  const [incoming, setIncoming] = useState<IncomingShare | null>(null);
+  const [captureShare, setCaptureShare] = useState<{ kind: ListKind; share: IncomingShare } | null>(null);
+  const [quoteShare, setQuoteShare] = useState<IncomingShare | undefined>(undefined);
+  useEffect(() => onIncomingShare(setIncoming), []);
+  const routeShare = (target: ShareTarget) => {
+    if (!incoming) return;
+    if (target === 'quote') {
+      setQuoteShare(incoming);
+      setQuoteTarget('pick');
+    } else {
+      setActiveTab(target === 'audit' ? 'auditor' : 'boq');
+      setCaptureShare({ kind: target, share: incoming });
+    }
+    setIncoming(null);
+  };
+  const clearCaptureShare = useCallback(() => setCaptureShare(null), []);
+  const shareList = async (format: ExportFormat) => {
     if (!kind) return;
+    const notes = kind === 'boq' ? boqNotes : '';
+    const name = `${titlePrefix(kind)}_${todayISO()}_${Date.now() % 100000}`;
     try {
-      const doc = buildPdf(kind, activeItems, kind === 'boq' ? boqNotes : '');
-      await shareFile(`${titlePrefix(kind)}_${todayISO()}_${Date.now() % 100000}.pdf`, pdfToBase64(doc), 'application/pdf');
+      if (format === 'xlsx') {
+        await shareFiles([await sheetToXlsx(listSheet(kind, activeItems, notes), `${name}.xlsx`, kind === 'audit' ? 'Purchases' : 'BOQ', [5, 30, 14, 14, 14, 10, 8, 8, 12, 14, 20, 12])]);
+      } else {
+        const doc = buildPdf(kind, activeItems, notes);
+        await shareFiles(format === 'pdf' ? [pdfFile(doc, name)] : await pdfToJpegs(doc, name));
+      }
     } catch (err) {
-      await dialogs.alert('Could not create the PDF', (err as Error).message);
+      await dialogs.alert('Could not create the file', (err as Error).message);
     }
   };
 
@@ -268,10 +297,10 @@ export default function App() {
                   <Eye size={14} /> <span>Preview</span>
                 </button>
                 <button
-                  onClick={downloadPdf}
+                  onClick={() => setShareOpen(true)}
                   className="flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 bg-[var(--color-brand-primary)] text-white text-[11px] md:text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-md hover:brightness-110 transition-colors whitespace-nowrap"
                 >
-                  <Download size={14} /> <span>PDF</span>
+                  <Share2 size={14} /> <span>Share</span>
                 </button>
               </>
             )}
@@ -311,7 +340,15 @@ export default function App() {
       <main className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden lg:h-[calc(100vh-73px)]">
         {activeTab !== 'database' && (
           <section className="w-full lg:w-[400px] bg-white border-r border-[var(--color-brand-concrete)] flex flex-col p-4 md:p-6 lg:overflow-y-auto">
-            {kind ? <CapturePanel key={kind} kind={kind} onVendorQuote={() => setQuoteTarget('pick')} /> : <HistorySidebar onNewBoq={() => setActiveTab('boq')} />}
+            {kind ? (
+              <CapturePanel
+                key={kind}
+                kind={kind}
+                onVendorQuote={() => setQuoteTarget('pick')}
+                incoming={captureShare?.kind === kind ? captureShare.share : null}
+                onIncomingUsed={clearCaptureShare}
+              />
+            ) : <HistorySidebar onNewBoq={() => setActiveTab('boq')} />}
           </section>
         )}
 
@@ -383,13 +420,34 @@ export default function App() {
             kind={kind}
             items={activeItems}
             notes={kind === 'boq' ? boqNotes : ''}
-            onDownload={downloadPdf}
+            onDownload={() => setShareOpen(true)}
             onClose={() => setPreviewOpen(false)}
           />
         )}
+        {shareOpen && kind && <ShareSheet key="share" title={kind === 'audit' ? 'purchase list' : 'BOQ'} onShare={shareList} onClose={() => setShareOpen(false)} />}
         {settingsOpen && <SettingsModal key="settings" onClose={closeSettings} firstRun={firstRun} />}
-        {quoteTarget === 'pick' && <BoqPicker key="boq-picker" onPick={setQuoteTarget} onClose={() => setQuoteTarget(null)} />}
-        {quoteTarget && quoteTarget !== 'pick' && <QuotesView key="quotes" boqId={quoteTarget} onClose={() => setQuoteTarget(null)} />}
+        {quoteTarget === 'pick' && (
+          <BoqPicker
+            key="boq-picker"
+            onPick={setQuoteTarget}
+            onClose={() => {
+              setQuoteTarget(null);
+              setQuoteShare(undefined);
+            }}
+          />
+        )}
+        {quoteTarget && quoteTarget !== 'pick' && (
+          <QuotesView
+            key="quotes"
+            boqId={quoteTarget}
+            initial={quoteShare}
+            onClose={() => {
+              setQuoteTarget(null);
+              setQuoteShare(undefined);
+            }}
+          />
+        )}
+        {incoming && <ShareTargetSheet key="share-target" share={incoming} hasSavedBoqs={savedBoqs.length > 0} onPick={routeShare} onClose={() => setIncoming(null)} />}
       </AnimatePresence>
     </div>
   );

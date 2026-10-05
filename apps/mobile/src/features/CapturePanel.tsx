@@ -25,9 +25,21 @@ import { compressImage, dataUrlToBase64, readFileAsDataUrl } from '../lib/images
 import { isNative } from '../lib/platform.ts';
 import { startDictation, type SpeechLanguage } from '../lib/speech.ts';
 import { useAppState } from '../state/AppState.tsx';
+import type { IncomingShare } from '../lib/sharedFiles.ts';
 import { ManualEntry } from './ManualEntry.tsx';
 
-export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendorQuote?(): void }) {
+export function CapturePanel({
+  kind,
+  onVendorQuote,
+  incoming,
+  onIncomingUsed,
+}: {
+  kind: ListKind;
+  onVendorQuote?(): void;
+  /** Photos or text shared from another app, to put into this entry. */
+  incoming?: IncomingShare | null;
+  onIncomingUsed?(): void;
+}) {
   const { actions, status, settings, boqNotes, categoryNames, jobsFor, itemsFor } = useAppState();
   const dialogs = useDialogs();
   const [inputText, setInputText] = useState('');
@@ -41,6 +53,15 @@ export function CapturePanel({ kind, onVendorQuote }: { kind: ListKind; onVendor
   const stopDictation = useRef<(() => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jobs = jobsFor(kind);
+
+  const usedShare = useRef<IncomingShare | null>(null);
+  useEffect(() => {
+    if (!incoming || usedShare.current === incoming) return;
+    usedShare.current = incoming;
+    setImages((prev) => [...prev, ...incoming.images].slice(0, MAX_IMAGES));
+    if (incoming.text) setInputText((prev) => (prev ? `${prev}\n${incoming.text}` : incoming.text));
+    onIncomingUsed?.();
+  }, [incoming, onIncomingUsed]);
 
   const addImages = async (dataUrls: (string | Promise<string | null>)[]) => {
     const results = (await Promise.all(dataUrls)).filter((x): x is string => !!x);

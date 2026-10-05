@@ -32,10 +32,12 @@
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "pdfjs-dist": "^6.4.299",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.8.1",
-    "sql.js": "^1.14.2"
+    "sql.js": "^1.14.2",
+    "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.2",
