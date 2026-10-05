@@ -118,11 +118,12 @@ export class JobWorker {
   private async process(job: Job, extractor: Extractor) {
     await setJobStatus(this.db, job.id, 'processing');
     this.onDataChanged();
-    // For the diagnostic log: what kind of reading, how big, how long, how it ended; never its contents.
+    // For the diagnostic log: what kind of reading, how big, how long, how it ended, the text given and what came back.
     const started = performance.now();
     const facts: Record<string, string | number | boolean> = { kind: job.quote_id ? 'quote' : 'entry', textChars: job.text.length };
-    const logReading = (outcome: string, extra: Record<string, string | number | boolean> = {}) =>
-      log('ai', `reading ${outcome}`, { ...facts, ms: Math.round(performance.now() - started), model: this.getSettings().geminiModel, ...extra });
+    const input = job.text.trim() ? `in: ${job.text.trim().slice(0, 300)}` : '';
+    const logReading = (outcome: string, extra: Record<string, string | number | boolean> = {}, out = '') =>
+      log('ai', `reading ${outcome}`, { ...facts, ms: Math.round(performance.now() - started), model: this.getSettings().geminiModel, ...extra }, [input, out].filter(Boolean).join('\n    '));
     try {
       const images = await getJobImages(this.db, job.id);
       facts.photos = images.length;
@@ -141,7 +142,11 @@ export class JobWorker {
           logReading('empty');
         } else {
           await completeQuoteJob(this.db, job.id, lines, boq.map((b) => b.id));
-          logReading('ok', { lines: lines.length, matched: lines.filter((l) => l.boq_sr).length, boqItems: boq.length });
+          logReading(
+            'ok',
+            { lines: lines.length, matched: lines.filter((l) => l.boq_sr).length, boqItems: boq.length },
+            `out: ${lines.map((l) => `#${l.boq_sr ?? '-'} ${l.item_name} ${l.quantity ?? ''} ${l.unit ?? ''} @${l.unit_price}`).join('; ')}`,
+          );
         }
         return;
       }
@@ -157,7 +162,11 @@ export class JobWorker {
         logReading('empty');
       } else {
         await completeJob(this.db, job.id, items);
-        logReading('ok', { lines: items.length, converted: items.filter((i) => i.ordered_as).length });
+        logReading(
+          'ok',
+          { lines: items.length, converted: items.filter((i) => i.ordered_as).length },
+          `out: ${items.map((i) => `${i.item_name} ${i.quantity} ${i.unit} @${i.unit_price}${i.vendor ? ` ${i.vendor}` : ''}${i.ordered_as ? ` (${i.ordered_as})` : ''}`).join('; ')}`,
+        );
       }
     } catch (err) {
       const e = classifyError(err);

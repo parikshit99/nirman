@@ -13,11 +13,11 @@ import * as repo from '../data/repo.ts';
 import { DRAFT_IDS, type Job, type ListKind, type Snapshot } from '../data/repo.ts';
 import type { Db } from '../data/sql.ts';
 import type { JobWorker, WorkerStatus } from '../jobs/worker.ts';
-import { logError, logPerf, logStep, timed } from '../lib/diagnostics.ts';
+import { describe, logError, logPerf, logStep, timed } from '../lib/diagnostics.ts';
 
 /**
- * Log each action (its name and time taken, never its arguments) for the
- * diagnostic log, and any error it throws.
+ * Log each action for the diagnostic log: its name, time taken and what it
+ * was given (photos left out), and any error it throws.
  */
 function instrument<T extends Record<string, unknown>>(actions: T, skip: string[]): T {
   const out: Record<string, unknown> = { ...actions };
@@ -25,9 +25,10 @@ function instrument<T extends Record<string, unknown>>(actions: T, skip: string[
     if (typeof fn !== 'function' || skip.includes(name)) continue;
     out[name] = (...args: unknown[]) => {
       const start = performance.now();
+      const detail = args.length ? describe(args) : undefined;
       const done = () => {
         const ms = performance.now() - start;
-        logStep(name, ms >= 50 ? { ms: Math.round(ms) } : undefined);
+        logStep(name, ms >= 50 ? { ms: Math.round(ms) } : undefined, detail);
         if (ms >= 800) logPerf(name, ms);
       };
       try {
@@ -39,7 +40,7 @@ function instrument<T extends Record<string, unknown>>(actions: T, skip: string[
               return value;
             },
             (err) => {
-              logError(err, name);
+              logError(err, name, detail);
               throw err;
             },
           );
@@ -47,7 +48,7 @@ function instrument<T extends Record<string, unknown>>(actions: T, skip: string[
         done();
         return result;
       } catch (err) {
-        logError(err, name);
+        logError(err, name, detail);
         throw err;
       }
     };

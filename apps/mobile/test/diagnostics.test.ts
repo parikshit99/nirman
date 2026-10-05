@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clearLog, getLog, issueUrl, log, logAsText, logError, scrub } from '../src/lib/diagnostics.ts';
+import { clearLog, describe as describeValue, getLog, issueUrl, log, logAsText, logError, logStep, scrub } from '../src/lib/diagnostics.ts';
 
 describe('diagnostic log', () => {
   it('never keeps an API key, and caps the size', () => {
@@ -23,5 +23,19 @@ describe('diagnostic log', () => {
     expect(body).toContain('Crashed when sharing');
     expect(body).toContain('TypeError: x is undefined');
     expect(logAsText()).toContain('saveDraftToHistory number 299');
+  });
+
+  it('records what a step worked on, without photos or the API key', () => {
+    clearLog();
+    const photo = 'A'.repeat(5000);
+    const detail = describeValue([{ item_name: 'OPC Cement 53', unit_price: 380, vendor: 'Sharma Traders', image: `data:image/jpeg;base64,${photo}`, raw: photo, geminiApiKey: 'secret' }]);
+    expect(detail).toContain('OPC Cement 53');
+    expect(detail).toContain('380');
+    expect(detail).not.toContain('AAAA');
+    expect(detail).not.toContain('secret');
+    expect(detail).toContain('kB]');
+    logStep('addItems', undefined, detail);
+    expect(logAsText()).toContain('Sharma Traders');
+    expect(decodeURIComponent(issueUrl('parikshit99/nirman').split('&body=')[1])).toContain('OPC Cement 53');
   });
 });

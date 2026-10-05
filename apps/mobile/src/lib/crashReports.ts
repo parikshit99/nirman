@@ -13,7 +13,7 @@ export const setCrashReportsEnabled = (on: boolean) => prefs.set(PREF, on);
 
 /**
  * Automatic crash reports: errors only, with the app version, phone details
- * and the last steps from the diagnostic log. Breadcrumbs that could carry
+ * and the last steps from the diagnostic log (with what they worked on). Breadcrumbs that could carry
  * typed text or request URLs are dropped, and nothing is sent while the
  * switch in Settings is off.
  */
@@ -31,7 +31,7 @@ export async function startCrashReports() {
       if (!crashReportsEnabled()) return null;
       if (event.request) delete event.request.url;
       for (const ex of event.exception?.values ?? []) if (ex.value) ex.value = scrub(ex.value);
-      event.extra = { ...event.extra, steps: getLog().filter((e) => e.kind !== 'error').slice(-20).map((e) => `${e.t} ${e.kind} ${e.msg}`) };
+      event.extra = { ...event.extra, steps: getLog().filter((e) => e.kind !== 'error').slice(-20).map((e) => `${e.t} ${e.kind} ${e.msg}${e.detail ? ` ${e.detail}` : ''}`) };
       return event;
     },
   });
