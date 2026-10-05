@@ -146,6 +146,21 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE items ADD COLUMN ordered_as TEXT NOT NULL DEFAULT '';
   `,
+  // 8: no new columns. Rates indexed from an unsaved purchase list had no site; take it from the saved list with the same line.
+  `
+  UPDATE indexed_rates SET
+    address = COALESCE((SELECT l.address FROM items i JOIN lists l ON l.id = i.list_id
+      WHERE l.kind = 'audit' AND l.status = 'saved' AND l.address != ''
+        AND LOWER(TRIM(i.item_name)) = LOWER(TRIM(indexed_rates.item_name)) AND i.unit_price = indexed_rates.price
+        AND (i.date = indexed_rates.date OR i.date = '') AND LOWER(CASE WHEN i.vendor = '' THEN 'Unknown' ELSE i.vendor END) = LOWER(indexed_rates.vendor)
+      ORDER BY l.updated_at DESC LIMIT 1), ''),
+    category = CASE WHEN category != '' THEN category ELSE COALESCE((SELECT l.category FROM items i JOIN lists l ON l.id = i.list_id
+      WHERE l.kind = 'audit' AND l.status = 'saved' AND l.category != ''
+        AND LOWER(TRIM(i.item_name)) = LOWER(TRIM(indexed_rates.item_name)) AND i.unit_price = indexed_rates.price
+        AND (i.date = indexed_rates.date OR i.date = '') AND LOWER(CASE WHEN i.vendor = '' THEN 'Unknown' ELSE i.vendor END) = LOWER(indexed_rates.vendor)
+      ORDER BY l.updated_at DESC LIMIT 1), '') END
+  WHERE address = ''
+  `,
 ];
 
 /** Default categories sort before anything the user adds. */

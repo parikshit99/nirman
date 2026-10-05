@@ -166,6 +166,35 @@ describe('local repository', () => {
     expect(entry.priceHistory).toHaveLength(2);
   });
 
+  it('gives rates indexed before saving the site of the list they were saved in', async () => {
+    const db = await freshDb();
+    await addItems(db, DRAFT_IDS.audit, [cement, sand]);
+    await indexRates(db, [cement, { ...cement, item_name: 'Steel', unit_price: 60 }]);
+    await saveDraftToHistory(db, 'audit', meta);
+    const sites = (await loadSnapshot(db)).rates.map((r) => [r.item_name, r.address, r.category]).sort();
+    expect(sites).toEqual([
+      ['Cement', 'Sector 44', 'Civil'],
+      ['Steel', '', ''],
+    ]);
+    // Rates indexed with a site keep it.
+    await indexRates(db, [{ ...cement, unit_price: 510, address: 'DLF 3', category: 'Finishing' }]);
+    await addItems(db, DRAFT_IDS.audit, [{ ...cement, unit_price: 510 }]);
+    await saveDraftToHistory(db, 'audit', meta);
+    expect((await loadSnapshot(db)).rates.find((r) => r.price === 510)?.address).toBe('DLF 3');
+  });
+
+  it('migration 8 fills the site of rates already indexed without one', async () => {
+    const db = await freshDb();
+    await indexRates(db, [cement]);
+    await addItems(db, DRAFT_IDS.audit, [cement]);
+    await saveDraftToHistory(db, 'audit', meta);
+    await db.run(`UPDATE indexed_rates SET address = '', category = ''`);
+    await db.run('UPDATE schema_version SET version = 7');
+    await migrateLocal(db);
+    const [rate] = (await loadSnapshot(db)).rates;
+    expect([rate.address, rate.category]).toEqual(['Sector 44', 'Civil']);
+  });
+
   it('renames a material everywhere, merging duplicates and remembering the old words', async () => {
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.audit, [cement, { ...cement, item_name: 'OPC Cement', original_term: 'cement bag', unit_price: 510 }]);
