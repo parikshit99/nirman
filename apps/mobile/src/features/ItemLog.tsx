@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { AlertTriangle, Calendar, Check, FileCode, HardHat, History, Pencil, Trash2, Truck, X, Zap } from 'lucide-react';
+import { AlertTriangle, Calendar, Check, FileCode, HardHat, History, Pencil, Plus, Trash2, Truck, Zap } from 'lucide-react';
 import { VARIANT_FIELDS, materialKey, parseAmount, todayISO, variantLabel, variantMatches, type ItemRow, type MaterialEntry } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { DeliveredToggle } from '../components/DeliveredToggle.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
 import { QuantityHelper } from '../components/QuantityHelper.tsx';
 import { VariantFields } from '../components/VariantFields.tsx';
+import { Button } from '../components/ui/Button.tsx';
+import { EmptyState } from '../components/ui/EmptyState.tsx';
 import type { ItemPatch, ListKind } from '../data/repo.ts';
 import { useBackHandler } from '../lib/backButton.ts';
 import { useAppState } from '../state/AppState.tsx';
@@ -15,14 +17,16 @@ interface Props {
   kind: ListKind;
   items: ItemRow[];
   searching: boolean;
-  /** Indexing saves the purchase list to History (asking its site and work type); Data reads prices from there. */
+  /** Saving a rate saves the purchase list (asking its site and work type); Rates reads prices from there. */
   onIndex(): void;
+  /** Opens the entry form (phones), offered when the list is empty. */
+  onAdd?(): void;
 }
 
 const rupees = (n: number) => `₹${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
 /** The current Audit or BOQ list: one card per item, sized for a phone screen. */
-export function ItemLog({ kind, items, searching, onIndex }: Props) {
+export function ItemLog({ kind, items, searching, onIndex, onAdd }: Props) {
   const { actions, itemDatabase, itemsFor, pendingDeletes } = useAppState();
   const dialogs = useDialogs();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -82,14 +86,20 @@ export function ItemLog({ kind, items, searching, onIndex }: Props) {
         <div className="divide-y divide-gray-100 min-h-[200px]">
           <AnimatePresence initial={false}>
             {items.length === 0 ? (
-              <div className="p-12 md:p-20 flex flex-col items-center justify-center text-gray-300">
-                {isAudit ? <HardHat size={48} strokeWidth={1} /> : <FileCode size={48} strokeWidth={1} />}
-                <p className="mt-4 font-mono text-sm uppercase tracking-widest text-center">
-                  {searching ? 'No match in search' : 'No items yet'}
-                  <br />
-                  <span className="text-xs normal-case">{searching ? 'Try clearing filters' : 'Add items with a photo, voice or text'}</span>
-                </p>
-              </div>
+              <EmptyState
+                icon={isAudit ? HardHat : FileCode}
+                title={searching ? 'No items match.' : 'No items yet.'}
+                action={
+                  !searching &&
+                  onAdd && (
+                    <Button variant="primary" onClick={onAdd}>
+                      <Plus size={16} /> Add {isAudit ? 'purchases' : 'items'}
+                    </Button>
+                  )
+                }
+              >
+                {searching ? 'Check the search.' : 'Add items with a photo, voice or text, or type one in.'}
+              </EmptyState>
             ) : (
               items.map((item) => (
                 <motion.div
@@ -140,22 +150,30 @@ export function ItemLog({ kind, items, searching, onIndex }: Props) {
                           <input aria-label="Vendor" className={field} value={draft.vendor} onChange={set('vendor')} placeholder="Vendor" />
                         </label>
                       )}
-                      <div className="flex items-center justify-between gap-2 pt-1">
-                        {isAudit ? (
-                          <span className="text-sm font-mono font-bold text-orange-600">
-                            Total {rupees((parseAmount(draft.quantity) ?? 0) * (parseAmount(draft.unit_price) ?? 0))}
-                          </span>
-                        ) : (
-                          <span />
-                        )}
-                        <div className="flex gap-2">
-                          <button onClick={() => setEditingId(null)} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-bold flex items-center gap-1" aria-label="Cancel">
-                            <X size={16} /> Cancel
-                          </button>
-                          <button onClick={saveEdit} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold flex items-center gap-1" aria-label="Save changes">
-                            <Check size={16} /> Save
-                          </button>
-                        </div>
+                      {isAudit && (
+                        <p className="text-sm font-mono font-bold text-orange-600 pt-1">
+                          Total {rupees((parseAmount(draft.quantity) ?? 0) * (parseAmount(draft.unit_price) ?? 0))}
+                        </p>
+                      )}
+                      {/* Delete lives here, not on every row, so it isn't tapped by accident (Undo still follows). */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <Button
+                          variant="dangerOutline"
+                          size="sm"
+                          aria-label={`Delete ${item.item_name}`}
+                          onClick={() => {
+                            setEditingId(null);
+                            actions.deleteItemLater(item.id);
+                          }}
+                        >
+                          <Trash2 size={14} /> Delete
+                        </Button>
+                        <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setEditingId(null)} aria-label="Cancel">
+                          Cancel
+                        </Button>
+                        <Button variant="primary" size="sm" onClick={saveEdit} aria-label="Save changes">
+                          <Check size={14} /> Save
+                        </Button>
                       </div>
                     </div>
                   ) : (
@@ -167,7 +185,6 @@ export function ItemLog({ kind, items, searching, onIndex }: Props) {
                       onIndex={onIndex}
                       onDelivered={(date) => actions.setDelivered([item.id], date)}
                       pendingDelete={pendingDeletes.has(item.id)}
-                      onDelete={() => actions.deleteItemLater(item.id)}
                       onUndo={() => actions.undoDelete(item.id)}
                     />
                   )}
@@ -179,13 +196,13 @@ export function ItemLog({ kind, items, searching, onIndex }: Props) {
       </div>
 
       <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-[var(--color-brand-concrete)] rounded-full text-xs uppercase font-mono tracking-widest text-gray-500 shadow-sm order-2 sm:order-1">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-[var(--color-brand-concrete)] rounded-full text-xs text-gray-500 shadow-sm order-2 sm:order-1 font-semibold">
           <History size={12} /> {items.length} {items.length === 1 ? 'item' : 'items'}
         </div>
         {isAudit && undelivered.length > 0 && (
           <button
             onClick={() => actions.setDelivered(undelivered.map((i) => i.id), todayISO())}
-            className="w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-4 py-3 bg-white border border-green-300 text-green-800 text-xs font-bold uppercase tracking-widest rounded-xl"
+            className="w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-4 py-3 bg-white border border-green-300 text-green-800 text-xs font-bold uppercase tracking-wider rounded-xl"
           >
             <Check size={14} /> Mark all delivered
           </button>
@@ -193,10 +210,10 @@ export function ItemLog({ kind, items, searching, onIndex }: Props) {
         {isAudit && indexable.length > 0 && (
           <button
             onClick={onIndex}
-            className="w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-br from-orange-500 to-orange-600 text-white text-xs font-bold uppercase tracking-widest rounded-xl shadow-lg shadow-orange-100 transition-all active:scale-95"
-            title="Save this purchase list to History; its rates go into Data"
+            className="w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-br from-orange-500 to-orange-600 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-lg shadow-orange-100 transition-all active:scale-95"
+            title="Save this purchase list; its rates go into Rates"
           >
-            <Zap size={14} fill="currentColor" /> Index all rates
+            <Zap size={14} fill="currentColor" /> Save all rates
           </button>
         )}
       </div>
@@ -220,11 +237,10 @@ interface CardProps {
   onIndex(): void;
   onDelivered(date: string): void;
   pendingDelete: boolean;
-  onDelete(): void;
   onUndo(): void;
 }
 
-function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendingDelete, onDelete, onUndo }: CardProps) {
+function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendingDelete, onUndo }: CardProps) {
   if (pendingDelete) {
     return (
       <div className="flex items-center gap-3 min-h-[44px]">
@@ -255,7 +271,7 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendin
           <div className="flex items-start justify-between gap-2">
             <span className="font-bold text-sm text-[var(--color-brand-dark)] flex items-center gap-1.5 min-w-0">
               <span className="truncate">{item.item_name}</span>
-              <Pencil size={12} className="text-gray-300 shrink-0" />
+              <Pencil size={12} className="text-gray-500 shrink-0" />
             </span>
             {isAudit && <span className="font-mono font-bold text-sm text-[var(--color-brand-dark)] shrink-0">{rupees(item.total_amount)}</span>}
           </div>
@@ -276,11 +292,8 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendin
                 <Calendar size={12} /> {item.date}
               </span>
             )}
-            {item.original_term && item.original_term !== item.item_name && <span className="italic text-gray-400 truncate">“{item.original_term}”</span>}
+            {item.original_term && item.original_term !== item.item_name && <span className="italic text-gray-500 truncate">“{item.original_term}”</span>}
           </div>
-        </button>
-        <button onClick={onDelete} className="p-2 -mr-2 -mt-1 text-red-500 hover:bg-red-50 rounded-xl shrink-0" aria-label={`Delete ${item.item_name}`}>
-          <Trash2 size={18} />
         </button>
       </div>
 
@@ -289,15 +302,15 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendin
           <DeliveredToggle name={item.item_name} deliveredAt={item.delivered_at} onChange={onDelivered} />
           {isIndexed ? (
             <span className="flex items-center gap-1 text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100">
-              <Check size={12} /> Indexed
+              <Check size={12} /> Rate saved
             </span>
           ) : (
             <button
               onClick={onIndex}
               className="flex items-center gap-1 text-xs font-bold text-orange-700 hover:text-white hover:bg-orange-500 px-2 py-0.5 rounded border border-orange-200 transition-all"
-              title="Save this purchase list to History; its rates go into Data"
+              title="Save this purchase list; its rates go into Rates"
             >
-              <Zap size={12} /> Index rate
+              <Zap size={12} /> Save rate
             </button>
           )}
           {dbMatch && dbMatch.latestPrice > 0 && !isIndexed && (

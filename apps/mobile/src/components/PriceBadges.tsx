@@ -9,7 +9,7 @@ export function VsLastBadge({ vsLast, last }: { vsLast: number | null; last: Pri
   if (vsLast === null || !last) return null;
   const tone = Math.abs(vsLast) < 0.005 ? 'bg-gray-100 text-gray-600' : vsLast > 0 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700';
   return (
-    <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-bold ${tone}`} title={`Last recorded ${rupees(last.price)} on ${shortDate(last.date)} from ${last.vendor}`}>
+    <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-bold ${tone}`} title={`Last recorded ${rupees(last.price)} on ${shortDate(last.date)} from ${last.vendor}`}>
       {pct(vsLast)} vs last {rupees(last.price)} ({shortDate(last.date)}, {last.vendor})
     </span>
   );

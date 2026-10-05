@@ -2,6 +2,23 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 4.0 — A new look for phones
+
+**Easier to use on a phone**
+- The five sections are now a **bar at the bottom** of the screen, within reach of your thumb, and they have clearer names: **Purchases, BOQ, Labour, Rates** (was Data) and **Saved** (was History).
+- The top of the screen is much smaller, so more of your list fits. The total spent and the Save, Preview, Share and Clear buttons stay at the top while you scroll.
+- **Your list comes first.** Tap the orange **Add** button to photograph a bill, speak or type what was bought, or add an item by hand. What you half-typed is kept if you close it, and readings in progress show above the list.
+- To **delete an item**, tap it and use Delete next to Save (Undo still appears). No more red bin on every line to tap by mistake.
+- **Dark mode**: Settings → Appearance → Phone, Light or Dark. The PDF preview stays white, like the file.
+- **Easier to read**: larger small text, plain labels instead of spaced-out capitals, darker grey text, and bigger buttons for close, delete and retry.
+- One look everywhere: every pop-up opens the same way, keeps clear of Android's gesture bar, and Back closes it (but not while something is being saved or shared). Tapping outside a form no longer closes it and loses what you typed. Orange marks the one main button on each screen.
+- Clearer words: *Save list* (name, site address, work type, date), *Save rate* (was Index rate), *Read items* (says why it's greyed out), *Work type* everywhere, also in Excel and PDF files.
+- Short notes such as "Backup restored" appear for a moment at the bottom instead of a box to dismiss.
+- Fixed: on narrow phones (320–360 px) the Share and Clear buttons were cut off; Saved said "No matching sessions" when nothing had been saved.
+
+**Since 3.0**
+- **Bills are read on the phone first**, with no internet or API key; Gemini reads what the phone can't (Settings → How bills are read). Optionally keep bill photos for training. Settings → Model lists the models your key can use.
+
 ## 3.1 — Bills read on the phone
 
 - **Bills are now read on the phone first**, with no internet or API key. Printed bills (photographed) and typed lists like "cement 50 bags 380" become lines in about a second, with vendor, date, quantities, rates and amounts, your learned corrections, and TMT / tile conversions.

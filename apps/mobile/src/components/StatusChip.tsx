@@ -10,7 +10,7 @@ export function StatusChip({ onClick }: { onClick(): void }) {
   let icon = <CheckCircle2 size={12} className="text-green-500" />;
   let label = 'Online';
   if (!status.online) {
-    icon = <CloudOff size={12} className="text-gray-400" />;
+    icon = <CloudOff size={12} className="text-gray-500" />;
     label = queued ? `Offline · ${queued} queued` : 'Offline';
   } else if (status.processing) {
     icon = <Loader2 size={12} className="animate-spin text-orange-500" />;
@@ -28,14 +28,14 @@ export function StatusChip({ onClick }: { onClick(): void }) {
       <button
         onClick={onClick}
         title={status.lastError ?? undefined}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[var(--color-brand-concrete)] rounded-full text-[11px] md:text-[11px] uppercase font-mono tracking-widest text-gray-500 shadow-sm whitespace-nowrap"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[var(--color-brand-concrete)] rounded-full text-xs uppercase tracking-wider text-gray-500 shadow-sm whitespace-nowrap"
         aria-label={`Status: ${label}`}
       >
         {icon} {label}
       </button>
       <button
         onClick={onClick}
-        className="p-2 bg-white border border-[var(--color-brand-concrete)] rounded-full text-gray-600 shadow-sm hover:text-[var(--color-brand-dark)]"
+        className="p-2.5 bg-white border border-[var(--color-brand-concrete)] rounded-full text-gray-600 shadow-sm hover:text-[var(--color-brand-dark)]"
         aria-label="Settings"
         title="Settings"
       >

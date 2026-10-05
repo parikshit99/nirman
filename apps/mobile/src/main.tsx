@@ -21,7 +21,10 @@ import { connectivity } from './lib/connectivity.ts';
 import { isNative } from './lib/platform.ts';
 import { AppStateProvider, type Services } from './state/AppState.tsx';
 import { settingsStore } from './lib/settings.ts';
+import { installTheme } from './lib/theme.ts';
 import './index.css';
+
+installTheme();
 
 async function openDatabase(): Promise<Db> {
   if (isNative) return openCapacitorSqlite('nirmaan');

@@ -23,7 +23,7 @@ export function DeliveredToggle({ name, deliveredAt, onChange }: { name: string;
         value={deliveredAt}
         max={todayISO()}
         onChange={(e) => e.target.value && onChange(e.target.value)}
-        className="bg-transparent font-mono text-[11px] outline-none w-[7.5rem]"
+        className="bg-transparent font-mono text-xs outline-none w-[7.5rem]"
       />
       <button onClick={() => onChange('')} className="px-1.5 py-0.5 text-green-800 hover:text-red-600" aria-label={`Mark ${name} not delivered`}>
         <X size={12} />

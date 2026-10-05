@@ -38,9 +38,18 @@ export function CapturePanel({
   onVendorQuote,
   incoming,
   onIncomingUsed,
+  onQueued,
+  showJobs = true,
+  inSheet = false,
 }: {
   kind: ListKind;
   onVendorQuote?(): void;
+  /** After an entry is sent to be read (the add sheet closes so the list shows). */
+  onQueued?(): void;
+  /** False when the readings in progress are shown beside the list instead. */
+  showJobs?: boolean;
+  /** Inside the Add sheet, which has its own title. */
+  inSheet?: boolean;
   /** Photos or text shared from another app, to put into this entry. */
   incoming?: IncomingShare | null;
   onIncomingUsed?(): void;
@@ -135,23 +144,21 @@ export function CapturePanel({
     });
     setInputText('');
     setImages([]);
+    onQueued?.();
   };
 
 
   return (
     <>
       {itemsFor(kind).length === 0 && (
-      <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-start gap-3">
-        <Database size={18} className="text-blue-500 mt-0.5 shrink-0" />
-        <div>
-          <p className="text-xs font-bold text-blue-900 mb-1">Works offline</p>
-          <p className="text-[11px] text-blue-700 leading-normal">
+        <div className="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-start gap-3">
+          <Database size={18} className="text-gray-500 mt-0.5 shrink-0" />
+          <p className="text-xs text-gray-600 leading-normal">
             {kind === 'audit'
-              ? 'Records are stored only on this phone. Type items in yourself with “Add item manually”, any time. Notes and photos are read by Google Gemini; when offline they wait until you are online.'
-              : 'Create a list for price quotation: type items in with “Add item manually”, or let the AI read a photo, voice note or text. Rate and total are left blank for vendor quotes.'}
+              ? 'Everything is stored only on this phone. Type items in with “Add item manually”, or add a bill photo, voice note or text: the phone reads it first, and Gemini helps with what it can’t read (when you are online).'
+              : 'A list for price quotes: type items in with “Add item manually”, or let a photo, voice note or text be read. Rate and total are left blank for vendors.'}
           </p>
         </div>
-      </div>
       )}
 
       {kind === 'boq' && onVendorQuote && (
@@ -162,7 +169,7 @@ export function CapturePanel({
           <Truck size={20} className="text-orange-500 shrink-0" />
           <span>
             <span className="block text-xs font-bold text-gray-900">Vendor quote received</span>
-            <span className="block text-[11px] text-gray-500 leading-normal">
+            <span className="block text-xs text-gray-500 leading-normal">
               Scan a vendor's reply, in any format, and match it to a saved BOQ to compare prices.
             </span>
           </span>
@@ -170,9 +177,11 @@ export function CapturePanel({
       )}
 
       <div className="mb-8">
-        <h2 className="text-xs font-mono uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
-          <Plus size={12} /> New {kind === 'audit' ? 'Purchase' : 'BOQ'} Entry
-        </h2>
+        {!inSheet && (
+          <h2 className="text-xs text-gray-500 mb-4 flex items-center gap-2 font-semibold">
+            <Plus size={12} /> New {kind === 'audit' ? 'purchase' : 'BOQ'} entry
+          </h2>
+        )}
 
         <div className="space-y-4">
           {manual ? (
@@ -219,24 +228,24 @@ export function CapturePanel({
                   {images.length < MAX_IMAGES && (
                     <button
                       onClick={addPhoto}
-                      className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-gray-500 hover:text-gray-500 transition-all bg-white/50"
+                      className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 text-gray-500 hover:border-gray-500 hover:text-gray-500 transition-all bg-white/50"
                     >
                       <Plus size={20} />
-                      <span className="text-[11px] font-bold uppercase">Add More</span>
+                      <span className="text-xs font-bold uppercase">Add more</span>
                     </button>
                   )}
                 </div>
-                <p className="text-center text-[11px] font-mono text-orange-600 font-bold uppercase tracking-widest leading-none">
-                  {images.length}/{MAX_IMAGES} Images Added
+                <p className="text-center text-xs text-orange-600 font-bold leading-none">
+                  {images.length} of {MAX_IMAGES} photos added
                 </p>
               </div>
             ) : (
               <button className="text-center" onClick={addPhoto}>
-                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 mx-auto mb-2">
+                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 mx-auto mb-2">
                   {isNative ? <Camera size={24} /> : <ImageIcon size={24} />}
                 </div>
-                <p className="text-sm font-medium text-gray-600">{isNative ? 'Take or Choose Photos' : 'Drop Bills or Choose Photos'}</p>
-                <p className="text-[11px] text-gray-400 uppercase tracking-wider font-mono">Up to {MAX_IMAGES} images for one entry</p>
+                <p className="text-sm font-medium text-gray-600">{isNative ? 'Take or choose bill photos' : 'Choose bill photos'}</p>
+                <p className="text-xs text-gray-500 font-semibold">Up to {MAX_IMAGES} photos for one bill</p>
               </button>
             )}
             <input
@@ -254,14 +263,14 @@ export function CapturePanel({
 
           <div className="space-y-2">
             <div className="flex justify-between items-center gap-2">
-              <label htmlFor="capture-text" className="text-[11px] font-mono uppercase tracking-wider text-gray-500 font-bold">
-                Input Details
+              <label htmlFor="capture-text" className="text-xs text-gray-500 font-bold">
+                Or type or speak it
               </label>
               <div className="flex gap-2">
                 {inputText && (
                   <button
                     onClick={() => setInputText('')}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-bold uppercase bg-gray-100 text-gray-400 hover:text-red-500"
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-bold uppercase bg-gray-100 text-gray-500 hover:text-red-500"
                   >
                     <X size={10} /> Clear
                   </button>
@@ -269,18 +278,18 @@ export function CapturePanel({
                 <button
                   onClick={() => setLanguage((l) => (l === 'en-IN' ? 'hi-IN' : 'en-IN'))}
                   disabled={listening}
-                  className="px-2 py-1 rounded-md text-[11px] font-bold uppercase bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-50"
+                  className="px-2 py-1 rounded-md text-xs font-bold uppercase bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-50"
                   title="Voice input language"
                 >
                   {language === 'en-IN' ? 'EN' : 'हिं'}
                 </button>
                 <button
                   onClick={toggleListening}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-bold uppercase transition-all
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-bold uppercase transition-all
                     ${listening ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
                 >
                   {listening ? <MicOff size={10} /> : <Mic size={10} />}
-                  {listening ? 'Stop' : 'Voice Input'}
+                  {listening ? 'Stop' : 'Voice'}
                 </button>
               </div>
             </div>
@@ -289,13 +298,13 @@ export function CapturePanel({
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder={kind === 'audit' ? "Example: '15 bori cement bought for 7500'" : "Example: 'Item: Brickwork, Quantity: 500 sqft, Rate: 45'"}
-              className="w-full h-32 p-4 bg-gray-50 border border-[var(--color-brand-concrete)] rounded-xl text-sm focus:ring-1 focus:ring-[var(--color-brand-primary)] focus:border-[var(--color-brand-primary)] outline-none transition-all resize-none font-mono"
+              className="w-full h-32 p-4 bg-gray-50 border border-[var(--color-brand-concrete)] rounded-xl text-sm focus:ring-1 focus:ring-[var(--color-brand-primary)] focus:border-[var(--color-brand-primary)] outline-none transition-all resize-none"
             />
           </div>
 
           <div className="flex items-center gap-3">
-            <label htmlFor="capture-category" className="text-[11px] font-mono uppercase tracking-wider text-gray-500 font-bold shrink-0">
-              Work Type
+            <label htmlFor="capture-category" className="text-xs text-gray-500 font-bold shrink-0">
+              Work type
             </label>
             <select
               id="capture-category"
@@ -319,10 +328,11 @@ export function CapturePanel({
             className="w-full h-12 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl flex items-center justify-center gap-3 hover:brightness-110 active:scale-[0.98] transition-all disabled:grayscale disabled:opacity-50 shadow-lg shadow-orange-100"
           >
             <ClipboardCheck size={20} />
-            <span className="uppercase tracking-widest text-[16px]">AI Extraction</span>
+            <span className="text-base font-semibold">Read items</span>
           </button>
+          {!inputText.trim() && images.length === 0 && <p className="text-xs text-gray-500 text-center -mt-2">Add a bill photo or type what {kind === 'audit' ? 'was bought' : 'you need'} first.</p>}
 
-          {jobs.length > 0 && (
+          {showJobs && jobs.length > 0 && (
             <JobList jobs={jobs} current={status.current} offline={!status.online} hasKey={!!settings.geminiApiKey || settings.readingMode !== 'gemini'} onRetry={actions.retryJob} onDelete={(j) => actions.deleteJob(j.id)} />
           )}
         </div>
@@ -365,11 +375,11 @@ function BoqNotes({ notes, onChange }: { notes: string; onChange(n: string): voi
   return (
     <div className="space-y-2 pt-2">
       <div className="flex justify-between items-end">
-        <label htmlFor="boq-notes" className="text-[11px] font-mono uppercase tracking-wider text-blue-500 font-bold">
+        <label htmlFor="boq-notes" className="text-xs text-blue-500 font-bold">
           General Specifications
         </label>
         {value && (
-          <button onClick={() => update('')} className="text-[11px] font-bold text-blue-400 hover:text-red-500 uppercase tracking-tighter">
+          <button onClick={() => update('')} className="text-xs font-bold text-blue-400 hover:text-red-500 uppercase tracking-tighter">
             Clear All
           </button>
         )}
@@ -379,9 +389,19 @@ function BoqNotes({ notes, onChange }: { notes: string; onChange(n: string): voi
         value={value}
         onChange={(e) => update(e.target.value)}
         placeholder="Enter color codes, finishes (glossy/matt), or specific brand requests here for the PDF..."
-        className="w-full h-24 p-3 bg-blue-50/50 border border-blue-100 rounded-xl text-[11px] focus:ring-1 focus:ring-blue-400 outline-none transition-all resize-none"
+        className="w-full h-24 p-3 bg-blue-50/50 border border-blue-100 rounded-xl text-xs focus:ring-1 focus:ring-blue-400 outline-none transition-all resize-none"
       />
     </div>
+  );
+}
+
+/** Entries being read (or waiting to be), for the list's kind. */
+export function QueuedReadings({ kind }: { kind: ListKind }) {
+  const { actions, status, settings, jobsFor } = useAppState();
+  const jobs = jobsFor(kind);
+  if (jobs.length === 0) return null;
+  return (
+    <JobList jobs={jobs} current={status.current} offline={!status.online} hasKey={!!settings.geminiApiKey || settings.readingMode !== 'gemini'} onRetry={actions.retryJob} onDelete={(j) => actions.deleteJob(j.id)} />
   );
 }
 
@@ -402,17 +422,17 @@ function ReadingBar({ current, photos }: { current: ReadingProgress; photos: num
     <div className="mt-1 space-y-1" role="status" aria-live="polite">
       <div className="flex items-center gap-1.5 flex-wrap">
         <span
-          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${phone ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}
+          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${phone ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}
         >
           {phone ? <Smartphone size={10} /> : <Sparkles size={10} />} {phone ? 'On phone' : 'Gemini'}
         </span>
         <span className="text-gray-600">{current.step}</span>
-        {!phone && <span className="text-gray-400 font-mono">{seconds}s</span>}
+        {!phone && <span className="text-gray-500 font-mono">{seconds}s</span>}
       </div>
       <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value * 100)}>
         <div className={`h-full transition-all duration-500 ${phone ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${Math.max(4, value * 100)}%` }} />
       </div>
-      {!phone && current.model && <div className="text-[10px] text-gray-400 font-mono truncate">{current.model}</div>}
+      {!phone && current.model && <div className="text-xs text-gray-500 font-mono truncate">{current.model}</div>}
     </div>
   );
 }
@@ -435,7 +455,7 @@ function JobList({
   const waitingReason = !hasKey ? 'Add your Gemini API key in Settings' : offline ? 'Will be read when online' : 'Queued';
   return (
     <div className="space-y-2">
-      <div className="text-[11px] font-mono uppercase tracking-widest text-gray-400">Extraction Queue</div>
+      <div className="text-xs text-gray-500 font-semibold">Extraction Queue</div>
       {jobs.map((job) => {
         const label = job.text ? `“${job.text.slice(0, 60)}${job.text.length > 60 ? '…' : ''}”` : '';
         const photos = job.image_count ? `${job.image_count} photo${job.image_count > 1 ? 's' : ''}` : '';
@@ -444,7 +464,7 @@ function JobList({
         return (
           <div
             key={job.id}
-            className={`p-3 rounded-xl border text-[11px] flex items-start gap-3
+            className={`p-3 rounded-xl border text-xs flex items-start gap-3
               ${job.status === 'failed' ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'}`}
           >
             <div className="mt-0.5 shrink-0">
@@ -453,7 +473,7 @@ function JobList({
               ) : job.status === 'failed' ? (
                 <AlertTriangle size={14} className="text-red-500" />
               ) : (
-                <CloudOff size={14} className="text-gray-400" />
+                <CloudOff size={14} className="text-gray-500" />
               )}
             </div>
             <div className="flex-1 min-w-0">
@@ -461,7 +481,7 @@ function JobList({
               {reading ? (
                 <ReadingBar current={reading} photos={job.image_count} />
               ) : (
-                <div className={`text-[11px] ${job.status === 'failed' ? 'text-red-600' : 'text-gray-500'}`}>
+                <div className={`text-xs ${job.status === 'failed' ? 'text-red-600' : 'text-gray-500'}`}>
                   {job.status === 'processing' ? 'Reading…' : job.status === 'failed' ? job.error : waitingReason}
                 </div>
               )}
@@ -469,11 +489,11 @@ function JobList({
             {!busy && (
               <div className="flex gap-1 shrink-0">
                 {job.status === 'failed' && (
-                  <button onClick={() => onRetry(job)} className="p-1.5 text-gray-500 hover:text-orange-600" aria-label="Retry">
+                  <button onClick={() => onRetry(job)} className="p-2.5 -m-1.5 text-gray-500 hover:text-orange-600" aria-label="Retry">
                     <RotateCcw size={14} />
                   </button>
                 )}
-                <button onClick={() => onDelete(job)} className="p-1.5 text-gray-400 hover:text-red-500" aria-label="Remove from queue">
+                <button onClick={() => onDelete(job)} className="p-2.5 -m-1.5 text-gray-500 hover:text-red-500" aria-label="Remove from queue">
                   <Trash2 size={14} />
                 </button>
               </div>

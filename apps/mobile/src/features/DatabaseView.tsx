@@ -2,20 +2,33 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { Check, ChevronDown, Database, Download, GitMerge, Pencil, TrendingUp, Trash2, Truck, X } from 'lucide-react';
-import { materialDatabaseToCSV, materialFilterOptions, materialKey, parseAmount, similarMaterials, todayISO, variantLabel, type MaterialEntry, type MaterialFilter } from '@nirman/shared';
+import {
+  materialDatabaseToCSV,
+  materialFilterOptions,
+  materialKey,
+  parseAmount,
+  similarMaterials,
+  todayISO,
+  variantLabel,
+  type MaterialEntry,
+  type MaterialFilter,
+} from '@nirman/shared';
 import { FilterChips } from '../components/FilterChips.tsx';
 import { MaterialFilters } from '../components/MaterialFilters.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
 import { shareFile, textToBase64 } from '../lib/files.ts';
 import { useAppState } from '../state/AppState.tsx';
-import { useBackHandler } from '../lib/backButton.ts';
+import { Button } from '../components/ui/Button.tsx';
+import { EmptyState } from '../components/ui/EmptyState.tsx';
+import { Tabs } from '../components/ui/Tabs.tsx';
+import { Sheet, SheetHeader } from '../components/ui/Sheet.tsx';
 
 type SubTab = 'materials' | 'categories';
 
 const SUB_TABS: { id: SubTab; label: string; about: string }[] = [
-  { id: 'materials', label: 'Materials', about: 'One card per material. Tap Prices to fix or remove a price, Edit to rename or merge duplicates, or 🗑 to delete it from Data.' },
-  { id: 'categories', label: 'Categories', about: 'Types of work (e.g. Earthwork) you can tag a saved purchase list or BOQ with, to filter by later.' },
+  { id: 'materials', label: 'Materials', about: 'One card per material. Tap Prices to fix or remove a price, Edit to rename or merge duplicates, or 🗑 to delete it from Rates.' },
+  { id: 'categories', label: 'Work types', about: 'Types of work (e.g. Earthwork) you can tag a saved purchase list or BOQ with, to filter by later.' },
 ];
 
 interface Props {
@@ -32,18 +45,7 @@ export function DatabaseView(props: Props) {
   const [tab, setTab] = useState<SubTab>('materials');
   return (
     <div className="space-y-6">
-      <div className="flex border-b border-gray-200 overflow-x-auto no-scrollbar">
-        {SUB_TABS.map(({ id, label }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={`px-4 md:px-6 py-3 text-xs font-bold uppercase tracking-widest transition-all border-b-2 whitespace-nowrap
-              ${tab === id ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <Tabs<SubTab> label="Rates" options={SUB_TABS} value={tab} onChange={setTab} className="md:max-w-sm" />
       <p className="text-xs text-gray-600 leading-snug -mt-3">{SUB_TABS.find((t) => t.id === tab)!.about}</p>
       {tab === 'materials' && <Materials {...props} />}
       {tab === 'categories' && <Categories />}
@@ -95,12 +97,11 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
     setBulk({ unit: '', vendor: '', price: '' });
   };
 
-  /** Delete materials from Data after confirming; true when done. */
+  /** Delete materials from Rates after confirming; true when done. */
   const deleteFromData = async (materials: MaterialEntry[]) => {
     if (materials.length === 0) return false;
-    const ok = await dialogs.confirm(materials.length === 1 ? `Delete “${materials[0].name}” from Data?` : `Delete ${materials.length} materials from Data?`, {
-      message:
-        'Their prices leave Data and price checks. Saved purchase lists and BOQs in History stay as they are, and new purchases show up again. Restore from Settings → On this phone.',
+    const ok = await dialogs.confirm(materials.length === 1 ? `Delete “${materials[0].name}” from Rates?` : `Delete ${materials.length} materials from Rates?`, {
+      message: 'Their prices leave Rates and price checks. Saved purchase lists and BOQs stay as they are, and new purchases show up again. Restore from Settings → On this phone.',
       confirmLabel: 'Delete',
       danger: true,
     });
@@ -123,112 +124,112 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
 
   return (
     <>
-      <FilterChips
-        categories={categoryNames}
-        categoryFilter={categoryFilter}
-        onCategory={onCategory}
-        addresses={uniqueAddresses}
-        addressFilter={addressFilter}
-        onAddress={onAddress}
-        addressLabel="Filter by Project Location"
-      />
-      <MaterialFilters value={materialFilter} options={materialFilterOptions(itemDatabase)} onChange={onMaterialFilter} />
+      {totalMaterials > 0 && (
+        <>
+          <FilterChips
+            categories={categoryNames}
+            categoryFilter={categoryFilter}
+            onCategory={onCategory}
+            addresses={uniqueAddresses}
+            addressFilter={addressFilter}
+            onAddress={onAddress}
+            addressLabel="Filter by site"
+          />
+          <MaterialFilters value={materialFilter} options={materialFilterOptions(itemDatabase)} onChange={onMaterialFilter} />
+        </>
+      )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => {
-              setSelectMode(!selectMode);
-              setSelected(new Set());
-            }}
-            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all border
-              ${selectMode ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
-          >
-            {selectMode ? 'Cancel Selection' : 'Select Items'}
-          </button>
-          {selectMode && selected.size > 0 && (
-            <div className="text-[11px] font-mono font-bold text-orange-600 flex items-center bg-orange-50 px-3 rounded-lg border border-orange-100">
-              {selected.size} Selected
-            </div>
-          )}
-          <button
-            onClick={exportCsv}
-            className="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all border bg-white text-green-600 border-green-200 hover:border-green-400 hover:bg-green-50 flex items-center gap-1.5"
-          >
-            <Download size={12} /> Export CSV
-          </button>
-          {!selectMode && entries.length > 0 && (
+      {totalMaterials > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => deleteFromData(entries)}
-              className="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all border bg-white text-red-600 border-red-200 hover:border-red-400 hover:bg-red-50 flex items-center gap-1.5"
+              onClick={() => {
+                setSelectMode(!selectMode);
+                setSelected(new Set());
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border
+              ${selectMode ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
             >
-              <Trash2 size={12} /> {entries.length === totalMaterials ? 'Delete all' : `Delete ${entries.length} shown`}
+              {selectMode ? 'Cancel selection' : 'Select items'}
             </button>
-          )}
-        </div>
-
-        <AnimatePresence>
-          {selectMode && selected.size > 0 && (
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="flex flex-wrap items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200 shadow-sm"
+            {selectMode && selected.size > 0 && (
+              <div className="text-xs font-mono font-bold text-orange-600 flex items-center bg-orange-50 px-3 rounded-lg border border-orange-100">{selected.size} selected</div>
+            )}
+            <button
+              onClick={exportCsv}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border bg-white text-green-600 border-green-200 hover:border-green-400 hover:bg-green-50 flex items-center gap-1.5"
             >
-              <input
-                placeholder="New Unit"
-                value={bulk.unit}
-                onChange={(e) => setBulk((p) => ({ ...p, unit: e.target.value }))}
-                className="px-2 py-1 text-[11px] border border-gray-200 rounded w-16 outline-none focus:border-orange-300"
-              />
-              <input
-                placeholder="Vendor"
-                value={bulk.vendor}
-                onChange={(e) => setBulk((p) => ({ ...p, vendor: e.target.value }))}
-                className="px-2 py-1 text-[11px] border border-gray-200 rounded w-20 outline-none focus:border-orange-300"
-              />
-              <input
-                inputMode="decimal"
-                placeholder="Today's price"
-                value={bulk.price}
-                onChange={(e) => setBulk((p) => ({ ...p, price: e.target.value }))}
-                className="px-2 py-1 text-[11px] border border-gray-200 rounded w-16 outline-none focus:border-orange-300"
-              />
-              <button onClick={applyBulk} className="bg-orange-500 text-white px-3 py-1 rounded text-[11px] font-bold uppercase hover:bg-orange-600">
-                Apply
-              </button>
+              <Download size={12} /> Export CSV
+            </button>
+            {!selectMode && entries.length > 0 && (
               <button
-                onClick={async () => {
-                  if (await deleteFromData(itemDatabase.filter((e) => selected.has(e.key)))) {
-                    setSelected(new Set());
-                    setSelectMode(false);
-                  }
-                }}
-                className="bg-white text-red-600 border border-red-200 px-3 py-1 rounded text-[11px] font-bold uppercase hover:bg-red-50 flex items-center gap-1"
+                onClick={() => deleteFromData(entries)}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border bg-white text-red-600 border-red-200 hover:border-red-400 hover:bg-red-50 flex items-center gap-1.5"
               >
-                <Trash2 size={11} /> Delete
+                <Trash2 size={12} /> {entries.length === totalMaterials ? 'Delete all' : `Delete ${entries.length} shown`}
               </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+            )}
+          </div>
+
+          <AnimatePresence>
+            {selectMode && selected.size > 0 && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="flex flex-wrap items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200 shadow-sm"
+              >
+                <input
+                  placeholder="New Unit"
+                  value={bulk.unit}
+                  onChange={(e) => setBulk((p) => ({ ...p, unit: e.target.value }))}
+                  className="px-2 py-1 text-xs border border-gray-200 rounded w-16 outline-none focus:border-orange-300"
+                />
+                <input
+                  placeholder="Vendor"
+                  value={bulk.vendor}
+                  onChange={(e) => setBulk((p) => ({ ...p, vendor: e.target.value }))}
+                  className="px-2 py-1 text-xs border border-gray-200 rounded w-20 outline-none focus:border-orange-300"
+                />
+                <input
+                  inputMode="decimal"
+                  placeholder="Today's price"
+                  value={bulk.price}
+                  onChange={(e) => setBulk((p) => ({ ...p, price: e.target.value }))}
+                  className="px-2 py-1 text-xs border border-gray-200 rounded w-16 outline-none focus:border-orange-300"
+                />
+                <button onClick={applyBulk} className="bg-orange-500 text-white px-3 py-1 rounded text-xs font-bold uppercase hover:bg-orange-600">
+                  Apply
+                </button>
+                <button
+                  onClick={async () => {
+                    if (await deleteFromData(itemDatabase.filter((e) => selected.has(e.key)))) {
+                      setSelected(new Set());
+                      setSelectMode(false);
+                    }
+                  }}
+                  className="bg-white text-red-600 border border-red-200 px-3 py-1 rounded text-xs font-bold uppercase hover:bg-red-50 flex items-center gap-1"
+                >
+                  <Trash2 size={11} /> Delete
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm w-full divide-y divide-gray-100">
         {entries.length === 0 ? (
-          <div className="p-10 text-center text-gray-400 space-y-2">
-            <Database size={40} className="mx-auto opacity-30" />
-            {totalMaterials > 0 ? (
-              <p className="text-sm">No materials match the search or filters.</p>
-            ) : (
-              <>
-                <p className="text-sm font-bold text-gray-600">No prices yet</p>
-                <p className="text-xs leading-relaxed max-w-sm mx-auto">
-                  Prices appear here when you save a purchase list (Save button), tap <b>Index</b> on a purchase (which saves the list to History), or confirm a vendor quote.
-                  {unsavedPriced > 0 && ` Your purchase list has ${unsavedPriced} priced item${unsavedPriced === 1 ? '' : 's'} not added yet.`}
-                </p>
-              </>
-            )}
-          </div>
+          totalMaterials > 0 ? (
+            <EmptyState icon={Database} title="No materials match.">
+              Check the filters or search.
+            </EmptyState>
+          ) : (
+            <EmptyState icon={Database} title="No prices yet">
+              Prices appear here when you save a purchase list (Save button), tap <b>Save rate</b> on a purchase (which saves the list), or confirm a vendor quote.
+              {unsavedPriced > 0 && ` Your purchase list has ${unsavedPriced} priced item${unsavedPriced === 1 ? '' : 's'} not added yet.`}
+            </EmptyState>
+          )
         ) : (
           entries.map((item, idx) => {
             const points = item.priceHistory.filter((h) => h.price > 0);
@@ -282,7 +283,7 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
                           <Truck size={12} /> {v}
                         </span>
                       ))}
-                      {item.vendors.length === 0 && <span className="text-xs text-gray-400 italic">No vendor yet</span>}
+                      {item.vendors.length === 0 && <span className="text-xs text-gray-500 italic">No vendor yet</span>}
                     </div>
                     {points.length > 1 && item.variants.length <= 1 && (
                       <div className="h-12 w-full">
@@ -298,7 +299,7 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
                             <Tooltip
                               labelFormatter={(_, payload) => payload?.[0]?.payload?.date ?? ''}
                               labelStyle={{ fontSize: '12px' }}
-                              contentStyle={{ fontSize: '12px', borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                              contentStyle={{ fontSize: '12px', borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', backgroundColor: 'var(--color-white)', color: 'var(--color-gray-900)' }}
                               formatter={(value) => [`₹${value}`, 'Price']}
                             />
                           </AreaChart>
@@ -328,7 +329,7 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
                         </button>
                         <button
                           onClick={() => actions.deleteMaterialLater({ key: item.key, name: item.name, unit: item.unit })}
-                          className="ml-auto p-1 -mr-1 text-red-500 hover:bg-red-50 rounded-lg"
+                          className="p-2.5 -m-1.5 ml-auto text-red-500 hover:bg-red-50 rounded-lg"
                           aria-label={`Delete ${item.name}`}
                         >
                           <Trash2 size={16} />
@@ -349,8 +350,9 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
         <TrendingUp className="text-orange-500 shrink-0" />
         <div>
           <h4 className="text-xs font-bold text-gray-700">Where prices come from</h4>
-          <p className="text-[11px] text-gray-500">
-            Saved purchase lists (Save or Index), rates indexed on their own by earlier versions, and confirmed vendor quotes. Fixing or removing a price from a saved list changes that list too.
+          <p className="text-xs text-gray-500">
+            Saved purchase lists (Save or Save rate), rates saved on their own by earlier versions, and confirmed vendor quotes. Fixing or removing a price from a saved list
+            changes that list too.
           </p>
         </div>
       </div>
@@ -474,10 +476,10 @@ function PriceRow({ point: p }: { point: MaterialEntry['priceHistory'][number] }
         ) : (
           draft === null && (
             <div className="flex shrink-0 -mr-1">
-              <button onClick={() => setDraft(String(p.price))} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg" aria-label={`Change price ${label}`}>
+              <button onClick={() => setDraft(String(p.price))} className="p-2.5 -m-1.5 text-gray-500 hover:bg-gray-100 rounded-lg" aria-label={`Change price ${label}`}>
                 <Pencil size={15} />
               </button>
-              <button onClick={remove} className="p-2 text-red-500 hover:bg-red-50 rounded-lg" aria-label={`Remove price ${label}`}>
+              <button onClick={remove} className="p-2.5 -m-1.5 text-red-500 hover:bg-red-50 rounded-lg" aria-label={`Remove price ${label}`}>
                 <Trash2 size={16} />
               </button>
             </div>
@@ -491,7 +493,6 @@ function PriceRow({ point: p }: { point: MaterialEntry['priceHistory'][number] }
 function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClose(): void }) {
   const { actions, itemDatabase, hiddenMaterials } = useAppState();
   const dialogs = useDialogs();
-  useBackHandler(onClose);
   const [name, setName] = useState(material.name);
   const [unit, setUnit] = useState(material.unit);
   const others = itemDatabase.filter((e) => e.key !== material.key);
@@ -521,7 +522,7 @@ function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClos
     const hidden = hiddenMaterials.find((h) => h.id === key);
     if (hidden) {
       const ok = await dialogs.confirm(`“${hidden.name}” per ${hidden.unit} is hidden`, {
-        message: 'Saving merges into it and shows it in Data again, with both price histories.',
+        message: 'Saving merges into it and shows it in Rates again, with both price histories.',
         confirmLabel: 'Merge and unhide',
       });
       if (!ok) return;
@@ -537,70 +538,64 @@ function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClos
 
   const field = 'mt-1 w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500';
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div role="dialog" aria-modal="true" aria-labelledby="material-editor-title" className="bg-white w-full max-w-md rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto space-y-5">
-        <div className="flex justify-between items-start">
-          <h3 id="material-editor-title" className="font-bold text-gray-900 uppercase tracking-widest text-sm">Edit material</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-black" aria-label="Close">
-            <X size={20} />
-          </button>
+    <Sheet labelledBy="material-editor-title" onClose={onClose} className="p-5 space-y-5">
+      <SheetHeader id="material-editor-title" title="Edit material" onClose={onClose} />
+
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <label className="block flex-1 min-w-0">
+            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Name</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
+          </label>
+          <label className="block w-24">
+            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Unit</span>
+            <input value={unit} onChange={(e) => setUnit(e.target.value)} className={field} />
+          </label>
         </div>
-
-        <div className="space-y-3">
-          <div className="flex gap-2">
-            <label className="block flex-1 min-w-0">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Name</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
-            </label>
-            <label className="block w-24">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Unit</span>
-              <input value={unit} onChange={(e) => setUnit(e.target.value)} className={field} />
-            </label>
-          </div>
-          <p className="text-[11px] text-gray-500">
-            Changes its {material.priceHistory.length === 1 ? 'price' : `${material.priceHistory.length} prices`} and the lines in saved lists. Using the name and unit of another material merges the two.
-          </p>
-          <button onClick={save} className="w-full h-11 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl text-xs uppercase tracking-widest">
-            Save
-          </button>
-        </div>
-
-        {similar.length > 0 && (
-          <section>
-            <h4 className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-2">Same thing under another name?</h4>
-            <ul className="space-y-1.5">
-              {similar.map((e) => (
-                <li key={e.key} className="flex items-center justify-between gap-2 p-2 border border-gray-200 rounded-xl">
-                  <span className="min-w-0 text-sm">
-                    <span className="font-bold block break-words">{e.name}</span>
-                    {e.variants.some((v) => v.label) && (
-                      <span className="text-xs font-bold text-gray-700 block break-words">
-                        {e.variants.map((v) => v.label).filter(Boolean).join(' / ')}
-                      </span>
-                    )}
-                    <span className="text-xs text-gray-500">
-                      per {e.unit} · {e.priceHistory.length ? `₹${Math.round(e.latestPrice).toLocaleString('en-IN')} latest` : 'no prices'}
-                    </span>
-                  </span>
-                  <button onClick={() => mergeInto(e)} className="shrink-0 px-3 py-2 text-xs font-bold text-orange-700 bg-orange-50 rounded-lg flex items-center gap-1">
-                    <GitMerge size={13} /> Merge into this
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        <section className="pt-3 border-t border-gray-100">
-          <button onClick={hide} className="w-full py-2.5 text-xs font-bold text-red-600 bg-red-50 rounded-xl flex items-center justify-center gap-2">
-            <Trash2 size={14} /> Delete from Data
-          </button>
-          <p className="text-[11px] text-gray-500 mt-1.5">
-            Removes its prices from Data and price checks. Saved lists in History don't change, and new purchases show up again. Restore it in Settings.
-          </p>
-        </section>
+        <p className="text-xs text-gray-500">
+          Changes its {material.priceHistory.length === 1 ? 'price' : `${material.priceHistory.length} prices`} and the lines in saved lists. Using the name and unit of another
+          material merges the two.
+        </p>
+        <Button variant="primary" block onClick={save}>
+          Save
+        </Button>
       </div>
-    </motion.div>
+
+      {similar.length > 0 && (
+        <section>
+          <h4 className="text-xs font-bold text-gray-500 mb-2">Same thing under another name?</h4>
+          <ul className="space-y-1.5">
+            {similar.map((e) => (
+              <li key={e.key} className="flex items-center justify-between gap-2 p-2 border border-gray-200 rounded-xl">
+                <span className="min-w-0 text-sm">
+                  <span className="font-bold block break-words">{e.name}</span>
+                  {e.variants.some((v) => v.label) && (
+                    <span className="text-xs font-bold text-gray-700 block break-words">
+                        {e.variants.map((v) => v.label).filter(Boolean).join(' / ')}
+                    </span>
+                  )}
+                  <span className="text-xs text-gray-500">
+                    per {e.unit} · {e.priceHistory.length ? `₹${Math.round(e.latestPrice).toLocaleString('en-IN')} latest` : 'no prices'}
+                  </span>
+                </span>
+                <button onClick={() => mergeInto(e)} className="shrink-0 px-3 py-2 text-xs font-bold text-orange-700 bg-orange-50 rounded-lg flex items-center gap-1">
+                  <GitMerge size={13} /> Merge into this
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="pt-3 border-t border-gray-100">
+        <button onClick={hide} className="w-full py-2.5 text-xs font-bold text-red-600 bg-red-50 rounded-xl flex items-center justify-center gap-2">
+          <Trash2 size={14} /> Delete from Rates
+        </button>
+        <p className="text-xs text-gray-500 mt-1.5">
+          Removes its prices from Rates and price checks. Saved lists don't change, and new purchases show up again. Restore it in Settings.
+        </p>
+      </section>
+    </Sheet>
   );
 }
 
@@ -614,8 +609,8 @@ function Categories() {
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm max-w-2xl mx-auto">
       <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-        <div className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Work Categories</div>
-        <div className="text-[11px] font-mono text-gray-500">{snapshot.categories.length} Total</div>
+        <div className="text-xs font-bold text-gray-500">Work types</div>
+        <div className="text-xs font-mono text-gray-500">{snapshot.categories.length} Total</div>
       </div>
       <div className="p-6">
         <div className="flex gap-2 mb-6">
@@ -626,7 +621,7 @@ function Categories() {
             placeholder="Add new category (e.g. Earthwork)"
             className="flex-1 min-w-0 px-4 py-2 border border-gray-200 rounded-xl outline-none font-mono text-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all"
           />
-          <button onClick={add} className="px-6 py-2 bg-orange-500 text-white font-bold rounded-xl text-xs uppercase tracking-widest hover:bg-orange-600 transition-colors">
+          <button onClick={add} className="px-6 py-2 bg-orange-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-orange-600 transition-colors">
             Add
           </button>
         </div>
@@ -636,7 +631,7 @@ function Categories() {
               <span className="text-xs font-bold text-gray-700">{cat.name}</span>
               <button
                 onClick={() => actions.deleteCategory(cat.id)}
-                className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
                 aria-label={`Delete ${cat.name}`}
               >
                 <X size={12} />

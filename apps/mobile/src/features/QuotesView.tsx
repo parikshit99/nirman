@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { motion } from 'motion/react';
 import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, Image as ImageIcon, Loader2, Plus, RotateCcw, Trash2, Truck, X } from 'lucide-react';
 import { MAX_IMAGES, compareQuotes, parseAmount, todayISO, variantLabel, type QuoteRow } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
@@ -11,7 +10,9 @@ import { isNative } from '../lib/platform.ts';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
 import { QuoteCompare } from './QuoteCompare.tsx';
 import { QuoteReview } from './QuoteReview.tsx';
-import { useBackHandler } from '../lib/backButton.ts';
+import { Sheet } from '../components/ui/Sheet.tsx';
+import { Tabs } from '../components/ui/Tabs.tsx';
+import { Button } from '../components/ui/Button.tsx';
 
 type Screen = { name: 'list' | 'add' | 'compare' } | { name: 'review'; quoteId: string };
 
@@ -27,75 +28,66 @@ export function QuotesView({ boqId, initial, onClose }: { boqId: string; initial
   // Shared photos fill in the first quote only.
   const [shared, setShared] = useState(initial);
   // Back steps out of a quote or the add form first, then closes.
-  useBackHandler(() => (screen.name === 'review' || screen.name === 'add' ? setScreen({ name: 'list' }) : onClose()));
+  const stepBack = () => (screen.name === 'review' || screen.name === 'add' ? setScreen({ name: 'list' }) : onClose());
   if (!boq) return null;
 
   const reviewing = screen.name === 'review' ? quotes.find((q) => q.id === screen.quoteId) : undefined;
   const back = () => setScreen({ name: 'list' });
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center md:p-4 bg-black/70 backdrop-blur-sm"
-    >
-      <div role="dialog" aria-modal="true" aria-labelledby="quotes-title" className="bg-white w-full max-w-5xl h-full md:h-[90vh] md:rounded-2xl flex flex-col shadow-2xl overflow-hidden">
-        <div className="p-4 border-b border-gray-200 bg-gray-50 flex items-center gap-3">
-          {screen.name === 'review' || screen.name === 'add' ? (
-            <button onClick={back} className="p-1 text-gray-500 hover:text-black" aria-label="Back to quotes">
-              <ArrowLeft size={20} />
-            </button>
-          ) : (
-            <div className="p-2 bg-[var(--color-brand-primary)] text-white rounded-lg shrink-0">
-              <Truck size={18} />
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <h3 id="quotes-title" className="text-sm font-bold truncate">Vendor quotes · {boq.title || 'Untitled BOQ'}</h3>
-            <p className="text-[11px] text-gray-500 font-mono truncate">
-              {boq.items.length} BOQ items{boq.address ? ` · ${boq.address}` : ''}
-            </p>
-          </div>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-black" aria-label="Close">
-            <X size={22} />
+    <Sheet kind="screen" size="xl" tall scroll={false} labelledBy="quotes-title" onClose={onClose} onBack={stepBack}>
+      <div className="p-4 border-b border-gray-200 bg-gray-50 flex items-center gap-3">
+        {screen.name === 'review' || screen.name === 'add' ? (
+          <button onClick={back} className="p-2.5 -m-1.5 text-gray-500 hover:text-black" aria-label="Back to quotes">
+            <ArrowLeft size={20} />
           </button>
-        </div>
-
-        {(screen.name === 'list' || screen.name === 'compare') && (
-          <nav className="flex gap-1 p-2 border-b border-gray-100" aria-label="Quote views">
-            {(['compare', 'list'] as const).map((name) => (
-              <button
-                key={name}
-                onClick={() => setScreen({ name })}
-                aria-current={screen.name === name ? 'page' : undefined}
-                className={`flex-1 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider ${screen.name === name ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'}`}
-              >
-                {name === 'compare' ? `Compare (${confirmed.length})` : `Quotes (${quotes.length})`}
-              </button>
-            ))}
-          </nav>
+        ) : (
+          <div className="p-2 bg-[var(--color-brand-primary)] text-white rounded-lg shrink-0">
+            <Truck size={18} />
+          </div>
         )}
-
-        <div className="flex-1 overflow-y-auto p-4">
-          {screen.name === 'add' && (
-            <AddQuote
-              boqId={boqId}
-              initial={shared}
-              onDone={(reviewQuoteId) => {
-                setShared(undefined);
-                // A typed quote opens straight in review, to check and confirm.
-                if (reviewQuoteId) setScreen({ name: 'review', quoteId: reviewQuoteId });
-                else back();
-              }}
-            />
-          )}
-          {screen.name === 'list' && <QuoteList boq={boq} quotes={quotes} onAdd={() => setScreen({ name: 'add' })} onOpen={(q) => setScreen({ name: 'review', quoteId: q.id })} />}
-          {screen.name === 'review' && (reviewing ? <QuoteReview boq={boq} quote={reviewing} onDone={() => setScreen({ name: 'compare' })} /> : <p className="text-xs text-gray-500">This quote was deleted.</p>)}
-          {screen.name === 'compare' && <QuoteCompare boq={boq} quotes={confirmed} onAdd={() => setScreen({ name: 'add' })} />}
+        <div className="min-w-0 flex-1">
+            <h3 id="quotes-title" className="text-sm font-bold truncate">Vendor quotes · {boq.title || 'Untitled BOQ'}</h3>
+          <p className="text-xs text-gray-500 font-mono truncate">
+            {boq.items.length} BOQ items{boq.address ? ` · ${boq.address}` : ''}
+          </p>
         </div>
+        <button onClick={onClose} className="p-2.5 -m-1.5 text-gray-500 hover:text-black" aria-label="Close">
+          <X size={22} />
+        </button>
       </div>
-    </motion.div>
+
+      {(screen.name === 'list' || screen.name === 'compare') && (
+        <Tabs
+          label="Quote views"
+          className="m-2"
+          value={screen.name}
+          onChange={(name) => setScreen({ name })}
+          options={[
+            { id: 'compare', label: `Compare (${confirmed.length})` },
+            { id: 'list', label: `Quotes (${quotes.length})` },
+          ]}
+        />
+      )}
+
+      <div className="flex-1 overflow-y-auto p-4">
+        {screen.name === 'add' && (
+          <AddQuote
+            boqId={boqId}
+            initial={shared}
+            onDone={(reviewQuoteId) => {
+              setShared(undefined);
+              // A typed quote opens straight in review, to check and confirm.
+              if (reviewQuoteId) setScreen({ name: 'review', quoteId: reviewQuoteId });
+              else back();
+            }}
+          />
+        )}
+        {screen.name === 'list' && <QuoteList boq={boq} quotes={quotes} onAdd={() => setScreen({ name: 'add' })} onOpen={(q) => setScreen({ name: 'review', quoteId: q.id })} />}
+        {screen.name === 'review' && (reviewing ? <QuoteReview boq={boq} quote={reviewing} onDone={() => setScreen({ name: 'compare' })} /> : <p className="text-xs text-gray-500">This quote was deleted.</p>)}
+        {screen.name === 'compare' && <QuoteCompare boq={boq} quotes={confirmed} onAdd={() => setScreen({ name: 'add' })} />}
+      </div>
+    </Sheet>
   );
 }
 
@@ -105,7 +97,7 @@ function QuoteList({ boq, quotes, onAdd, onOpen }: { boq: HistoryRecord; quotes:
 
   const remove = async (q: QuoteRow) => {
     const ok = await dialogs.confirm(`Delete ${q.vendor}'s quote?`, {
-      message: q.status === 'confirmed' ? 'Prices already added to the material database stay there; remove them from the Data tab if needed.' : undefined,
+      message: q.status === 'confirmed' ? 'Prices already added to the material database stay there; remove them from the Rates tab if needed.' : undefined,
       confirmLabel: 'Delete',
       danger: true,
     });
@@ -116,11 +108,11 @@ function QuoteList({ boq, quotes, onAdd, onOpen }: { boq: HistoryRecord; quotes:
     <div className="space-y-3">
       <button
         onClick={onAdd}
-        className="w-full py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"
+        className="w-full py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2"
       >
         <Plus size={14} /> Add vendor quote
       </button>
-      {quotes.length === 0 && <p className="text-xs text-gray-400 text-center p-6">No quotes yet for this BOQ.</p>}
+      {quotes.length === 0 && <p className="text-xs text-gray-500 text-center p-6">No quotes yet for this BOQ.</p>}
       {quotes.map((q) => {
         const job = jobForQuote(q.id);
         const lines = linesFor(q.id);
@@ -155,23 +147,23 @@ function QuoteList({ boq, quotes, onAdd, onOpen }: { boq: HistoryRecord; quotes:
             <div className="flex justify-between items-start gap-2">
               <div className="min-w-0">
                 <div className="font-bold text-sm text-gray-900 truncate">{q.vendor || 'Unnamed vendor'}</div>
-                <div className="text-[11px] font-mono text-gray-400">{new Date(q.quote_date).toLocaleDateString('en-IN')}</div>
+                <div className="text-xs font-mono text-gray-500">{new Date(q.quote_date).toLocaleDateString('en-IN')}</div>
               </div>
-              <button onClick={() => remove(q)} className="p-1.5 text-gray-300 hover:text-red-500" aria-label={`Delete ${q.vendor}'s quote`}>
+              <button onClick={() => remove(q)} className="p-2.5 -m-1.5 text-gray-500 hover:text-red-500" aria-label={`Delete ${q.vendor}'s quote`}>
                 <Trash2 size={16} />
               </button>
             </div>
-            <div className="text-[11px] mt-2">{state}</div>
+            <div className="text-xs mt-2">{state}</div>
             <div className="flex gap-2 mt-3">
               {job?.status === 'failed' && (
-                <button onClick={() => actions.retryJob(job)} className="flex-1 py-2 bg-gray-100 rounded-lg text-[11px] font-bold uppercase flex items-center justify-center gap-1">
+                <button onClick={() => actions.retryJob(job)} className="flex-1 py-2 bg-gray-100 rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1">
                   <RotateCcw size={12} /> Retry
                 </button>
               )}
               {!job && lines.length > 0 && (
-                <button onClick={() => onOpen(q)} className="flex-1 py-2 bg-gray-900 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider">
+                <Button variant="primary" size="sm" className="flex-1" onClick={() => onOpen(q)}>
                   {q.status === 'confirmed' ? 'View lines' : 'Review & confirm'}
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -242,20 +234,20 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
             role="tab"
             aria-selected={mode === m}
             onClick={() => setMode(m)}
-            className={`py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider ${mode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+            className={`py-2 rounded-lg text-xs font-bold uppercase tracking-wider ${mode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
           >
             {m === 'read' ? 'Photo / text (AI)' : 'Type rates'}
           </button>
         ))}
       </div>
-      <p className="text-[11px] text-gray-500 leading-relaxed">
+      <p className="text-xs text-gray-500 leading-relaxed">
         {mode === 'read'
           ? "Photograph the vendor's reply as it is, even if they wrote their own list. The AI matches each line to this BOQ, and you check the matches before anything is saved."
           : "Enter the vendor's rate against each BOQ line; leave blank what they didn't quote. Works without internet or an API key."}
       </p>
       <div className="grid grid-cols-[1fr_auto] gap-3">
         <label className="block">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Vendor</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Vendor</span>
           <input
             value={vendor}
             onChange={(e) => setVendor(e.target.value)}
@@ -270,7 +262,7 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
           </datalist>
         </label>
         <label className="block">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Quote date</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Quote date</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none" />
         </label>
       </div>
@@ -305,16 +297,16 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
           <button
             onClick={submitTyped}
             disabled={!vendor.trim() || typed.length === 0 || badRate || busy}
-            className="w-full h-12 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-widest text-xs"
+            className="w-full h-12 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wider text-xs"
           >
             {busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Review {typed.length} {typed.length === 1 ? 'rate' : 'rates'}
           </button>
-          {badRate && <p className="text-[11px] text-red-600 text-center">Use digits for rates, e.g. 380 or 1,500.</p>}
+          {badRate && <p className="text-xs text-red-600 text-center">Use digits for rates, e.g. 380 or 1,500.</p>}
         </>
       ) : (
         <>
-      <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Photos of the quote</span>
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Photos of the quote</span>
             <div className="mt-1 grid grid-cols-3 gap-2">
               {images.map((src, idx) => (
                 <div key={idx} className="relative aspect-square rounded-lg border border-gray-200 overflow-hidden">
@@ -331,10 +323,10 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
               {images.length < MAX_IMAGES && (
                 <button
                   onClick={addPhoto}
-                  className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-gray-500"
+                  className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 text-gray-500 hover:border-gray-500"
                 >
                   {isNative ? <Camera size={20} /> : <ImageIcon size={20} />}
-                  <span className="text-[11px] font-bold uppercase">Add page</span>
+                  <span className="text-xs font-bold uppercase">Add page</span>
                 </button>
               )}
             </div>
@@ -354,7 +346,7 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
           </div>
 
           <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Or type / paste the quote (optional)</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Or type / paste the quote (optional)</span>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -367,13 +359,13 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
           <button
             onClick={submit}
             disabled={!ready || busy}
-            className="w-full h-12 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-widest text-xs"
+            className="w-full h-12 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wider text-xs"
           >
             {busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Read quote
           </button>
         </>
       )}
-      {!vendor.trim() && <p className="text-[11px] text-gray-400 text-center">Enter the vendor's name to continue.</p>}
+      {!vendor.trim() && <p className="text-xs text-gray-500 text-center">Enter the vendor's name to continue.</p>}
       {sourceMenu && <PhotoSourceSheet remaining={MAX_IMAGES - images.length} onPick={pickFrom} onClose={() => setSourceMenu(false)} />}
     </div>
   );

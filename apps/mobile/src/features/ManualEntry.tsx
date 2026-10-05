@@ -6,6 +6,7 @@ import { QuantityHelper } from '../components/QuantityHelper.tsx';
 import { VariantFields } from '../components/VariantFields.tsx';
 import { DRAFT_IDS, type ListKind } from '../data/repo.ts';
 import { useAppState } from '../state/AppState.tsx';
+import { Button } from '../components/ui/Button.tsx';
 
 const EMPTY: Record<string, string> = { item_name: '', quantity: '', unit: '', unit_price: '', vendor: '', brand: '', model: '', spec: '', color: '', ordered_as: '' };
 
@@ -61,8 +62,8 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
   return (
     <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2" role="group" aria-label="Add item manually">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-mono uppercase tracking-wider text-gray-500 font-bold">Add item manually</span>
-        <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600" aria-label="Close manual entry">
+        <span className="text-xs text-gray-500 font-bold">Add item manually</span>
+        <button onClick={onClose} className="p-2.5 -m-1.5 text-gray-500 hover:text-gray-600" aria-label="Close manual entry">
           <X size={16} />
         </button>
       </div>
@@ -130,9 +131,9 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
           </datalist>
         </label>
       )}
-      <button onClick={add} className="w-full h-11 bg-[var(--color-brand-dark)] text-white font-bold rounded-xl flex items-center justify-center gap-2 text-sm">
+      <Button variant="primary" block onClick={add}>
         <Check size={16} /> Add to {isAudit ? 'purchases' : 'BOQ'}
-      </button>
+      </Button>
       {added.length > 0 && (
         <p role="status" className="text-xs text-green-700 text-center">
           Added {added[added.length - 1]}

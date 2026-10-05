@@ -1,6 +1,6 @@
 # Nirman: notes for contributors (and Claude)
 
-Android app (Capacitor + React) for tracking construction purchases, BOQs and vendor quotes. See README.md for the layout and docs/data-format.md for the data. Run `npm run lint`, `npm test` and `npm run build` before every push.
+Android app (Capacitor + React) for tracking construction purchases, BOQs and vendor quotes. See README.md for the layout and docs/data-format.md for the data. Run `npm run lint`, `npm test` and `npm run build` before every push; after a layout change also `npm run test:e2e -w apps/mobile` (checks 320–412 px).
 
 ## Versions: deciding the size of a change
 

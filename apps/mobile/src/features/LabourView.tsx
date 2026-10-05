@@ -2,7 +2,10 @@ import { ClipboardList, HardHat, Plus, Users } from 'lucide-react';
 import { contractTotals, sumTotals, type ContractRow, type ContractTotals } from '@nirman/shared';
 import { FilterChips } from '../components/FilterChips.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
+import { EmptyState } from '../components/ui/EmptyState.tsx';
+import { Tabs } from '../components/ui/Tabs.tsx';
 import { useAppState } from '../state/AppState.tsx';
+import { Button } from '../components/ui/Button.tsx';
 
 export const rupees = (n: number) => `₹${Math.round(n || 0).toLocaleString('en-IN')}`;
 
@@ -26,20 +29,20 @@ export function LabourSidebar({ contracts, onNew, onSiteReport }: { contracts: C
         <h3 className="text-sm font-bold text-orange-900 flex items-center gap-2">
           <Users size={16} /> Labour contracts
         </h3>
-        <p className="text-[11px] text-orange-700 mt-1">Record work measured, payments and deductions for each contractor; the balance due is worked out for you.</p>
+        <p className="text-xs text-orange-700 mt-1">Record work measured, payments and deductions for each contractor; the balance due is worked out for you.</p>
       </div>
       {contracts.length > 0 && (
         <div className="grid grid-cols-3 gap-2 text-center" role="status" aria-label="Totals for the contracts shown">
           <div className={box}>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Work done</div>
+            <div className="text-xs text-gray-500 font-semibold">Work done</div>
             <div className="text-xs font-mono font-bold">{rupees(totals.workDone)}</div>
           </div>
           <div className={box}>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Paid</div>
+            <div className="text-xs text-gray-500 font-semibold">Paid</div>
             <div className="text-xs font-mono font-bold">{rupees(totals.paid)}</div>
           </div>
           <div className={box}>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Balance</div>
+            <div className="text-xs text-gray-500 font-semibold">Balance</div>
             <div className="text-xs font-mono font-bold">
               <BalanceText balance={totals.balance} />
             </div>
@@ -47,24 +50,24 @@ export function LabourSidebar({ contracts, onNew, onSiteReport }: { contracts: C
         </div>
       )}
       <div className={`grid gap-2 ${hasSites ? 'grid-cols-2 lg:grid-cols-1' : 'grid-cols-1'}`}>
-        <button
-          onClick={onNew}
-          className="w-full py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"
-        >
+        <Button variant="primary" block onClick={onNew}>
           <Plus size={14} /> New contract
-        </button>
+        </Button>
         {hasSites && (
-          <button
-            onClick={onSiteReport}
-            className="w-full py-3 bg-[var(--color-brand-dark)] text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"
-          >
+          <Button variant="secondary" block onClick={onSiteReport}>
             <ClipboardList size={14} /> Site report
-          </button>
+          </Button>
         )}
       </div>
     </div>
   );
 }
+
+const STATUS_TABS: { id: StatusFilter; label: string }[] = [
+  { id: 'active', label: 'Ongoing' },
+  { id: 'closed', label: 'Closed' },
+  { id: 'all', label: 'All' },
+];
 
 interface Props {
   contracts: ContractRow[];
@@ -82,8 +85,6 @@ export function LabourView({ contracts, status, onStatus, categoryFilter, onCate
   const { contracts: all, entriesFor, pendingDeletes, categoryNames, actions } = useAppState();
   const sites = [...new Set(all.map((c) => c.address).filter(Boolean))].sort();
   const usedCategories = new Set(all.map((c) => c.category));
-  const chip = (on: boolean) =>
-    `px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${on ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500'}`;
 
   return (
     <div className="space-y-4">
@@ -98,22 +99,14 @@ export function LabourView({ contracts, status, onStatus, categoryFilter, onCate
             onAddress={onAddress}
             addressLabel="Sites"
           />
-          <div className="flex gap-2" role="group" aria-label="Contract status">
-            {(['active', 'closed', 'all'] as const).map((s) => (
-              <button key={s} className={chip(status === s)} onClick={() => onStatus(s)} aria-pressed={status === s}>
-                {s === 'active' ? 'Ongoing' : s === 'closed' ? 'Closed' : 'All'}
-              </button>
-            ))}
-          </div>
+          <Tabs label="Contract status" options={STATUS_TABS} value={status} onChange={onStatus} className="md:max-w-sm" />
         </>
       )}
 
       {contracts.length === 0 ? (
-        <div className="py-16 text-center text-gray-400">
-          <HardHat size={36} className="mx-auto mb-3 opacity-40" />
-          <p className="text-sm font-bold text-gray-500">{all.length ? 'No contracts match.' : 'No labour contracts yet.'}</p>
-          {!all.length && <p className="text-xs mt-1">Add one with “New contract”: the contractor, the job, and the rate or lump sum.</p>}
-        </div>
+        <EmptyState icon={HardHat} title={all.length ? 'No contracts match.' : 'No labour contracts yet.'}>
+          {all.length ? 'Check the filters or search.' : 'Add one with “New contract”: the contractor, the job, and the rate or lump sum.'}
+        </EmptyState>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {contracts.map((c) => (
@@ -144,10 +137,10 @@ function ContractCard({ contract: c, totals: t, pending, onOpen }: { contract: C
         <div className="min-w-0">
           <div className="font-bold text-gray-900 truncate">{c.contractor}</div>
           <div className="text-xs text-gray-600 truncate">{c.work || 'Work not described'}</div>
-          <div className="text-[11px] text-gray-400 truncate">{[c.address, c.category].filter(Boolean).join(' · ')}</div>
+          <div className="text-xs text-gray-500 truncate">{[c.address, c.category].filter(Boolean).join(' · ')}</div>
         </div>
         <span
-          className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${c.status === 'closed' ? 'bg-gray-100 text-gray-500' : 'bg-orange-50 text-orange-700'}`}
+          className={`shrink-0 text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded ${c.status === 'closed' ? 'bg-gray-100 text-gray-500' : 'bg-orange-50 text-orange-700'}`}
         >
           {c.status === 'closed' ? 'Closed' : c.kind === 'rate' ? `₹${c.rate}/${c.unit || 'unit'}` : 'Lump sum'}
         </span>
@@ -157,13 +150,13 @@ function ContractCard({ contract: c, totals: t, pending, onOpen }: { contract: C
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full bg-orange-500" style={{ width: `${progress * 100}%` }} />
           </div>
-          <div className="text-[10px] text-gray-400 mt-0.5">
+          <div className="text-xs text-gray-500 mt-0.5">
             {Math.round((t.progress ?? 0) * 100)}% done
             {c.kind === 'rate' && ` · ${t.doneQty.toLocaleString('en-IN')} of ${c.est_quantity.toLocaleString('en-IN')} ${c.unit}`}
           </div>
         </div>
       )}
-      <div className="mt-2 grid grid-cols-3 gap-1 text-[11px] font-mono">
+      <div className="mt-2 grid grid-cols-3 gap-1 text-xs font-mono">
         <span className="text-gray-500">
           Work <b className="text-gray-800">{rupees(t.workDone)}</b>
         </span>

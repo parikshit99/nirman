@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { motion } from 'motion/react';
-import { CheckCircle2, Download, Eye, EyeOff, KeyRound, Loader2, Settings as SettingsIcon, Upload, X } from 'lucide-react';
+import { CheckCircle2, Download, Eye, EyeOff, KeyRound, Loader2, Settings as SettingsIcon, Upload } from 'lucide-react';
 import { backupFilename, BackupError } from '../data/backup.ts';
 import { shareFile, textToBase64 } from '../lib/files.ts';
 import { FALLBACK_MODELS, listReadingModels, testGeminiKey, type ModelOption } from '../lib/gemini.ts';
@@ -15,64 +14,46 @@ import { parseSize, sizeLabel, type SheetSize } from '@nirman/shared';
 import { describeLastBackup, recordBackup } from '../lib/backupReminder.ts';
 import { useAppState } from '../state/AppState.tsx';
 import { useDialogs } from './Dialogs.tsx';
-import { useBackHandler } from '../lib/backButton.ts';
+import { Sheet, SheetHeader } from './ui/Sheet.tsx';
+import { Tabs } from './ui/Tabs.tsx';
+import { setThemeChoice, themeChoice, type ThemeChoice } from '../lib/theme.ts';
+import { Button } from './ui/Button.tsx';
 
 /**
  * API key, backup and storage info. On first launch it doubles as a short
  * welcome that asks for the key (skippable: typing items in works without one).
  */
 export function SettingsModal({ onClose, firstRun, onWhatsNew }: { onClose(): void; firstRun?: boolean; onWhatsNew?(): void }) {
-  useBackHandler(onClose);
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-    >
-      <motion.div
-        initial={{ scale: 0.95, y: 10 }}
-        animate={{ scale: 1, y: 0 }}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-title"
-        className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto"
-      >
-        <div className="flex justify-between items-center">
-          <h3 id="settings-title" className="font-bold text-gray-900 uppercase tracking-widest text-sm flex items-center gap-2">
-            <SettingsIcon size={18} className="text-orange-500" /> {firstRun ? 'Welcome' : 'Settings'}
-          </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-black" aria-label="Close">
-            <X size={20} />
-          </button>
-        </div>
-        {firstRun && (
-          <p className="text-[11px] text-gray-500 leading-relaxed">
+    <Sheet kind="dialog" size="sm" labelledBy="settings-title" onClose={onClose} className="p-6 space-y-6">
+      <SheetHeader id="settings-title" icon={<SettingsIcon size={18} className="text-orange-500" />} title={firstRun ? 'Welcome' : 'Settings'} onClose={onClose} />
+      {firstRun && (
+        <p className="text-xs text-gray-500 leading-relaxed">
             Everything you record is stored only on this phone and works offline. Printed bills and typed lists are read on the phone. For
             handwritten bills and vendor quotes, add your own Google Gemini API key below. You can skip this and add it later from Settings.
-          </p>
-        )}
-        <ApiKeySection onSaved={firstRun ? onClose : undefined} />
-        {firstRun ? (
-          <button onClick={onClose} className="w-full py-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[11px]">
-            Skip for now
-          </button>
-        ) : (
-          <>
-            <ReadingSection />
-            <BackupSection />
-            <ConversionsSection />
-            <DiagnosticsSection />
-            <StorageSection onWhatsNew={onWhatsNew} />
-          </>
-        )}
-      </motion.div>
-    </motion.div>
+        </p>
+      )}
+      <ApiKeySection onSaved={firstRun ? onClose : undefined} />
+      {firstRun ? (
+        <button onClick={onClose} className="w-full py-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl uppercase tracking-wider text-xs">
+          Skip for now
+        </button>
+      ) : (
+        <>
+          <AppearanceSection />
+          <ReadingSection />
+          <BackupSection />
+          <ConversionsSection />
+          <DiagnosticsSection />
+          <StorageSection onWhatsNew={onWhatsNew} />
+        </>
+      )}
+    </Sheet>
   );
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h4 className="text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold">{children}</h4>;
+  return <h4 className="text-xs text-gray-500 font-bold">{children}</h4>;
 }
 
 function ApiKeySection({ onSaved }: { onSaved?(): void }) {
@@ -125,7 +106,7 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
     <section className="space-y-3">
       <SectionTitle>AI reading (Gemini)</SectionTitle>
       <div>
-        <label htmlFor="api-key" className="text-[11px] font-bold text-gray-700 flex items-center gap-1.5 mb-1">
+        <label htmlFor="api-key" className="text-xs font-bold text-gray-700 flex items-center gap-1.5 mb-1">
           <KeyRound size={12} /> API key
         </label>
         <div className="relative">
@@ -142,17 +123,17 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
             placeholder="AIza…"
             className="w-full pl-4 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm font-mono"
           />
-          <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-3 text-gray-400" aria-label={show ? 'Hide key' : 'Show key'}>
+          <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-3 text-gray-500" aria-label={show ? 'Hide key' : 'Show key'}>
             {show ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
-        <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
+        <p className="text-xs text-gray-500 mt-1 leading-relaxed">
           Get a free key at aistudio.google.com → “Get API key”. It is stored encrypted on this phone only.
         </p>
       </div>
-      <div className="text-[11px]">
+      <div className="text-xs">
         <label htmlFor="api-model" className="font-bold text-gray-700 mb-1 flex items-center gap-1.5">
-          Model {loadingModels && <Loader2 size={11} className="animate-spin text-gray-400" />}
+          Model {loadingModels && <Loader2 size={11} className="animate-spin text-gray-500" />}
         </label>
         {typing ? (
           <input
@@ -178,13 +159,13 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
             <option value="__other">Other (type a name)…</option>
           </select>
         )}
-        <p className="text-gray-400 mt-1 leading-relaxed">
+        <p className="text-gray-500 mt-1 leading-relaxed">
           Flash is fast and cheap (best for bills); Flash-Lite is fastest; Pro is slower but more careful. {savedKey ? 'The list shows the models your key can use.' : 'Save a key to see every model it can use.'}
         </p>
       </div>
-      {state.kind === 'error' && <p className="text-[11px] text-red-600 bg-red-50 border border-red-100 rounded-lg p-2">{state.message}</p>}
+      {state.kind === 'error' && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg p-2">{state.message}</p>}
       {state.kind === 'ok' && (
-        <p className="text-[11px] text-green-700 flex items-center gap-1">
+        <p className="text-xs text-green-700 flex items-center gap-1">
           <CheckCircle2 size={12} /> {state.message}
         </p>
       )}
@@ -192,14 +173,14 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
         <button
           onClick={test}
           disabled={!key.trim() || state.kind === 'testing'}
-          className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 disabled:opacity-50"
+          className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 disabled:opacity-50"
         >
           {state.kind === 'testing' && <Loader2 size={12} className="animate-spin" />} Test key
         </button>
         <button
           onClick={save}
           disabled={!dirty}
-          className="flex-1 py-3 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl uppercase tracking-widest text-[11px] disabled:opacity-50"
+          className="flex-1 py-3 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl uppercase tracking-wider text-xs disabled:opacity-50"
         >
           Save
         </button>
@@ -213,6 +194,29 @@ const READING_MODES: { mode: ReadingMode; label: string; about: string }[] = [
   { mode: 'phone', label: 'Phone only', about: 'Never sends anything to Gemini. Handwritten bills may need fixing by hand.' },
   { mode: 'gemini', label: 'Gemini always', about: 'Best for handwritten bills; needs internet and an API key.' },
 ];
+
+function AppearanceSection() {
+  const [choice, setChoice] = useState<ThemeChoice>(themeChoice);
+  return (
+    <section className="space-y-2">
+      <SectionTitle>Appearance</SectionTitle>
+      <Tabs<ThemeChoice>
+        label="Appearance"
+        value={choice}
+        onChange={(c) => {
+          setChoice(c);
+          setThemeChoice(c);
+        }}
+        options={[
+          { id: 'system', label: 'Phone' },
+          { id: 'light', label: 'Light' },
+          { id: 'dark', label: 'Dark' },
+        ]}
+      />
+      <p className="text-xs text-gray-500">Dark is easier on the eyes at night; Phone follows the phone's setting.</p>
+    </section>
+  );
+}
 
 function ReadingSection() {
   const { settings, actions } = useAppState();
@@ -250,14 +254,14 @@ function ReadingSection() {
         {READING_MODES.map(({ mode, label, about }) => (
           <label key={mode} className={`flex gap-2 p-2 rounded-xl border cursor-pointer ${settings.readingMode === mode ? 'border-orange-400 bg-orange-50' : 'border-gray-200'}`}>
             <input type="radio" name="reading-mode" className="mt-0.5" checked={settings.readingMode === mode} onChange={() => set({ readingMode: mode })} />
-            <span className="text-[11px] text-gray-600">
+            <span className="text-xs text-gray-600">
               <b className="block text-xs text-gray-800">{label}</b>
               {about}
             </span>
           </label>
         ))}
       </div>
-      <label className="flex items-start gap-2 text-[11px] text-gray-600 pt-1">
+      <label className="flex items-start gap-2 text-xs text-gray-600 pt-1">
         <input type="checkbox" className="mt-0.5" checked={settings.collectTraining} onChange={(e) => set({ collectTraining: e.target.checked })} />
         <span>
           <b className="text-gray-800">Keep bill photos for training.</b> Each photographed bill is kept on this phone with the lines it became (as you correct
@@ -265,7 +269,7 @@ function ReadingSection() {
         </span>
       </label>
       {!!samples && (
-        <div className="flex items-center gap-2 text-[11px]">
+        <div className="flex items-center gap-2 text-xs">
           <span className="flex-1 text-gray-600">{samples} bills kept</span>
           <button onClick={exportData} disabled={busy} className="px-3 py-1.5 bg-gray-100 rounded-lg font-bold text-gray-700 flex items-center gap-1 disabled:opacity-50">
             {busy ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />} Export
@@ -306,14 +310,14 @@ function BackupSection() {
       const when = new Date(backup.exported_at).toLocaleString('en-IN');
       const saved = backup.lists.filter((l) => l.status === 'saved').length;
       const ok = await dialogs.confirm('Replace all data on this phone?', {
-        message: `Restore the backup from ${when} (${saved} saved sessions, ${backup.items.length} items).\nEverything currently on this phone, including queued entries, will be replaced.`,
+        message: `Restore the backup from ${when} (${saved} saved lists, ${backup.items.length} items).\nEverything currently on this phone, including queued entries, will be replaced.`,
         confirmLabel: 'Restore',
         danger: true,
       });
       if (!ok) return;
       setBusy(true);
       await actions.restoreBackup(backup);
-      await dialogs.alert('Backup restored');
+      dialogs.toast('Backup restored');
     } catch (err) {
       await dialogs.alert('Could not restore', err instanceof BackupError ? err.message : (err as Error).message);
     } finally {
@@ -324,22 +328,18 @@ function BackupSection() {
   return (
     <section className="space-y-3">
       <SectionTitle>Backup</SectionTitle>
-      <p className="text-[11px] text-gray-500 leading-relaxed">
+      <p className="text-xs text-gray-500 leading-relaxed">
         Your data lives only on this phone. Save a backup file to Google Drive, WhatsApp or email now and then, so you can restore it on a new phone.
       </p>
-      <p className={`text-[11px] font-bold ${lastBackup === 'never' ? 'text-red-600' : 'text-gray-700'}`}>Last backup: {lastBackup}</p>
+      <p className={`text-xs font-bold ${lastBackup === 'never' ? 'text-red-600' : 'text-gray-700'}`}>Last backup: {lastBackup}</p>
       <div className="flex gap-3">
-        <button
-          onClick={doExport}
-          disabled={busy}
-          className="flex-1 py-3 bg-black text-white font-bold rounded-xl uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 disabled:opacity-50"
-        >
+        <Button variant="primary" className="flex-1" onClick={doExport} disabled={busy}>
           <Download size={14} /> Save backup
-        </button>
+        </Button>
         <button
           onClick={() => fileRef.current?.click()}
           disabled={busy}
-          className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 disabled:opacity-50"
+          className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 disabled:opacity-50"
         >
           <Upload size={14} /> Restore
         </button>
@@ -375,8 +375,8 @@ function StorageSection({ onWhatsNew }: { onWhatsNew?(): void }) {
   return (
     <section className="space-y-2">
       <SectionTitle>On this phone</SectionTitle>
-      <dl className="grid grid-cols-2 gap-2 text-[11px]">
-        <dt className="text-gray-500">Saved sessions</dt>
+      <dl className="grid grid-cols-2 gap-2 text-xs">
+        <dt className="text-gray-500">Saved lists</dt>
         <dd className="font-bold text-right">{history.length}</dd>
         <dt className="text-gray-500">Items</dt>
         <dd className="font-bold text-right">{snapshot.items.length}</dd>
@@ -406,8 +406,8 @@ function StorageSection({ onWhatsNew }: { onWhatsNew?(): void }) {
       {showLearned && learningCount > 0 && <LearnedCorrections onForgetAll={resetLearning} />}
       {hiddenMaterials.length > 0 && (
         <div className="pt-2">
-          <div className="flex justify-between items-center text-[11px] text-gray-500 mb-1">
-            <span>Deleted from Data ({hiddenMaterials.length})</span>
+          <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
+            <span>Deleted from Rates ({hiddenMaterials.length})</span>
             {hiddenMaterials.length > 1 && (
               <button onClick={async () => { for (const m of hiddenMaterials) await actions.unhideMaterial(m.id); }} className="text-blue-600 font-bold underline" aria-label="Restore all deleted materials to Data">
                 Restore all
@@ -420,7 +420,7 @@ function StorageSection({ onWhatsNew }: { onWhatsNew?(): void }) {
                 <span className="truncate">
                   {m.name} <span className="text-gray-500">· per {m.unit}</span>
                 </span>
-                <button onClick={() => actions.unhideMaterial(m.id)} className="text-blue-600 font-bold underline shrink-0" aria-label={`Restore ${m.name} to Data`}>
+                <button onClick={() => actions.unhideMaterial(m.id)} className="text-blue-600 font-bold underline shrink-0" aria-label={`Restore ${m.name} to Rates`}>
                   Restore
                 </button>
               </li>
@@ -446,7 +446,7 @@ function LearnedCorrections({ onForgetAll }: { onForgetAll(): void }) {
 
   return (
     <div className="pt-2 space-y-2">
-      <p className="text-[11px] text-gray-500 leading-snug">
+      <p className="text-xs text-gray-500 leading-snug">
         Words the app has learned to read your way, from your edits. Change what a word is read as, or delete it so the AI reads it fresh.
       </p>
       {snapshot.learned.length > 6 && (
@@ -503,7 +503,7 @@ function LearnedCorrections({ onForgetAll }: { onForgetAll(): void }) {
         )}
         {terms.length === 0 && <li className="text-xs text-gray-500 px-1">No match.</li>}
       </ul>
-      <button onClick={onForgetAll} className="text-[11px] text-red-600 font-bold underline">
+      <button onClick={onForgetAll} className="text-xs text-red-600 font-bold underline">
         Forget all learned corrections
       </button>
     </div>
@@ -537,7 +537,7 @@ function ConversionsSection() {
   return (
     <section className="space-y-2">
       <SectionTitle>TMT, tiles and ACP</SectionTitle>
-      <p className="text-[11px] text-gray-500 leading-relaxed">
+      <p className="text-xs text-gray-500 leading-relaxed">
         Used to turn TMT bundles into kg and sqft into whole tiles or sheets.{' '}
         <button onClick={() => setOpen((v) => !v)} className="text-blue-600 font-bold underline" aria-expanded={open}>
           {open ? 'Hide' : 'Edit'}
@@ -570,11 +570,11 @@ function ConversionsSection() {
             <span className="font-bold text-gray-500">ACP sheet sizes (mm)</span>
             <input aria-label="ACP sheet sizes" className={field} value={acp} onChange={(e) => { setAcp(e.target.value); setSaved(false); }} />
           </label>
-          <p className="text-[11px] text-gray-500">Sizes are width x length, separated by commas, e.g. {sizeLabel({ width: 600, length: 1200 }).replace(' mm', '')}, 800x1600.</p>
+          <p className="text-xs text-gray-500">Sizes are width x length, separated by commas, e.g. {sizeLabel({ width: 600, length: 1200 }).replace(' mm', '')}, 800x1600.</p>
           <div className="flex gap-3 items-center">
-            <button onClick={save} className="px-4 py-2 bg-gray-900 text-white rounded-lg font-bold">
+            <Button variant="primary" size="sm" onClick={save}>
               Save
-            </button>
+            </Button>
             <button
               onClick={() => {
                 resetConversions();
@@ -626,7 +626,7 @@ function DiagnosticsSection() {
   return (
     <section className="space-y-2">
       <SectionTitle>Problems and diagnostics</SectionTitle>
-      <p className="text-[11px] text-gray-500 leading-relaxed">
+      <p className="text-xs text-gray-500 leading-relaxed">
         The app keeps a log on this phone of errors, AI readings, the steps you take and slow screens, including the items, rates and vendors involved, to
         help fix problems. Photos and your API key are never recorded. {log.length} entries{errors ? `, ${errors} errors` : ''}.
       </p>
@@ -638,14 +638,14 @@ function DiagnosticsSection() {
         className="w-full h-16 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-orange-400 resize-none"
       />
       <div className="grid grid-cols-2 gap-2">
-        <button onClick={report} className="py-2.5 bg-gray-900 text-white rounded-xl text-[11px] font-bold uppercase tracking-widest">
+        <Button variant="secondary" size="sm" onClick={report}>
           Report a problem
-        </button>
-        <button onClick={shareLog} className="py-2.5 bg-gray-100 text-gray-700 rounded-xl text-[11px] font-bold uppercase tracking-widest">
+        </Button>
+        <button onClick={shareLog} className="py-2.5 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold uppercase tracking-wider">
           Share log
         </button>
       </div>
-      <p className="text-[11px] text-gray-500">Report a problem opens a GitHub issue with the phone details and recent errors filled in; you can add a screenshot there.</p>
+      <p className="text-xs text-gray-500">Report a problem opens a GitHub issue with the phone details and recent errors filled in; you can add a screenshot there.</p>
       {crashReportsAvailable() && (
         <label className="flex items-start gap-2 text-xs text-gray-700">
           <input
@@ -659,7 +659,7 @@ function DiagnosticsSection() {
           />
           <span>
             Send crash reports automatically
-            <span className="block text-[11px] text-gray-500">Only errors, with the app version, phone model and recent steps. Takes effect after restarting the app.</span>
+            <span className="block text-xs text-gray-500">Only errors, with the app version, phone model and recent steps. Takes effect after restarting the app.</span>
           </span>
         </label>
       )}
@@ -669,7 +669,7 @@ function DiagnosticsSection() {
             clearLog();
             refresh((n) => n + 1);
           }}
-          className="text-[11px] text-blue-600 font-bold underline"
+          className="text-xs text-blue-600 font-bold underline"
         >
           Clear the log
         </button>

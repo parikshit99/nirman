@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { motion } from 'motion/react';
-import { Share2, X } from 'lucide-react';
+import { Share2 } from 'lucide-react';
 import { buildLabourReport, buildSiteReport, financialYear, siteHasDeliveries, todayISO } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { ShareSheet } from '../components/ShareSheet.tsx';
-import { useBackHandler } from '../lib/backButton.ts';
+import { Button } from '../components/ui/Button.tsx';
+import { Sheet, SheetHeader } from '../components/ui/Sheet.tsx';
 import { pdfFile, pdfToJpegs, sheetToXlsx, siteReportSheet, type ExportFormat } from '../lib/exports.ts';
 import { shareFiles } from '../lib/files.ts';
 import { buildSiteReportPdf } from '../lib/pdf.ts';
@@ -19,7 +19,12 @@ export function SiteReport({ onClose }: { onClose(): void }) {
   const dialogs = useDialogs();
   const sites = useMemo(
     () =>
-      [...new Set([...snapshot.lists.filter((l) => l.kind === 'audit' && l.status === 'saved' && l.address).map((l) => l.address), ...snapshot.contracts.map((c) => c.address).filter(Boolean)])].sort(),
+      [
+        ...new Set([
+          ...snapshot.lists.filter((l) => l.kind === 'audit' && l.status === 'saved' && l.address).map((l) => l.address),
+          ...snapshot.contracts.map((c) => c.address).filter(Boolean),
+        ]),
+      ].sort(),
     [snapshot.lists, snapshot.contracts],
   );
   const [address, setAddress] = useState(sites[0] ?? '');
@@ -28,7 +33,6 @@ export function SiteReport({ onClose }: { onClose(): void }) {
   const [categories, setCategories] = useState<string[]>([]);
   const [deliveredOnly, setDeliveredOnly] = useState(() => siteHasDeliveries(snapshot.lists, snapshot.items, sites[0] ?? ''));
   const [sharing, setSharing] = useState(false);
-  useBackHandler(onClose, !sharing);
 
   const pickSite = (a: string) => {
     setAddress(a);
@@ -61,7 +65,9 @@ export function SiteReport({ onClose }: { onClose(): void }) {
     const name = `Site_report_${address.replace(/[^\w-]+/g, '_').slice(0, 40)}_${todayISO()}`;
     try {
       if (format === 'xlsx') {
-        await shareFiles([await sheetToXlsx(siteReportSheet(address, filters, report, labour), `${name}.xlsx`, 'Site report', [16, 30, 12, 12, 12, 14, 24, 10, 8, 26, 12, 14, 18, 20, 14])]);
+        await shareFiles([
+          await sheetToXlsx(siteReportSheet(address, filters, report, labour), `${name}.xlsx`, 'Site report', [16, 30, 12, 12, 12, 14, 24, 10, 8, 26, 12, 14, 18, 20, 14]),
+        ]);
       } else {
         const doc = buildSiteReportPdf(address, filters, report, labour);
         await shareFiles(format === 'pdf' ? [pdfFile(doc, name)] : await pdfToJpegs(doc, name));
@@ -72,22 +78,19 @@ export function SiteReport({ onClose }: { onClose(): void }) {
   };
 
   const chip = (on: boolean) =>
-    `px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${on ? 'bg-orange-500 text-white' : 'bg-white border border-gray-200 text-gray-500'}`;
-  const label = 'text-[11px] font-mono uppercase tracking-widest text-gray-400 font-bold block mb-1';
+    `px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${on ? 'bg-orange-500 text-white' : 'bg-white border border-gray-200 text-gray-500'}`;
+  const label = 'text-xs text-gray-600 font-bold block mb-1';
   const input = 'w-full min-w-0 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-1 focus:ring-orange-400';
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center md:p-4 bg-black/60">
-      <div role="dialog" aria-modal="true" aria-labelledby="site-report-title" className="bg-white w-full max-w-lg md:rounded-2xl p-5 shadow-2xl flex flex-col overflow-y-auto">
-        <div className="flex justify-between items-start mb-1">
-          <h3 id="site-report-title" className="font-bold text-gray-900 uppercase tracking-widest text-sm">
-            Site report
-          </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-black" aria-label="Close">
-            <X size={20} />
-          </button>
-        </div>
-        <p className="text-[11px] text-gray-500 mb-4">Everything bought for one site, grouped by work type and material, with every line listed, plus labour contracts.</p>
+    <>
+      <Sheet kind="screen" size="lg" labelledBy="site-report-title" onClose={onClose} backEnabled={!sharing} className="p-5 gap-4">
+        <SheetHeader
+          id="site-report-title"
+          title="Site report"
+          subtitle="Everything bought for one site, grouped by work type and material, with every line listed, plus labour contracts."
+          onClose={onClose}
+        />
 
         {sites.length === 0 ? (
           <p className="text-sm text-gray-500">Save a purchase list or add a labour contract with a site address first.</p>
@@ -122,7 +125,7 @@ export function SiteReport({ onClose }: { onClose(): void }) {
             </div>
 
             <div>
-              <span className={label}>Category</span>
+              <span className={label}>Work type</span>
               <div className="flex flex-wrap gap-2">
                 <button className={chip(categories.length === 0)} onClick={() => setCategories([])}>All</button>
                 {siteCategories.map((c) => (
@@ -160,22 +163,18 @@ export function SiteReport({ onClose }: { onClose(): void }) {
               </div>
             )}
 
-            <button
-              onClick={() => setSharing(true)}
-              disabled={empty}
-              className="w-full h-12 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl flex items-center justify-center gap-2 uppercase tracking-widest text-sm disabled:opacity-50"
-            >
+            <Button variant="primary" block onClick={() => setSharing(true)} disabled={empty}>
               <Share2 size={16} /> Share report
-            </button>
+            </Button>
             {empty && (
               <p className="text-xs text-gray-500 text-center">
-                Nothing matches.{deliveredOnly ? ' Tick deliveries in History → Deliveries, or include all saved purchases.' : ''}
+                Nothing matches.{deliveredOnly ? ' Tick deliveries in Saved → Deliveries, or include all saved purchases.' : ''}
               </p>
             )}
           </div>
         )}
-      </div>
+      </Sheet>
       {sharing && <ShareSheet title="site report" onShare={share} onClose={() => setSharing(false)} />}
-    </motion.div>
+    </>
   );
 }

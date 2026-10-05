@@ -29,7 +29,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
     return (
       <div className="text-center p-8 space-y-4">
         <p className="text-sm text-gray-500">No confirmed quotes yet. Add a vendor's quote and confirm it to compare prices here.</p>
-        <button onClick={onAdd} className="px-5 py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-xs font-bold uppercase tracking-widest inline-flex items-center gap-2">
+        <button onClick={onAdd} className="px-5 py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
           <Plus size={14} /> Add vendor quote
         </button>
       </div>
@@ -65,13 +65,13 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
             <div className="flex justify-between items-center gap-2">
               <span className="font-bold text-sm truncate">{v.quote.vendor}</span>
               {v === best && (
-                <span className="text-[11px] font-bold text-green-700 flex items-center gap-1 shrink-0">
+                <span className="text-xs font-bold text-green-700 flex items-center gap-1 shrink-0">
                   <Trophy size={10} /> Cheapest overall
                 </span>
               )}
             </div>
             <div className="text-lg font-mono font-bold">{rupees(Math.round(v.total))}</div>
-            <div className="text-[11px] text-gray-500 space-x-1">
+            <div className="text-xs text-gray-500 space-x-1">
               <span>{shortDate(v.quote.quote_date)}</span>
               <span>· {v.quoted}/{boq.items.length} quoted</span>
               {v.missing.length > 0 && <b className="text-red-600">· {v.missing.length} missing</b>}
@@ -79,18 +79,18 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
               {v.variantIssues > 0 && <span className="text-orange-700">· {v.variantIssues} other brand/model</span>}
             </div>
             {multi && comparison.commonItems < boq.items.length && (
-              <div className="text-[11px] text-gray-600 mt-1">
+              <div className="text-xs text-gray-600 mt-1">
                 {rupees(Math.round(v.commonTotal))} on the {comparison.commonItems} item{comparison.commonItems === 1 ? '' : 's'} all vendors quoted
               </div>
             )}
             {v.vsLast !== null && (
-              <div className={`text-[11px] font-bold mt-1 ${v.vsLast > 0.005 ? 'text-red-600' : v.vsLast < -0.005 ? 'text-green-700' : 'text-gray-500'}`}>
+              <div className={`text-xs font-bold mt-1 ${v.vsLast > 0.005 ? 'text-red-600' : v.vsLast < -0.005 ? 'text-green-700' : 'text-gray-500'}`}>
                 {pct(v.vsLast)} vs last prices for the same items ({rupees(Math.round(v.lastTotal))})
               </div>
             )}
             <button
               onClick={() => setOrderFrom(v.quote.id)}
-              className={`mt-2 w-full py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider ${v === best ? 'bg-green-700 text-white' : 'bg-white border border-gray-300 text-gray-700'}`}
+              className={`mt-2 w-full py-2 rounded-lg text-xs font-bold uppercase tracking-wider ${v === best ? 'bg-green-700 text-white' : 'bg-white border border-gray-300 text-gray-700'}`}
             >
               Order from {v.quote.vendor || 'this vendor'}
             </button>
@@ -103,15 +103,15 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
           <div key={row.item.id} className="border border-gray-200 rounded-xl p-3">
             <div className="flex justify-between gap-2">
               <div className="min-w-0">
-                <span className="font-mono text-gray-400 mr-1 text-xs">{row.sr}.</span>
+                <span className="font-mono text-gray-500 mr-1 text-xs">{row.sr}.</span>
                 <span className="font-bold text-sm">{row.item.item_name}</span>
                 {variantLabel(row.item) && <div className="text-xs text-gray-600">{variantLabel(row.item)}</div>}
               </div>
-              <span className="text-[11px] text-gray-500 font-mono shrink-0">
+              <span className="text-xs text-gray-500 font-mono shrink-0">
                 {row.item.quantity} {row.item.unit}
               </span>
             </div>
-            <div className="text-[11px] text-gray-500 mt-1 flex items-center gap-2">
+            <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
               {row.history.last ? (
                 <>
                   <span>
@@ -137,7 +137,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
 
       <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-xl">
         <table className="w-full text-xs min-w-[640px]">
-          <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
+          <thead className="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
             <tr>
               <th className="text-left p-2 font-bold">Item (BOQ qty)</th>
               <th className="text-left p-2 font-bold">Past prices</th>
@@ -152,10 +152,10 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
             {comparison.rows.map((row) => (
               <tr key={row.item.id} className="border-t border-gray-100 align-top">
                 <td className="p-2">
-                  <span className="font-mono text-gray-400 mr-1">{row.sr}.</span>
+                  <span className="font-mono text-gray-500 mr-1">{row.sr}.</span>
                   <span className="font-bold">{row.item.item_name}</span>
-                  {variantLabel(row.item) && <div className="text-[11px] text-gray-600">{variantLabel(row.item)}</div>}
-                  <div className="text-[11px] text-gray-500">
+                  {variantLabel(row.item) && <div className="text-xs text-gray-600">{variantLabel(row.item)}</div>}
+                  <div className="text-xs text-gray-500">
                     {row.item.quantity} {row.item.unit}
                   </div>
                 </td>
@@ -163,18 +163,18 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
                   {row.history.last ? (
                     <div className="space-y-0.5">
                       <div className="font-mono">{rupees(row.history.last.price)}</div>
-                      <div className="text-[11px] text-gray-500">
+                      <div className="text-xs text-gray-500">
                         {shortDate(row.history.last.date)} · {row.history.last.vendor}
                       </div>
                       {row.history.points.length > 1 && (
-                        <div className="flex items-center gap-1 text-[11px] text-gray-400">
+                        <div className="flex items-center gap-1 text-xs text-gray-500">
                           <Sparkline points={row.history.points} />
                           {rupees(row.history.min)}–{rupees(row.history.max)}
                         </div>
                       )}
                     </div>
                   ) : (
-                    <span className="text-[11px] text-gray-400 italic">No past price</span>
+                    <span className="text-xs text-gray-500 italic">No past price</span>
                   )}
                 </td>
                 {comparison.vendors.map((v) => (
@@ -190,13 +190,13 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
 
       {comparison.vendors.some((v) => v.extras.length > 0) && (
         <section>
-          <h4 className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-2">Also quoted (not in the BOQ)</h4>
+          <h4 className="text-xs font-bold text-gray-500 mb-2">Also quoted (not in the BOQ)</h4>
           <ul className="text-xs space-y-1">
             {comparison.vendors.flatMap((v) =>
               v.extras.map((l) => (
                 <li key={l.id} className="flex justify-between gap-2 px-3 py-1.5 bg-gray-50 rounded-lg">
                   <span>
-                    {l.item_name} <span className="text-gray-400">· {v.quote.vendor}</span>
+                    {l.item_name} <span className="text-gray-500">· {v.quote.vendor}</span>
                   </span>
                   <span className="font-mono shrink-0">
                     {l.unit_price > 0 ? `${rupees(l.unit_price)}/${l.unit}` : 'no rate'}
@@ -209,10 +209,10 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
       )}
 
       <div className="flex gap-2">
-        <button onClick={onAdd} className="flex-1 py-3 bg-white border border-gray-200 rounded-xl text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+        <button onClick={onAdd} className="flex-1 py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2">
           <Plus size={14} /> Add vendor quote
         </button>
-        <button onClick={() => setShareOpen(true)} className="flex-1 py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+        <button onClick={() => setShareOpen(true)} className="flex-1 py-3 bg-[var(--color-brand-primary)] text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2">
           <Share2 size={14} /> Share comparison
         </button>
       </div>
@@ -230,20 +230,20 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
 
 /** One vendor's rate for one item: lowest marker, change against the last price, unit/quantity notes. */
 function PriceCell({ cell }: { cell?: QuoteCell }) {
-  if (!cell || cell.price <= 0) return <span className="text-[11px] text-red-500 italic">not quoted</span>;
+  if (!cell || cell.price <= 0) return <span className="text-xs text-red-500 italic">not quoted</span>;
   return (
     <div className="text-right">
       <div className={`font-mono font-bold text-xs ${cell.cheapest ? 'text-green-700' : ''}`}>
         {rupees(cell.price)}
         {cell.unitDiffers && <span className="text-orange-600 font-normal">/{cell.line.unit}</span>}
-        {cell.cheapest && <span className="ml-1 text-[11px] font-bold">· Lowest</span>}
+        {cell.cheapest && <span className="ml-1 text-xs font-bold">· Lowest</span>}
       </div>
       <div className="mt-0.5">
         <VsLastBadge vsLast={cell.vsLast} last={cell.lastPoint} />
       </div>
-      {cell.unitDiffers && <div className="text-[11px] text-orange-700">different unit, not compared</div>}
-      {cell.variantDiffers.length > 0 && <div className="text-[11px] text-orange-700">{variantLabel(cell.line)}: not what the BOQ asks for, not ranked</div>}
-      {cell.qtyDiffers && <div className="text-[11px] text-gray-500">quoted for {cell.line.quantity}</div>}
+      {cell.unitDiffers && <div className="text-xs text-orange-700">different unit, not compared</div>}
+      {cell.variantDiffers.length > 0 && <div className="text-xs text-orange-700">{variantLabel(cell.line)}: not what the BOQ asks for, not ranked</div>}
+      {cell.qtyDiffers && <div className="text-xs text-gray-500">quoted for {cell.line.quantity}</div>}
     </div>
   );
 }
