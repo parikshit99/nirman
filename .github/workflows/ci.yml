@@ -18,6 +18,11 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+      - name: Layout check at phone widths (320–412 px)
+        run: |
+          npm run build
+          (cd apps/mobile && npx playwright install --with-deps chromium)
+          npm run test:e2e -w apps/mobile
 
   android:
     needs: test

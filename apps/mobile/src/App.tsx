@@ -357,15 +357,16 @@ export default function App() {
             <StatusChip onClick={() => setSettingsOpen(true)} />
           </div>
           {kind && (
-            <div className="text-right pr-3 border-r border-gray-100 leading-tight">
-              <div className="text-[11px] md:text-[11px] uppercase tracking-widest text-gray-400 font-mono">{kind === 'audit' ? 'Total Spent' : 'Items'}</div>
-              <div className="text-xs md:text-sm font-mono font-bold">
-                {kind === 'audit' ? `₹${totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : `${filteredItems.length} Recs`}
+            <div className="min-w-0 text-right pr-3 border-r border-gray-100 leading-tight">
+              <div className="text-[11px] uppercase tracking-wider text-gray-400 font-mono whitespace-nowrap">{kind === 'audit' ? 'Spent' : 'Items'}</div>
+              <div className="text-xs md:text-sm font-mono font-bold" data-testid="header-total">
+                {kind === 'audit' ? `₹${totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : `${filteredItems.length} Recs`}
               </div>
             </div>
           )}
 
-          <div className="flex items-center gap-1.5 md:gap-2 ml-auto">
+          {/* Fits 320 px: below 480 px Preview and Share show only their icons. */}
+          <div className="flex items-center gap-1.5 md:gap-2 ml-auto shrink-0">
             {kind && activeItems.length > 0 && (
               <>
                 <button
@@ -376,15 +377,17 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setPreviewOpen(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 bg-white border border-gray-200 text-[var(--color-brand-dark)] text-[11px] md:text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap"
+                  aria-label="Preview"
+                  className="flex items-center gap-1.5 p-2 min-[480px]:px-2.5 min-[480px]:py-1.5 md:px-3 md:py-2 bg-white border border-gray-200 text-[var(--color-brand-dark)] text-[11px] md:text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-sm hover:bg-gray-50 transition-colors whitespace-nowrap"
                 >
-                  <Eye size={14} /> <span>Preview</span>
+                  <Eye size={14} /> <span className="hidden min-[480px]:inline">Preview</span>
                 </button>
                 <button
                   onClick={openShare}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 bg-[var(--color-brand-primary)] text-white text-[11px] md:text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-md hover:brightness-110 transition-colors whitespace-nowrap"
+                  aria-label="Share"
+                  className="flex items-center gap-1.5 p-2 min-[480px]:px-2.5 min-[480px]:py-1.5 md:px-3 md:py-2 bg-[var(--color-brand-primary)] text-white text-[11px] md:text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-md hover:brightness-110 transition-colors whitespace-nowrap"
                 >
-                  <Share2 size={14} /> <span>Share</span>
+                  <Share2 size={14} /> <span className="hidden min-[480px]:inline">Share</span>
                 </button>
               </>
             )}

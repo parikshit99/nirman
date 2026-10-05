@@ -53,7 +53,7 @@ interface Props {
 }
 
 export function HistoryView({ records, categoryFilter, onCategory, addressFilter, onAddress, onEdit, onOpen, onQuotes, onDeliveries, onBuyAgain }: Props) {
-  const { actions, categoryNames, uniqueAddresses, quotesFor } = useAppState();
+  const { actions, categoryNames, uniqueAddresses, quotesFor, history } = useAppState();
   const dialogs = useDialogs();
 
   const remove = async (record: HistoryRecord) => {
@@ -67,24 +67,25 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
 
   return (
     <div className="space-y-6">
-      <FilterChips
-        categories={categoryNames}
-        categoryFilter={categoryFilter}
-        onCategory={onCategory}
-        addresses={uniqueAddresses}
-        addressFilter={addressFilter}
-        onAddress={onAddress}
-        addressLabel="Filter by Address"
-      />
+      {history.length > 0 && (
+        <FilterChips
+          categories={categoryNames}
+          categoryFilter={categoryFilter}
+          onCategory={onCategory}
+          addresses={uniqueAddresses}
+          addressFilter={addressFilter}
+          onAddress={onAddress}
+          addressLabel="Filter by Address"
+        />
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {records.length === 0 ? (
-          <div className="col-span-full p-20 flex flex-col items-center justify-center text-gray-300 border-2 border-dashed border-gray-100 rounded-2xl">
-            <History size={48} strokeWidth={1} />
-            <p className="mt-4 font-mono text-sm uppercase tracking-widest text-center">
-              No matching sessions
-              <br />
-              <span className="text-[11px] normal-case italic">Check your filters or search terms</span>
+          <div className="col-span-full py-16 text-center text-gray-400">
+            <History size={36} className="mx-auto mb-3 opacity-40" />
+            <p className="text-sm font-bold text-gray-500">{history.length ? 'No saved lists match.' : 'Nothing saved yet.'}</p>
+            <p className="text-xs mt-1">
+              {history.length ? 'Check the filters or search.' : 'Lists you save from Spend or BOQ (the Save button) appear here.'}
             </p>
           </div>
         ) : (
