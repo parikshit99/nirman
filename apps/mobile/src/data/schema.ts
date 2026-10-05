@@ -138,6 +138,10 @@ const MIGRATIONS: string[] = [
       WHERE q.status = 'confirmed' AND q.quote_date = indexed_rates.date AND (q.vendor = indexed_rates.vendor OR (q.vendor = '' AND indexed_rates.vendor = 'Unknown'))
       ORDER BY q.updated_at DESC LIMIT 1), '');
   `,
+  // 6: when a purchase line was delivered to the site; blank = not marked.
+  `
+  ALTER TABLE items ADD COLUMN delivered_at TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 /** Default categories sort before anything the user adds. */

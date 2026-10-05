@@ -324,6 +324,134 @@ export function filterMaterials(entries: MaterialEntry[], filter: MaterialFilter
 }
 
 // ---------------------------------------------------------------------------
+// Site report: everything bought (or delivered) for one address
+// ---------------------------------------------------------------------------
+
+export interface SiteReportOptions {
+  address: string;
+  /** Inclusive YYYY-MM-DD bounds; blank or absent means no limit. */
+  from?: string;
+  to?: string;
+  /** Work categories to include; empty means all. */
+  categories?: string[];
+  /** Only lines ticked as delivered. */
+  deliveredOnly: boolean;
+}
+
+export interface SiteReportLine {
+  /** Delivery date if ticked, else the bill date, else the session's date. */
+  date: string;
+  item: ItemRow;
+  listTitle: string;
+}
+
+export interface SiteReportMaterial {
+  name: string;
+  unit: string;
+  quantity: number;
+  amount: number;
+  /** Amount ÷ quantity over the priced lines; 0 when none were priced. */
+  avgRate: number;
+  vendors: string[];
+  /** Number of saved sessions (bills) it appears in. */
+  bills: number;
+  lines: SiteReportLine[];
+}
+
+export interface SiteReportCategory {
+  name: string;
+  amount: number;
+  materials: SiteReportMaterial[];
+}
+
+export interface SiteReport {
+  categories: SiteReportCategory[];
+  total: number;
+  lineCount: number;
+}
+
+const UNCATEGORISED = 'Uncategorised';
+
+/** The date a purchase line counts under in a site report. */
+export const siteReportDate = (item: ItemRow, list: ListRow) => item.delivered_at || item.date || list.site_date || list.created_at.slice(0, 10);
+
+/** Whether any saved purchase line for this address is ticked as delivered. */
+export function siteHasDeliveries(lists: ListRow[], items: ItemRow[], address: string): boolean {
+  const ids = new Set(lists.filter((l) => l.kind === 'audit' && l.status === 'saved' && l.address === address).map((l) => l.id));
+  return items.some((i) => ids.has(i.list_id) && !!i.delivered_at);
+}
+
+/**
+ * Saved purchases for one site, grouped by work category and then by material
+ * (names tidied by learned corrections, as in the price database).
+ */
+export function buildSiteReport(lists: ListRow[], items: ItemRow[], learning: LearningMap, opts: SiteReportOptions): SiteReport {
+  const wanted = new Set((opts.categories ?? []).map((c) => c.trim().toLowerCase()));
+  const siteLists = new Map(
+    lists
+      .filter((l) => l.kind === 'audit' && l.status === 'saved' && l.address === opts.address)
+      .filter((l) => wanted.size === 0 || wanted.has((l.category || UNCATEGORISED).toLowerCase()))
+      .map((l) => [l.id, l]),
+  );
+  type Acc = Omit<SiteReportMaterial, 'avgRate' | 'vendors' | 'bills'> & { vendors: Set<string>; bills: Set<string>; pricedQty: number; pricedAmount: number };
+  const byCategory = new Map<string, Map<string, Acc>>();
+  let lineCount = 0;
+
+  for (const item of items) {
+    const list = siteLists.get(item.list_id);
+    if (!list || !item.item_name) continue;
+    if (opts.deliveredOnly && !item.delivered_at) continue;
+    const date = siteReportDate(item, list);
+    if (opts.from && date < opts.from) continue;
+    if (opts.to && date > opts.to) continue;
+
+    const category = list.category || UNCATEGORISED;
+    let materials = byCategory.get(category);
+    if (!materials) byCategory.set(category, (materials = new Map()));
+    const { item_name, unit } = applyLearning(learning, item);
+    const key = materialKey(item_name, unit);
+    let m = materials.get(key);
+    if (!m) {
+      m = { name: item_name, unit, quantity: 0, amount: 0, vendors: new Set(), bills: new Set(), pricedQty: 0, pricedAmount: 0, lines: [] };
+      materials.set(key, m);
+    }
+    m.quantity += item.quantity || 0;
+    m.amount += item.total_amount || 0;
+    if (item.unit_price > 0 && item.quantity > 0) {
+      m.pricedQty += item.quantity;
+      m.pricedAmount += item.total_amount || item.quantity * item.unit_price;
+    }
+    if (item.vendor) m.vendors.add(item.vendor);
+    m.bills.add(list.id);
+    m.lines.push({ date, item, listTitle: list.title || 'Untitled session' });
+    lineCount++;
+  }
+
+  const categories = [...byCategory.entries()]
+    .map(([name, materials]) => {
+      const list = [...materials.values()]
+        .map(({ vendors, bills, pricedQty, pricedAmount, lines, ...m }) => ({
+          ...m,
+          avgRate: pricedQty > 0 ? pricedAmount / pricedQty : 0,
+          vendors: [...vendors].sort(),
+          bills: bills.size,
+          lines: lines.sort((a, b) => a.date.localeCompare(b.date)),
+        }))
+        .sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
+      return { name, amount: list.reduce((sum, m) => sum + m.amount, 0), materials: list };
+    })
+    .sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
+  return { categories, total: categories.reduce((sum, c) => sum + c.amount, 0), lineCount };
+}
+
+/** Indian financial year (1 April – 31 March) containing `date`, or the one before it. */
+export function financialYear(date: string, previous = false): { from: string; to: string } {
+  const [y, m] = date.split('-').map(Number);
+  const start = (m >= 4 ? y : y - 1) - (previous ? 1 : 0);
+  return { from: `${start}-04-01`, to: `${start + 1}-03-31` };
+}
+
+// ---------------------------------------------------------------------------
 // Vendor quotes compared with each other and with past prices
 // ---------------------------------------------------------------------------
 

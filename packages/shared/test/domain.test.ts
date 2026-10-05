@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildItemDatabase,
+  buildSiteReport,
   filterMaterials,
+  financialYear,
+  siteHasDeliveries,
   materialFilterOptions,
   guessCategory,
   materialDatabaseToCSV,
@@ -28,7 +31,7 @@ function list(id: string, over: Partial<ListRow> = {}): ListRow {
 function item(id: string, list_id: string, over: Partial<ItemRow> = {}): ItemRow {
   return {
     id, list_id, item_name: 'Cement', original_term: 'bori', quantity: 10, unit: 'Bag', unit_price: 400,
-    total_amount: 4000, vendor: 'Sharma', date: '2026-01-01', brand: '', model: '', spec: '', color: '', created_at: ts('2026-01-01'),
+    total_amount: 4000, vendor: 'Sharma', date: '2026-01-01', brand: '', model: '', spec: '', color: '', delivered_at: '', created_at: ts('2026-01-01'),
     updated_at: ts('2026-01-01'), ...over,
   };
 }
@@ -210,5 +213,50 @@ describe('filtering the price database (#28)', () => {
     expect(gupta.map((e) => [e.name, e.priceHistory.map((p) => p.price)])).toEqual([['Switch', [95]], ['Wire', [1500]]]);
     expect(filterMaterials(db, { vendor: 'Sharma', brand: 'Anchor' })).toEqual([]);
     expect(filterMaterials(db, {})).toBe(db);
+  });
+});
+
+describe('site report (#38)', () => {
+  const lists = [
+    list('a1', { address: 'Sector 44', category: 'Civil', title: 'Cement order', created_at: ts('2026-04-10') }),
+    list('a2', { address: 'Sector 44', category: 'Electrical', title: 'Wiring', created_at: ts('2026-06-01') }),
+    list('a3', { address: 'Sector 44', category: 'Civil', title: 'Old', created_at: ts('2025-12-01') }),
+    list('b1', { address: 'Site B', category: 'Civil' }),
+    list('q1', { address: 'Sector 44', kind: 'boq' }),
+    list('d1', { address: 'Sector 44', status: 'draft' }),
+  ];
+  const items = [
+    item('c1', 'a1', { item_name: 'Cemnt', original_term: 'bori', quantity: 10, unit_price: 400, total_amount: 4000, date: '2026-04-10', delivered_at: '2026-04-12' }),
+    item('c2', 'a3', { item_name: 'OPC Cement', original_term: '', quantity: 5, unit_price: 380, total_amount: 1900, date: '2025-12-01', vendor: 'Gupta' }),
+    item('w1', 'a2', { item_name: 'Copper wire', original_term: '', unit: 'coil', quantity: 2, unit_price: 1500, total_amount: 3000, date: '2026-06-01' }),
+    item('b', 'b1', { quantity: 99, total_amount: 9999 }),
+    item('q', 'q1', { quantity: 50 }),
+    item('d', 'd1', { quantity: 50 }),
+  ];
+  const learning = { bori: { item_name: 'OPC Cement', unit: 'Bag' } };
+
+  it('covers the whole history of one site by default, grouped by category with learned names merged', () => {
+    const r = buildSiteReport(lists, items, learning, { address: 'Sector 44', deliveredOnly: false });
+    expect(r.categories.map((c) => [c.name, c.amount, c.materials.map((m) => [m.name, m.quantity, m.amount, m.bills, m.vendors])])).toEqual([
+      ['Civil', 5900, [['OPC Cement', 15, 5900, 2, ['Gupta', 'Sharma']]]],
+      ['Electrical', 3000, [['Copper wire', 2, 3000, 1, ['Sharma']]]],
+    ]);
+    expect(r.total).toBe(8900);
+    expect(r.lineCount).toBe(3);
+    expect(r.categories[0].materials[0].avgRate).toBeCloseTo(5900 / 15);
+    // Lines are dated by delivery when ticked.
+    expect(r.categories[0].materials[0].lines.map((l) => l.date)).toEqual(['2025-12-01', '2026-04-12']);
+  });
+
+  it('filters by dates, categories and delivery', () => {
+    const fy = financialYear('2026-10-05');
+    expect(fy).toEqual({ from: '2026-04-01', to: '2027-03-31' });
+    expect(financialYear('2026-02-01', true)).toEqual({ from: '2024-04-01', to: '2025-03-31' });
+    expect(buildSiteReport(lists, items, learning, { address: 'Sector 44', ...fy, deliveredOnly: false }).total).toBe(7000);
+    expect(buildSiteReport(lists, items, learning, { address: 'Sector 44', categories: ['electrical'], deliveredOnly: false }).total).toBe(3000);
+    const delivered = buildSiteReport(lists, items, learning, { address: 'Sector 44', deliveredOnly: true });
+    expect([delivered.total, delivered.lineCount]).toEqual([4000, 1]);
+    expect(siteHasDeliveries(lists, items, 'Sector 44')).toBe(true);
+    expect(siteHasDeliveries(lists, items, 'Site B')).toBe(false);
   });
 });

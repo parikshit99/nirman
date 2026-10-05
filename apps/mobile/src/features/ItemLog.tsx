@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { AlertTriangle, Calendar, Check, FileCode, HardHat, History, Pencil, Trash2, Truck, X, Zap } from 'lucide-react';
 import { VARIANT_FIELDS, materialKey, parseAmount, todayISO, variantLabel, variantMatches, type ItemRow, type MaterialEntry } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
+import { DeliveredToggle } from '../components/DeliveredToggle.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
 import { VariantFields } from '../components/VariantFields.tsx';
 import type { ItemPatch, ListKind } from '../data/repo.ts';
@@ -66,6 +67,7 @@ export function ItemLog({ kind, items, searching }: Props) {
   useEffect(() => () => void actions.flushDeletes(), [actions]);
 
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => setDraft((p) => ({ ...p, [field]: e.target.value }));
+  const undelivered = isAudit ? items.filter((i) => !i.delivered_at && !pendingDeletes.has(i.id)) : [];
   const indexable = itemsFor('audit').filter((i) => i.item_name && i.unit_price && !pendingDeletes.has(i.id));
   const field = 'w-full px-3 py-2 bg-white border border-orange-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-400';
 
@@ -146,6 +148,7 @@ export function ItemLog({ kind, items, searching }: Props) {
                       dbMatch={pricesFor(byKey.get(materialKey(item.item_name, item.unit)), item)}
                       onEdit={() => startEditing(item)}
                       onIndex={() => actions.indexRates([item])}
+                      onDelivered={(date) => actions.setDelivered([item.id], date)}
                       pendingDelete={pendingDeletes.has(item.id)}
                       onDelete={() => actions.deleteItemLater(item.id)}
                       onUndo={() => actions.undoDelete(item.id)}
@@ -162,6 +165,14 @@ export function ItemLog({ kind, items, searching }: Props) {
         <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-[var(--color-brand-concrete)] rounded-full text-xs uppercase font-mono tracking-widest text-gray-500 shadow-sm order-2 sm:order-1">
           <History size={12} /> {items.length} {items.length === 1 ? 'item' : 'items'}
         </div>
+        {isAudit && undelivered.length > 0 && (
+          <button
+            onClick={() => actions.setDelivered(undelivered.map((i) => i.id), todayISO())}
+            className="w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-4 py-3 bg-white border border-green-300 text-green-800 text-xs font-bold uppercase tracking-widest rounded-xl"
+          >
+            <Check size={14} /> Mark all delivered
+          </button>
+        )}
         {isAudit && indexable.length > 0 && (
           <button
             onClick={() => actions.indexRates(indexable)}
@@ -190,12 +201,13 @@ interface CardProps {
   dbMatch?: MatchingPrices;
   onEdit(): void;
   onIndex(): void;
+  onDelivered(date: string): void;
   pendingDelete: boolean;
   onDelete(): void;
   onUndo(): void;
 }
 
-function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, pendingDelete, onDelete, onUndo }: CardProps) {
+function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendingDelete, onDelete, onUndo }: CardProps) {
   if (pendingDelete) {
     return (
       <div className="flex items-center gap-3 min-h-[44px]">
@@ -256,6 +268,7 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, pendingDelete, onDe
 
       {isAudit && (
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          <DeliveredToggle name={item.item_name} deliveredAt={item.delivered_at} onChange={onDelivered} />
           {isIndexed ? (
             <span className="flex items-center gap-1 text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100">
               <Check size={12} /> Indexed

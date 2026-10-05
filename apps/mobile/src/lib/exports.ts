@@ -1,6 +1,6 @@
 import type { jsPDF } from 'jspdf';
 import type { SheetData } from 'write-excel-file/browser';
-import type { ItemRow, ListRow, QuoteComparison } from '@nirman/shared';
+import type { ItemRow, ListRow, QuoteComparison, SiteReport } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
 import { pdfToBase64 } from './pdf.ts';
 import type { SharedFile } from './files.ts';
@@ -63,6 +63,25 @@ export function comparisonSheet(boq: ListRow, comparison: QuoteComparison): Shee
     ]);
   }
   rows.push([null, bold('TOTAL (BOQ qty x rate)'), null, null, null, null, null, null, null, null, ...vendors.map((v) => ({ ...money(Math.round(v.total)), fontWeight: 'bold' as const }))]);
+  return rows;
+}
+
+/** Site report for Excel: the per-material summary, then every line. */
+export function siteReportSheet(address: string, filters: string, report: SiteReport): SheetData {
+  const rows: SheetData = [[bold('Site report')], [address], [filters], [`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`], []];
+  rows.push(['Category', 'Material', 'Quantity', 'Unit', 'Avg rate', 'Amount', 'Vendors', 'Bills'].map(bold));
+  for (const c of report.categories) {
+    for (const m of c.materials) rows.push([c.name, m.name, m.quantity, m.unit, m.avgRate ? money(m.avgRate) : null, money(m.amount), m.vendors.join(', '), m.bills]);
+    rows.push([bold(`${c.name} total`), null, null, null, null, { ...money(c.amount), fontWeight: 'bold' }, null, null]);
+  }
+  rows.push([bold('GRAND TOTAL'), null, null, null, null, { ...money(report.total), fontWeight: 'bold' }, null, null]);
+  rows.push([], [bold('All lines')]);
+  rows.push(['Date', 'Category', 'Item', 'Brand', 'Model / code', 'Size / spec', 'Color', 'Qty', 'Unit', 'Rate', 'Amount', 'Vendor', 'Session', 'Delivered on'].map(bold));
+  const lines = report.categories.flatMap((c) => c.materials.flatMap((m) => m.lines.map((l) => ({ ...l, category: c.name }))));
+  lines.sort((a, b) => a.date.localeCompare(b.date));
+  for (const { date, item, listTitle, category } of lines) {
+    rows.push([date, category, item.item_name, item.brand, item.model, item.spec, item.color, item.quantity, item.unit, money(item.unit_price), money(item.total_amount), item.vendor, listTitle, item.delivered_at]);
+  }
   return rows;
 }
 

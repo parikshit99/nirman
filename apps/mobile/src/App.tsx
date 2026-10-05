@@ -6,6 +6,8 @@ import { filterMaterials, guessCategory, todayISO, type MaterialFilter } from '@
 import { useDialogs } from './components/Dialogs.tsx';
 import { useBackHandler } from './lib/backButton.ts';
 import { prefs } from './lib/prefs.ts';
+import { hasUnseenNotes, latestNotes, markNotesSeen } from './lib/whatsNew.ts';
+import { WhatsNewModal } from './components/WhatsNewModal.tsx';
 import { backupOverdue, describeLastBackup, snoozeBackupReminder } from './lib/backupReminder.ts';
 import { PdfPreviewModal } from './components/PdfPreviewModal.tsx';
 import { BoqPicker } from './features/BoqPicker.tsx';
@@ -17,6 +19,8 @@ import type { ListKind, ListMeta } from './data/repo.ts';
 import { CapturePanel } from './features/CapturePanel.tsx';
 import { DatabaseView } from './features/DatabaseView.tsx';
 import { HistorySidebar, HistoryView } from './features/HistoryView.tsx';
+import { DeliveriesSheet } from './features/DeliveriesSheet.tsx';
+import { SiteReport } from './features/SiteReport.tsx';
 import { ItemLog } from './features/ItemLog.tsx';
 import { buildPdf } from './lib/pdf.ts';
 import { listSheet, pdfFile, pdfToJpegs, sheetToXlsx, type ExportFormat } from './lib/exports.ts';
@@ -68,6 +72,18 @@ export default function App() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(() => !settings.geminiApiKey && !prefs.get('nirmaan_onboarded', false));
   const [firstRun, setFirstRun] = useState(settingsOpen);
+  // After an update, show what's new once; a new install has nothing to compare with.
+  const [whatsNewOpen, setWhatsNewOpen] = useState(() => {
+    if (settingsOpen) {
+      markNotesSeen();
+      return false;
+    }
+    return hasUnseenNotes();
+  });
+  const closeWhatsNew = () => {
+    markNotesSeen();
+    setWhatsNewOpen(false);
+  };
 
   // Re-checked after Settings closes (a backup may have been made) or the reminder is snoozed.
   const [reminderTick, setReminderTick] = useState(0);
@@ -193,6 +209,8 @@ export default function App() {
   };
 
   const [shareOpen, setShareOpen] = useState(false);
+  const [siteReportOpen, setSiteReportOpen] = useState(false);
+  const [deliveriesFor, setDeliveriesFor] = useState<string | null>(null);
 
   // Photos or text shared from another app: first ask where they go, then hand them to that entry form.
   const [incoming, setIncoming] = useState<IncomingShare | null>(null);
@@ -348,7 +366,7 @@ export default function App() {
                 incoming={captureShare?.kind === kind ? captureShare.share : null}
                 onIncomingUsed={clearCaptureShare}
               />
-            ) : <HistorySidebar onNewBoq={() => setActiveTab('boq')} />}
+            ) : <HistorySidebar onNewBoq={() => setActiveTab('boq')} onSiteReport={() => setSiteReportOpen(true)} />}
           </section>
         )}
 
@@ -392,6 +410,7 @@ export default function App() {
                 onEdit={editRecordDetails}
                 onOpen={openRecord}
                 onQuotes={(record) => setQuoteTarget(record.id)}
+                onDeliveries={(record) => setDeliveriesFor(record.id)}
               />
             ) : (
               <ItemLog kind={kind!} items={filteredItems} searching={!!search} />
@@ -425,7 +444,8 @@ export default function App() {
           />
         )}
         {shareOpen && kind && <ShareSheet key="share" title={kind === 'audit' ? 'purchase list' : 'BOQ'} onShare={shareList} onClose={() => setShareOpen(false)} />}
-        {settingsOpen && <SettingsModal key="settings" onClose={closeSettings} firstRun={firstRun} />}
+        {settingsOpen && <SettingsModal key="settings" onClose={closeSettings} firstRun={firstRun} onWhatsNew={() => setWhatsNewOpen(true)} />}
+        {whatsNewOpen && latestNotes && <WhatsNewModal key="whats-new" notes={latestNotes} onClose={closeWhatsNew} />}
         {quoteTarget === 'pick' && (
           <BoqPicker
             key="boq-picker"
@@ -447,6 +467,8 @@ export default function App() {
             }}
           />
         )}
+        {siteReportOpen && <SiteReport key="site-report" onClose={() => setSiteReportOpen(false)} />}
+        {deliveriesFor && <DeliveriesSheet key="deliveries" recordId={deliveriesFor} onClose={() => setDeliveriesFor(null)} />}
         {incoming && <ShareTargetSheet key="share-target" share={incoming} hasSavedBoqs={savedBoqs.length > 0} onPick={routeShare} onClose={() => setIncoming(null)} />}
       </AnimatePresence>
     </div>

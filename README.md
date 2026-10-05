@@ -19,6 +19,7 @@ Everything is stored **only on your phone**. There is no server or account.
 - **Vendor quotes.** When a vendor replies to a BOQ with their own list, tap *Vendor quote received* on the BOQ tab, or *Quotes* on a saved BOQ in History, and photograph it. The AI matches each line to the BOQ, and you review the matches, see which items are missing, and confirm. Confirmed prices are saved under the BOQ's item names, so vendors line up side by side with the lowest rate marked, and every rate is compared with the last price you recorded for that item.
 - **Share in any format.** *Share* on a purchase list, BOQ or quote comparison offers a PDF, an Excel sheet (.xlsx) or a picture (JPG) of each page, then opens the phone's share sheet.
 - **Share into the app.** In WhatsApp (or any app), share a bill photo or a text message to *Nirman* and choose Purchases, BOQ or a vendor quote for a saved BOQ; the photos are put into that entry, ready to read.
+- **Deliveries and site reports.** Tick each purchase line when it reaches the site, on the open list or later under *History → Deliveries*. *History → Site report* lists everything bought for one address, for all time or any dates, for some or all work types, and optionally only what was delivered, as a PDF, Excel sheet or JPG.
 - **Backup.** *Settings → Save backup* shares one `.json` file with everything; save it to Google Drive, WhatsApp or email. *Restore* on any phone brings it all back. Queued, unread entries are not included.
 
 ## Using the app
@@ -65,6 +66,6 @@ cd android && ./gradlew assembleDebug
 
 ### Versions
 
-Every build is numbered `1.1.<build>` (e.g. `1.1.20`). The build number comes from CI and goes up with every build, so each APK installs over the previous one as an update. To start a new series (e.g. `1.2`), change `version` in `apps/mobile/package.json`; only the first two numbers are used. The version shows in *Settings → On this phone*, in Android's App info, in the release title, and as a `v1.1.<build>` tag on the commit it was built from. Local builds show `dev`.
+Every build is numbered `2.0.<build>` (e.g. `2.0.130`). The build number comes from CI and goes up with every build, so each APK installs over the previous one as an update. To start a new series (e.g. `2.1`), change `version` in `apps/mobile/package.json` and add a section at the top of [CHANGELOG.md](CHANGELOG.md); only the first two numbers of the version are used, and the newest changelog section becomes the release notes and the app's *What's new* screen, shown once after the update. The version shows in *Settings → On this phone*, in Android's App info, in the release title, and as a `v2.0.<build>` tag on the commit it was built from. Local builds show `dev`.
 
 CI (`.github/workflows/ci.yml`) type-checks, runs the tests and builds a debug APK on every push. Builds of `main` are published to the [`latest-debug` release](https://github.com/parikshit99/nirman/releases/tag/latest-debug), which is where the download link above points; builds of a pull request are under that workflow run's *Artifacts*. For a Play Store release, add a signing config and run `./gradlew bundleRelease`.

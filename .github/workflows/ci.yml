@@ -72,7 +72,12 @@ jobs:
           git tag -f latest-debug
           git tag -f "v$APP_VERSION"
           git push -f origin refs/tags/latest-debug "refs/tags/v$APP_VERSION"
-          NOTES="Version $APP_VERSION, built from main at ${GITHUB_SHA::7} on $(date -u +%Y-%m-%d).
+          # Release notes: the newest CHANGELOG section, then this build's details (dates in IST).
+          WHATS_NEW=$(awk '/^## /{n++} n==1' CHANGELOG.md)
+          NOTES="$WHATS_NEW
+
+          ---
+          Version $APP_VERSION, built from main at ${GITHUB_SHA::7} on $(TZ=Asia/Kolkata date +%Y-%m-%d).
 
           Latest change: $(git log -1 --format=%s)"
           gh release view latest-debug >/dev/null 2>&1 || gh release create latest-debug --title "Nirman v$APP_VERSION" --notes "$NOTES"

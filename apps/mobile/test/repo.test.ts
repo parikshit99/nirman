@@ -25,6 +25,7 @@ import {
   restoreToDraft,
   saveDraftToHistory,
   setListNotes,
+  setDelivered,
   setPrice,
   unhideMaterial,
   updateItem,
@@ -76,6 +77,23 @@ describe('local repository', () => {
     const snap = await loadSnapshot(db);
     expect(snap.items[0].total_amount).toBe(4500);
     expect(learningMap(snap.learned)).toEqual({ bori: { item_name: 'OPC Cement 53 Grade', unit: 'Bag' } });
+  });
+
+  it('marks purchase lines delivered and keeps the date through saving and reopening', async () => {
+    const db = await freshDb();
+    await addItems(db, DRAFT_IDS.audit, [cement, sand]);
+    const draft = (await loadSnapshot(db)).items.filter((i) => i.list_id === DRAFT_IDS.audit);
+    const byName = (n: string) => draft.find((i) => i.item_name === n)!;
+    expect(byName('Sand').delivered_at).toBe('');
+    await setDelivered(db, [byName('Sand').id], '2026-10-03');
+    const id = await saveDraftToHistory(db, 'audit', meta);
+    // Ticked on the draft after saving: reopening the saved copy brings back what was saved.
+    await setDelivered(db, [byName('Cement').id], '2026-10-04');
+    await restoreToDraft(db, id);
+    const reopened = (await loadSnapshot(db)).items.filter((i) => i.list_id === DRAFT_IDS.audit);
+    expect(reopened.map((i) => [i.item_name, i.delivered_at]).sort()).toEqual([['Cement', ''], ['Sand', '2026-10-03']].sort());
+    await setDelivered(db, reopened.map((i) => i.id), '');
+    expect((await loadSnapshot(db)).items.filter((i) => i.list_id === DRAFT_IDS.audit).every((i) => i.delivered_at === '')).toBe(true);
   });
 
   it('edits and forgets single learned corrections', async () => {
@@ -277,6 +295,7 @@ describe('local repository', () => {
       // Back to how a phone stored them before migration 5.
       await db.run('ALTER TABLE indexed_rates DROP COLUMN category');
       await db.run('ALTER TABLE indexed_rates DROP COLUMN address');
+      await db.run('ALTER TABLE items DROP COLUMN delivered_at');
       await db.run('UPDATE schema_version SET version = 4');
       await migrateLocal(db);
       const rates = (await loadSnapshot(db)).rates.map((r) => [r.item_name, r.category, r.address]).sort();
