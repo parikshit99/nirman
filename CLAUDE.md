@@ -24,6 +24,6 @@ When unsure between two sizes, pick the smaller one. A test (`apps/mobile/test/w
 
 ## Diagnostics
 
-- `apps/mobile/src/lib/diagnostics.ts` keeps the on-phone log. Log names, counts, timings and error messages only: never item names, prices, addresses, notes, vendor or receiver details, photos or keys.
+- `apps/mobile/src/lib/diagnostics.ts` keeps the on-phone log. Steps carry what they worked on (action arguments, AI input text and output lines, so item names, rates, vendors and addresses may appear) to help reproduce bugs; the owner allowed this, and the repo is private. Never log photos (`describe()` replaces encoded data with a size) or the API key (`scrub()` removes it).
 - Users send it with *Settings → Report a problem* (a pre-filled GitHub issue labelled `bug`) or *Share log*. Read those issues' logs when debugging.
 - Automatic crash reports go to Sentry when the `SENTRY_DSN` repository variable is set (Settings → Secrets and variables → Actions → Variables); without it they are off.

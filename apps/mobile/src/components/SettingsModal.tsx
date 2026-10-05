@@ -520,8 +520,8 @@ function DiagnosticsSection() {
     <section className="space-y-2">
       <SectionTitle>Problems and diagnostics</SectionTitle>
       <p className="text-[11px] text-gray-500 leading-relaxed">
-        The app keeps a short log on this phone of errors, AI readings, the steps you take and slow screens, to help fix problems. It never records what you
-        bought, prices, addresses, names or your API key. {log.length} entries{errors ? `, ${errors} errors` : ''}.
+        The app keeps a log on this phone of errors, AI readings, the steps you take and slow screens, including the items, rates and vendors involved, to
+        help fix problems. Photos and your API key are never recorded. {log.length} entries{errors ? `, ${errors} errors` : ''}.
       </p>
       <textarea
         aria-label="Describe the problem"
