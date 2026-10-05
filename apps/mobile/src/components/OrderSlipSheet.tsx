@@ -21,10 +21,26 @@ const FORMATS: { format: ExportFormat; label: string; icon: typeof FileText }[] 
  * rates, plus where, when and to whom to deliver. The site and receiver are
  * remembered for next time.
  */
-export function OrderSlipSheet({ items, notes, address, addresses, onClose }: { items: ItemRow[]; notes: string; address: string; addresses: string[]; onClose(): void }) {
+export function OrderSlipSheet({
+  items,
+  notes,
+  address,
+  addresses,
+  vendor = '',
+  onClose,
+}: {
+  items: ItemRow[];
+  notes: string;
+  address: string;
+  addresses: string[];
+  /** Prefilled when ordering from a vendor's quote. */
+  vendor?: string;
+  onClose(): void;
+}) {
   const dialogs = useDialogs();
   const last = prefs.get<Partial<OrderSlipDetails>>(LAST_KEY, {});
   const [details, setDetails] = useState<OrderSlipDetails>({
+    vendor,
     address: address || last.address || '',
     deliveryDate: '',
     receiverName: last.receiverName ?? '',
@@ -38,7 +54,7 @@ export function OrderSlipSheet({ items, notes, address, addresses, onClose }: { 
   const share = async (format: ExportFormat) => {
     setBusy(format);
     prefs.set(LAST_KEY, { address: details.address, receiverName: details.receiverName, receiverPhone: details.receiverPhone });
-    const name = `Order_slip_${(details.address || 'site').replace(/[^\w-]+/g, '_').slice(0, 30)}_${todayISO()}`;
+    const name = `Order_slip_${(details.vendor?.trim() || details.address || 'site').replace(/[^\w-]+/g, '_').slice(0, 30)}_${todayISO()}`;
     try {
       if (format === 'xlsx') {
         await shareFiles([await sheetToXlsx(orderSlipSheet(items, details), `${name}.xlsx`, 'Order slip', [14, 32, 14, 14, 14, 10, 8, 8, 30])]);
@@ -79,6 +95,10 @@ export function OrderSlipSheet({ items, notes, address, addresses, onClose }: { 
             <X size={20} />
           </button>
         </div>
+        <label className="block">
+          <span className={label}>To (vendor, optional)</span>
+          <input aria-label="Vendor" value={details.vendor ?? ''} onChange={set('vendor')} className={input} placeholder="e.g. Sharma Traders" />
+        </label>
         <label className="block">
           <span className={label}>Deliver to (site address)</span>
           <input aria-label="Deliver to" list="order-slip-sites" value={details.address} onChange={set('address')} className={input} placeholder="e.g. Sector 44, Gurgaon" />

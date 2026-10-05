@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { CheckSquare, ClipboardList, Eye, History, Pencil, Plus, Trash2, Truck } from 'lucide-react';
+import { CheckSquare, ClipboardList, Eye, History, Pencil, Plus, RotateCcw, Trash2, Truck } from 'lucide-react';
 import { FilterChips } from '../components/FilterChips.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
@@ -49,9 +49,10 @@ interface Props {
   onOpen(record: HistoryRecord): void;
   onQuotes(record: HistoryRecord): void;
   onDeliveries(record: HistoryRecord): void;
+  onBuyAgain(record: HistoryRecord): void;
 }
 
-export function HistoryView({ records, categoryFilter, onCategory, addressFilter, onAddress, onEdit, onOpen, onQuotes, onDeliveries }: Props) {
+export function HistoryView({ records, categoryFilter, onCategory, addressFilter, onAddress, onEdit, onOpen, onQuotes, onDeliveries, onBuyAgain }: Props) {
   const { actions, categoryNames, uniqueAddresses, quotesFor } = useAppState();
   const dialogs = useDialogs();
 
@@ -155,6 +156,15 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
                 >
                   <Eye size={12} /> Open & Restore
                 </button>
+                {record.kind === 'audit' && record.items.length > 0 && (
+                  <button
+                    onClick={() => onBuyAgain(record)}
+                    className="py-2 px-3 bg-white text-gray-700 border border-gray-300 text-[11px] font-bold uppercase tracking-widest rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
+                    aria-label={`Buy again: ${record.title}`}
+                  >
+                    <RotateCcw size={12} /> Again
+                  </button>
+                )}
                 {record.kind === 'audit' && record.items.length > 0 && (
                   <button
                     onClick={() => onDeliveries(record)}

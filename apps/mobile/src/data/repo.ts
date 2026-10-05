@@ -638,6 +638,45 @@ export async function enqueueQuote(db: Db, quote: NewQuote): Promise<string> {
 }
 
 /**
+ * A vendor quote typed in by hand: a rate against each BOQ item (no AI). It
+ * goes to review like a read quote, so it is checked before confirming.
+ */
+export async function createManualQuote(
+  db: Db,
+  quote: { boqId: string; vendor: string; quoteDate: string; rates: { boqItemId: string; unitPrice: number }[] },
+): Promise<string> {
+  const quoteId = newId();
+  await db.transaction(async (tx) => {
+    const ts = nowISO();
+    await writeRow(tx, 'quotes', {
+      id: quoteId, boq_id: quote.boqId, vendor: quote.vendor.trim(), quote_date: quote.quoteDate, status: 'review',
+      created_at: ts, updated_at: ts,
+    });
+    const items = new Map((await listItems(tx, quote.boqId)).map((i) => [i.id, i]));
+    let position = 0;
+    for (const { boqItemId, unitPrice } of quote.rates) {
+      const item = items.get(boqItemId);
+      if (!item || !(unitPrice > 0)) continue;
+      await writeRow(tx, 'quote_lines', {
+        id: newId(),
+        quote_id: quoteId,
+        position: position++,
+        boq_item_id: item.id,
+        original_term: '',
+        item_name: item.item_name,
+        quantity: item.quantity,
+        unit: item.unit,
+        unit_price: unitPrice,
+        total_amount: item.quantity * unitPrice,
+        note: '',
+        ...variantOf(item),
+      });
+    }
+  });
+  return quoteId;
+}
+
+/**
  * Store the lines read from a vendor quote and drop the job. `boqItemIds[i]` is
  * the item printed as Sr. i+1 when the job was read.
  */

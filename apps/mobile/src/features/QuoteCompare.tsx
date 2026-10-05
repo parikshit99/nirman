@@ -4,6 +4,7 @@ import { compareQuotes, variantLabel, type QuoteCell, type QuoteRow } from '@nir
 import { useDialogs } from '../components/Dialogs.tsx';
 import { Sparkline, VsLastBadge, pct, rupees, shortDate } from '../components/PriceBadges.tsx';
 import { ShareSheet } from '../components/ShareSheet.tsx';
+import { OrderSlipSheet } from '../components/OrderSlipSheet.tsx';
 import { comparisonSheet, pdfFile, pdfToJpegs, sheetToXlsx, type ExportFormat } from '../lib/exports.ts';
 import { shareFiles } from '../lib/files.ts';
 import { buildQuoteComparisonPdf } from '../lib/pdf.ts';
@@ -18,6 +19,8 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
   const { linesFor, itemDatabase, learning } = useAppState();
   const dialogs = useDialogs();
   const [shareOpen, setShareOpen] = useState(false);
+  const [orderFrom, setOrderFrom] = useState<string | null>(null);
+  const { uniqueAddresses } = useAppState();
   const lines = quotes.flatMap((q) => linesFor(q.id));
   const comparison = compareQuotes(boq.items, quotes, lines, itemDatabase, learning);
 
@@ -83,6 +86,12 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
                 {pct(v.vsLast)} vs last prices for the same items ({rupees(Math.round(v.lastTotal))})
               </div>
             )}
+            <button
+              onClick={() => setOrderFrom(v.quote.id)}
+              className={`mt-2 w-full py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider ${v === best ? 'bg-green-700 text-white' : 'bg-white border border-gray-300 text-gray-700'}`}
+            >
+              Order from {v.quote.vendor || 'this vendor'}
+            </button>
           </div>
         ))}
       </div>
@@ -206,6 +215,13 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
         </button>
       </div>
       {shareOpen && <ShareSheet title="comparison" onShare={share} onClose={() => setShareOpen(false)} />}
+      {orderFrom && (() => {
+        const v = comparison.vendors.find((x) => x.quote.id === orderFrom);
+        if (!v) return null;
+        // Only what this vendor quoted for; the rest goes to someone else.
+        const items = boq.items.filter((i) => (comparison.rows.find((r) => r.item.id === i.id)?.cells[v.quote.id]?.price ?? 0) > 0);
+        return <OrderSlipSheet items={items} notes={boq.notes} address={boq.address} addresses={uniqueAddresses} vendor={v.quote.vendor} onClose={() => setOrderFrom(null)} />;
+      })()}
     </div>
   );
 }

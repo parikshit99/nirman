@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, Image as ImageIcon, Loader2, Plus, RotateCcw, Trash2, Truck, X } from 'lucide-react';
-import { MAX_IMAGES, compareQuotes, todayISO, type QuoteRow } from '@nirman/shared';
+import { MAX_IMAGES, compareQuotes, parseAmount, todayISO, variantLabel, type QuoteRow } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { PhotoSourceSheet } from '../components/PhotoSourceSheet.tsx';
 import { chooseFromGallery, takePhoto } from '../lib/camera.ts';
@@ -82,9 +82,11 @@ export function QuotesView({ boqId, initial, onClose }: { boqId: string; initial
             <AddQuote
               boqId={boqId}
               initial={shared}
-              onDone={() => {
+              onDone={(reviewQuoteId) => {
                 setShared(undefined);
-                back();
+                // A typed quote opens straight in review, to check and confirm.
+                if (reviewQuoteId) setScreen({ name: 'review', quoteId: reviewQuoteId });
+                else back();
               }}
             />
           )}
@@ -179,8 +181,8 @@ function QuoteList({ boq, quotes, onAdd, onOpen }: { boq: HistoryRecord; quotes:
   );
 }
 
-function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: IncomingShare; onDone(): void }) {
-  const { actions, knownVendors } = useAppState();
+function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: IncomingShare; onDone(reviewQuoteId?: string): void }) {
+  const { actions, knownVendors, history } = useAppState();
   const dialogs = useDialogs();
   const [vendor, setVendor] = useState('');
   const [date, setDate] = useState(todayISO());
@@ -189,6 +191,21 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
   const [sourceMenu, setSourceMenu] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Typing the vendor's rates against each BOQ line needs no AI or internet.
+  const [mode, setMode] = useState<'read' | 'type'>('read');
+  const boqItems = history.find((h) => h.id === boqId)?.items ?? [];
+  const [rates, setRates] = useState<Record<string, string>>({});
+  const typed = boqItems.map((i) => ({ boqItemId: i.id, unitPrice: parseAmount(rates[i.id] ?? '') ?? NaN })).filter((r) => r.unitPrice > 0);
+  const badRate = boqItems.some((i) => (rates[i.id] ?? '').trim() && !(Number(parseAmount(rates[i.id])) >= 0));
+  const submitTyped = async () => {
+    setBusy(true);
+    try {
+      const id = await actions.createManualQuote({ boqId, vendor, quoteDate: date || todayISO(), rates: typed });
+      onDone(id);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const addImages = async (urls: (string | Promise<string | null>)[]) => {
     const results = (await Promise.all(urls)).filter((x): x is string => !!x);
@@ -218,9 +235,23 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
 
   return (
     <div className="space-y-4 max-w-xl mx-auto">
+      <div className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-xl" role="tablist" aria-label="How to add the quote">
+        {(['read', 'type'] as const).map((m) => (
+          <button
+            key={m}
+            role="tab"
+            aria-selected={mode === m}
+            onClick={() => setMode(m)}
+            className={`py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider ${mode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+          >
+            {m === 'read' ? 'Photo / text (AI)' : 'Type rates'}
+          </button>
+        ))}
+      </div>
       <p className="text-[11px] text-gray-500 leading-relaxed">
-        Photograph the vendor's reply as it is, even if they wrote their own list. The AI matches each line to this BOQ, and you check the matches before
-        anything is saved.
+        {mode === 'read'
+          ? "Photograph the vendor's reply as it is, even if they wrote their own list. The AI matches each line to this BOQ, and you check the matches before anything is saved."
+          : "Enter the vendor's rate against each BOQ line; leave blank what they didn't quote. Works without internet or an API key."}
       </p>
       <div className="grid grid-cols-[1fr_auto] gap-3">
         <label className="block">
@@ -244,64 +275,104 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
         </label>
       </div>
 
+      {mode === 'type' ? (
+        <>
+          <ul className="divide-y divide-gray-100 border border-gray-200 rounded-xl">
+            {boqItems.map((item, i) => (
+              <li key={item.id} className="flex items-center gap-3 p-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold truncate">
+                    {i + 1}. {item.item_name}
+                  </div>
+                  <div className="text-xs text-gray-500 truncate">
+                    {[variantLabel(item), `${item.quantity} ${item.unit}`].filter(Boolean).join(' · ')}
+                  </div>
+                </div>
+                <label className="flex items-center gap-1 shrink-0">
+                  <span className="text-xs text-gray-500">₹</span>
+                  <input
+                    inputMode="decimal"
+                    aria-label={`Rate for ${item.item_name}`}
+                    value={rates[item.id] ?? ''}
+                    onChange={(e) => setRates((r) => ({ ...r, [item.id]: e.target.value }))}
+                    placeholder={`per ${item.unit}`}
+                    className="w-24 px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </label>
+              </li>
+            ))}
+          </ul>
+          <button
+            onClick={submitTyped}
+            disabled={!vendor.trim() || typed.length === 0 || badRate || busy}
+            className="w-full h-12 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-widest text-xs"
+          >
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Review {typed.length} {typed.length === 1 ? 'rate' : 'rates'}
+          </button>
+          {badRate && <p className="text-[11px] text-red-600 text-center">Use digits for rates, e.g. 380 or 1,500.</p>}
+        </>
+      ) : (
+        <>
       <div>
-        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Photos of the quote</span>
-        <div className="mt-1 grid grid-cols-3 gap-2">
-          {images.map((src, idx) => (
-            <div key={idx} className="relative aspect-square rounded-lg border border-gray-200 overflow-hidden">
-              <img src={src} alt={`Page ${idx + 1}`} className="w-full h-full object-cover" />
-              <button
-                onClick={() => setImages((prev) => prev.filter((_, i) => i !== idx))}
-                className="absolute top-1 right-1 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center"
-                aria-label={`Remove page ${idx + 1}`}
-              >
-                <Trash2 size={12} />
-              </button>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Photos of the quote</span>
+            <div className="mt-1 grid grid-cols-3 gap-2">
+              {images.map((src, idx) => (
+                <div key={idx} className="relative aspect-square rounded-lg border border-gray-200 overflow-hidden">
+                  <img src={src} alt={`Page ${idx + 1}`} className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => setImages((prev) => prev.filter((_, i) => i !== idx))}
+                    className="absolute top-1 right-1 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center"
+                    aria-label={`Remove page ${idx + 1}`}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+              {images.length < MAX_IMAGES && (
+                <button
+                  onClick={addPhoto}
+                  className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-gray-500"
+                >
+                  {isNative ? <Camera size={20} /> : <ImageIcon size={20} />}
+                  <span className="text-[11px] font-bold uppercase">Add page</span>
+                </button>
+              )}
             </div>
-          ))}
-          {images.length < MAX_IMAGES && (
-            <button
-              onClick={addPhoto}
-              className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-gray-500"
-            >
-              {isNative ? <Camera size={20} /> : <ImageIcon size={20} />}
-              <span className="text-[11px] font-bold uppercase">Add page</span>
-            </button>
-          )}
-        </div>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          aria-label="Quote photos"
-          onChange={(e) => {
-            const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith('image/')).slice(0, MAX_IMAGES - images.length);
-            e.target.value = '';
-            void addImages(files.map(async (f) => compressImage(await readFileAsDataUrl(f))));
-          }}
-        />
-      </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              aria-label="Quote photos"
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith('image/')).slice(0, MAX_IMAGES - images.length);
+                e.target.value = '';
+                void addImages(files.map(async (f) => compressImage(await readFileAsDataUrl(f))));
+              }}
+            />
+          </div>
 
-      <label className="block">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Or type / paste the quote (optional)</span>
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          rows={3}
-          placeholder="e.g. cement ACC 380 per bag, reti 1400 per ton…"
-          className="mt-1 w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-500"
-        />
-      </label>
+          <label className="block">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Or type / paste the quote (optional)</span>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={3}
+              placeholder="e.g. cement ACC 380 per bag, reti 1400 per ton…"
+              className="mt-1 w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-500"
+            />
+          </label>
 
-      <button
-        onClick={submit}
-        disabled={!ready || busy}
-        className="w-full h-12 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-widest text-xs"
-      >
-        {busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Read quote
-      </button>
+          <button
+            onClick={submit}
+            disabled={!ready || busy}
+            className="w-full h-12 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-widest text-xs"
+          >
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Read quote
+          </button>
+        </>
+      )}
       {!vendor.trim() && <p className="text-[11px] text-gray-400 text-center">Enter the vendor's name to continue.</p>}
       {sourceMenu && <PhotoSourceSheet remaining={MAX_IMAGES - images.length} onPick={pickFrom} onClose={() => setSourceMenu(false)} />}
     </div>
