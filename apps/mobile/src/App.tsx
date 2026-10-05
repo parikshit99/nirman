@@ -162,9 +162,6 @@ export default function App() {
   const totalSpent = kind === 'audit' ? filteredItems.reduce((acc, i) => acc + (pendingDeletes.has(i.id) ? 0 : i.total_amount || 0), 0) : 0;
   const titlePrefix = (k: ListKind) => (k === 'audit' ? 'Purchases' : 'BOQ');
 
-  const linkedList = kind ? history.find((r) => r.id === linkedRecord[kind]) : undefined;
-  const linkedSite = linkedList ? { address: linkedList.address, category: linkedList.category } : undefined;
-
   const openSave = () => {
     if (!kind || activeItems.length === 0) return;
     const record = history.find((r) => r.id === linkedRecord[kind]);
@@ -501,7 +498,7 @@ export default function App() {
                 kind={kind!}
                 items={filteredItems}
                 searching={!!search}
-                site={linkedSite}
+                onIndex={openSave}
               />
             )}
           </div>

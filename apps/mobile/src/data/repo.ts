@@ -586,6 +586,11 @@ export async function setJobStatus(db: Db, jobId: string, status: JobStatus, err
   );
 }
 
+/** Queue a failed entry again, with a fresh count of attempts. */
+export async function retryJob(db: Db, jobId: string) {
+  await db.run(`UPDATE jobs SET status = 'pending', error = NULL, attempts = 0 WHERE id = ?`, [jobId]);
+}
+
 /** Store the extracted items and drop the job in one step. */
 export async function completeJob(db: Db, jobId: string, materials: MaterialInput[]) {
   await db.transaction(async (tx) => {

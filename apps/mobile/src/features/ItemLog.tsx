@@ -1,38 +1,32 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { AlertTriangle, Calendar, Check, FileCode, HardHat, History, Pencil, Trash2, Truck, X, Zap } from 'lucide-react';
-import { VARIANT_FIELDS, guessCategory, materialKey, parseAmount, todayISO, variantLabel, variantMatches, type ItemRow, type MaterialEntry } from '@nirman/shared';
+import { VARIANT_FIELDS, materialKey, parseAmount, todayISO, variantLabel, variantMatches, type ItemRow, type MaterialEntry } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
-import { IndexSiteSheet, type RateSite } from '../components/IndexSiteSheet.tsx';
 import { DeliveredToggle } from '../components/DeliveredToggle.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
 import { QuantityHelper } from '../components/QuantityHelper.tsx';
 import { VariantFields } from '../components/VariantFields.tsx';
 import type { ItemPatch, ListKind } from '../data/repo.ts';
 import { useBackHandler } from '../lib/backButton.ts';
-import { prefs } from '../lib/prefs.ts';
-import { workTypeKey } from '../lib/workType.ts';
 import { useAppState } from '../state/AppState.tsx';
 
 interface Props {
   kind: ListKind;
   items: ItemRow[];
   searching: boolean;
-  /** Site and work type of the saved list being edited, if any; indexed rates carry them. */
-  site?: RateSite;
+  /** Indexing saves the purchase list to History (asking its site and work type); Data reads prices from there. */
+  onIndex(): void;
 }
-
-const LAST_SITE_KEY = 'nirmaan_index_site';
 
 const rupees = (n: number) => `₹${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
 /** The current Audit or BOQ list: one card per item, sized for a phone screen. */
-export function ItemLog({ kind, items, searching, site }: Props) {
-  const { actions, itemDatabase, itemsFor, pendingDeletes, categoryNames, uniqueAddresses } = useAppState();
+export function ItemLog({ kind, items, searching, onIndex }: Props) {
+  const { actions, itemDatabase, itemsFor, pendingDeletes } = useAppState();
   const dialogs = useDialogs();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
-  const [toIndex, setToIndex] = useState<ItemRow[] | null>(null);
   const isAudit = kind === 'audit';
   const byKey = new Map<string, MaterialEntry>(itemDatabase.map((e) => [e.key, e]));
 
@@ -80,13 +74,6 @@ export function ItemLog({ kind, items, searching, site }: Props) {
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => setDraft((p) => ({ ...p, [field]: e.target.value }));
   const undelivered = isAudit ? items.filter((i) => !i.delivered_at && !pendingDeletes.has(i.id)) : [];
   const indexable = itemsFor('audit').filter((i) => i.item_name && i.unit_price && !pendingDeletes.has(i.id));
-  // Rates need a site: an edited saved list has one; otherwise ask (remembering the last answer).
-  const indexRates = (list: ItemRow[]) => (site?.address ? actions.indexRates(list.map((i) => ({ ...i, ...site }))) : setToIndex(list));
-  const confirmIndex = (chosen: RateSite) => {
-    if (chosen.address) prefs.set(LAST_SITE_KEY, chosen.address);
-    void actions.indexRates(toIndex!.map((i) => ({ ...i, ...chosen })));
-    setToIndex(null);
-  };
   const field = 'w-full px-3 py-2 bg-white border border-orange-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-400';
 
   return (
@@ -177,7 +164,7 @@ export function ItemLog({ kind, items, searching, site }: Props) {
                       isAudit={isAudit}
                       dbMatch={pricesFor(byKey.get(materialKey(item.item_name, item.unit)), item)}
                       onEdit={() => startEditing(item)}
-                      onIndex={() => indexRates([item])}
+                      onIndex={onIndex}
                       onDelivered={(date) => actions.setDelivered([item.id], date)}
                       pendingDelete={pendingDeletes.has(item.id)}
                       onDelete={() => actions.deleteItemLater(item.id)}
@@ -205,27 +192,14 @@ export function ItemLog({ kind, items, searching, site }: Props) {
         )}
         {isAudit && indexable.length > 0 && (
           <button
-            onClick={() => indexRates(indexable)}
+            onClick={onIndex}
             className="w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-br from-orange-500 to-orange-600 text-white text-xs font-bold uppercase tracking-widest rounded-xl shadow-lg shadow-orange-100 transition-all active:scale-95"
-            title="Index all rates into your vendor database"
+            title="Save this purchase list to History; its rates go into Data"
           >
             <Zap size={14} fill="currentColor" /> Index all rates
           </button>
         )}
       </div>
-      {toIndex && (
-        <IndexSiteSheet
-          count={toIndex.length}
-          initial={{
-            address: site?.address || prefs.get(LAST_SITE_KEY, ''),
-            category: site?.category || prefs.get(workTypeKey('audit'), '') || guessCategory(toIndex) || categoryNames[0] || 'Civil',
-          }}
-          addresses={uniqueAddresses}
-          categories={categoryNames}
-          onConfirm={confirmIndex}
-          onClose={() => setToIndex(null)}
-        />
-      )}
     </>
   );
 }
@@ -321,7 +295,7 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendin
             <button
               onClick={onIndex}
               className="flex items-center gap-1 text-xs font-bold text-orange-700 hover:text-white hover:bg-orange-500 px-2 py-0.5 rounded border border-orange-200 transition-all"
-              title="Verify and index this rate"
+              title="Save this purchase list to History; its rates go into Data"
             >
               <Zap size={12} /> Index rate
             </button>

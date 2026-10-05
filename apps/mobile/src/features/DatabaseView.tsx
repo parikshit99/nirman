@@ -223,7 +223,7 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
               <>
                 <p className="text-sm font-bold text-gray-600">No prices yet</p>
                 <p className="text-xs leading-relaxed max-w-sm mx-auto">
-                  Prices appear here when you save a purchase list (Save button), tap <b>Index rate</b> on a purchase, or confirm a vendor quote.
+                  Prices appear here when you save a purchase list (Save button), tap <b>Index</b> on a purchase (which saves the list to History), or confirm a vendor quote.
                   {unsavedPriced > 0 && ` Your purchase list has ${unsavedPriced} priced item${unsavedPriced === 1 ? '' : 's'} not added yet.`}
                 </p>
               </>
@@ -350,7 +350,7 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
         <div>
           <h4 className="text-xs font-bold text-gray-700">Where prices come from</h4>
           <p className="text-[11px] text-gray-500">
-            Saved purchase lists, single rates added with “Index rate”, and confirmed vendor quotes. Fixing or removing a price from a saved list changes that list too.
+            Saved purchase lists (Save or Index), rates indexed on their own by earlier versions, and confirmed vendor quotes. Fixing or removing a price from a saved list changes that list too.
           </p>
         </div>
       </div>

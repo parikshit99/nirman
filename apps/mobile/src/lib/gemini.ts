@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import {
   IMAGE_INSTRUCTION,
   QUOTE_IMAGE_INSTRUCTION,
@@ -27,7 +27,12 @@ export interface Extractor {
  * - `retry`: offline, timed out, rate limited or a Google-side error.
  */
 export class ExtractionError extends Error {
-  constructor(message: string, public kind: 'invalid' | 'retry') {
+  constructor(
+    message: string,
+    public kind: 'invalid' | 'retry',
+    /** Gemini didn't answer in time (as opposed to being offline or busy). */
+    public timedOut = false,
+  ) {
     super(message);
   }
 }
@@ -79,7 +84,11 @@ const QUOTE_SCHEMA = {
   },
 };
 
-const TIMEOUT_MS = 60_000;
+/** A bill photo can take Gemini over a minute to read; give up after two. */
+const TIMEOUT_MS = 120_000;
+
+/** Gemini 3 models think at length by default; reading a bill needs little, and answers much sooner. */
+const thinkingFor = (model: string) => (/gemini-3/.test(model) ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {});
 
 type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
 
@@ -100,7 +109,7 @@ export function classifyError(err: unknown): ExtractionError {
   }
   if (status === 404) return new ExtractionError('Unknown Gemini model. Check the model name in Settings.', 'invalid');
   if (status === 429) return new ExtractionError('Gemini rate limit reached; will retry.', 'retry');
-  if (e?.name === 'TimeoutError' || e?.name === 'AbortError') return new ExtractionError('Gemini timed out; will retry.', 'retry');
+  if (e?.name === 'TimeoutError' || e?.name === 'AbortError') return new ExtractionError('Gemini timed out; will retry.', 'retry', true);
   if (status && status >= 500) return new ExtractionError('Gemini is having problems; will retry.', 'retry');
   return new ExtractionError('Could not reach Gemini; will retry when online.', 'retry');
 }
@@ -155,6 +164,7 @@ export function createGeminiExtractor(apiKey: string, model: string, onModelRepl
         systemInstruction,
         responseMimeType: 'application/json',
         responseSchema,
+        ...thinkingFor(current),
         abortSignal: AbortSignal.timeout(TIMEOUT_MS),
       },
     });
