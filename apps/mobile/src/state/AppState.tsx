@@ -210,6 +210,9 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
         worker.schedule();
       },
       exportBackup: () => exportBackup(db),
+      countTrainingSamples: () => repo.countTrainingSamples(db),
+      exportTrainingData: () => repo.exportTrainingData(db),
+      clearTrainingSamples: () => repo.clearTrainingSamples(db),
       parseBackup,
       async restoreBackup(backup: Parameters<typeof restoreBackup>[1]) {
         await restoreBackup(db, backup);

@@ -155,8 +155,9 @@ async function ensureDraftRows(tx: SqlExecutor) {
  * (lists are shown newest first).
  */
 let lastInsertMs = 0;
-async function insertMaterials(tx: SqlExecutor, listId: string, input: MaterialInput[]) {
+async function insertMaterials(tx: SqlExecutor, listId: string, input: MaterialInput[]): Promise<string[]> {
   const materials = input.map((m) => extractedMaterialSchema.parse(m));
+  const ids: string[] = [];
   const n = materials.length;
   // Strictly increasing so a batch added right after another still sorts above it.
   const base = Math.max(Date.now(), lastInsertMs + 1);
@@ -165,8 +166,10 @@ async function insertMaterials(tx: SqlExecutor, listId: string, input: MaterialI
     const ts = new Date(base + (n - i)).toISOString();
     const quantity = Number(m.quantity) || 0;
     const unitPrice = Number(m.unit_price) || 0;
+    const id = newId();
+    ids.push(id);
     await writeRow(tx, 'items', {
-      id: newId(),
+      id,
       list_id: listId,
       item_name: m.item_name,
       original_term: m.original_term || '',
@@ -183,6 +186,7 @@ async function insertMaterials(tx: SqlExecutor, listId: string, input: MaterialI
       updated_at: ts,
     });
   }
+  return ids;
 }
 
 /** Mark lines delivered on a date (YYYY-MM-DD), or not delivered with ''. */
@@ -592,14 +596,77 @@ export async function retryJob(db: Db, jobId: string) {
 }
 
 /** Store the extracted items and drop the job in one step. */
-export async function completeJob(db: Db, jobId: string, materials: MaterialInput[]) {
-  await db.transaction(async (tx) => {
+/** Store the extracted items and drop the job in one step; returns the new items' ids. */
+export async function completeJob(db: Db, jobId: string, materials: MaterialInput[]): Promise<string[]> {
+  return db.transaction(async (tx) => {
     const [job] = await tx.all<Job>('SELECT * FROM jobs WHERE id = ?', [jobId]);
-    if (!job) return;
-    await insertMaterials(tx, job.list_id, materials);
+    if (!job) return [];
+    const ids = await insertMaterials(tx, job.list_id, materials);
     await tx.run('DELETE FROM job_images WHERE job_id = ?', [jobId]);
     await tx.run('DELETE FROM jobs WHERE id = ?', [jobId]);
+    return ids;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Training data (opt-in): bill photos with the lines they became, as finally corrected
+// ---------------------------------------------------------------------------
+
+export interface TrainingSampleInput {
+  /** What read it: 'phone' or 'gemini'. */
+  engine: string;
+  ocr_text: string;
+  images: string[];
+  item_ids: string[];
+  category: string;
+}
+
+export async function saveTrainingSample(db: Db, s: TrainingSampleInput) {
+  await db.run('INSERT INTO training_samples (id, created_at, engine, ocr_text, images, item_ids, category) VALUES (?, ?, ?, ?, ?, ?, ?)', [
+    newId(),
+    nowISO(),
+    s.engine,
+    s.ocr_text,
+    JSON.stringify(s.images),
+    JSON.stringify(s.item_ids),
+    s.category,
+  ]);
+}
+
+export async function countTrainingSamples(db: Db): Promise<number> {
+  const [row] = await db.all<{ n: number }>('SELECT COUNT(*) AS n FROM training_samples');
+  return row?.n ?? 0;
+}
+
+export async function clearTrainingSamples(db: Db) {
+  await db.run('DELETE FROM training_samples');
+}
+
+/**
+ * Training data as JSON Lines: one bill per line with its photos (base64 JPEG),
+ * the text the phone read, and the lines as they are now (after any
+ * corrections). Bills whose lines were all deleted are left out.
+ */
+export async function exportTrainingData(db: Db): Promise<{ jsonl: string; count: number }> {
+  const samples = await db.all<{ id: string; created_at: string; engine: string; ocr_text: string; images: string; item_ids: string; category: string }>(
+    'SELECT * FROM training_samples ORDER BY created_at',
+  );
+  const out: string[] = [];
+  for (const s of samples) {
+    const ids = JSON.parse(s.item_ids) as string[];
+    if (!ids.length) continue;
+    const items = await db.all<ItemRow>(`SELECT ${tableColumns.items.join(', ')} FROM items WHERE id IN (${ids.map(() => '?').join(', ')})`, ids);
+    if (!items.length) continue;
+    const lines = ids
+      .map((id) => items.find((i) => i.id === id))
+      .filter((i): i is ItemRow => !!i)
+      .map((i) => ({
+        item_name: i.item_name, original_term: i.original_term, quantity: i.quantity, unit: i.unit, unit_price: i.unit_price, total_amount: i.total_amount,
+        vendor: i.vendor, date: i.date, brand: i.brand, model: i.model, spec: i.spec, color: i.color, ordered_as: i.ordered_as,
+      }));
+    out.push(JSON.stringify({ id: s.id, created_at: s.created_at, read_by: s.engine, category: s.category, images: JSON.parse(s.images), phone_text: s.ocr_text, lines }));
+  }
+  return { jsonl: out.join('\n'), count: out.length };
 }
 
 /** Remove a queued entry; for a quote still being read, the empty quote goes too. */

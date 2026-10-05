@@ -13,6 +13,7 @@ Everything is stored **only on your phone**. There is no server or account. The 
 
 ## How it works
 
+- **Reads bills on the phone.** Printed bills and typed lists are read on the phone (Google ML Kit text recognition, bundled) and checked (quantity × rate = amount, the bill's total); unclear ones, like most handwritten bills, go to Gemini. *Settings → How bills are read* picks phone first, phone only or Gemini always. Opt-in: keep bill photos with their corrected lines to train an on-phone model later.
 - **Local database.** All records live in SQLite inside the app, and every screen works without internet. *Add item manually* adds a line to a purchase list or BOQ without the AI, so lists can be made with no internet or API key.
 - **AI reading.** Entries go straight from the phone to Google Gemini using your own API key. An entry made offline is queued and read automatically once the phone is online. Photos and notes leave the phone only for that Gemini request.
 - **Learns your corrections.** If you fix an item's name or unit, the correction is remembered and used for future readings.
