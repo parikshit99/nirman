@@ -36,3 +36,15 @@ describe('site report export', () => {
     expect(rows.at(-1)).toEqual(['2026-10-06', 'Civil', 'Cement', 'UltraTech', '', '53 grade', '', 10, 'Bag', '', 380, 3800, 'Sharma', 'Order 1', '2026-10-06']);
   });
 });
+
+describe('order slip export', () => {
+  it('has the delivery details and quantities but no rates', async () => {
+    const { orderSlipSheet } = await import('../src/lib/exports.ts');
+    const rows = values(orderSlipSheet([item({ ordered_as: '3 bundles of 12 mm' })], { address: 'Sector 44', deliveryDate: '2026-10-08', receiverName: 'Ramesh', receiverPhone: '9876543210', notes: 'Unload at gate 2' }));
+    expect(rows.slice(3, 6)).toEqual([['Deliver to', 'Sector 44'], ['Delivery by', '2026-10-08'], ['Receiver', 'Ramesh - 9876543210']]);
+    expect(rows[7]).toEqual(['Sr.', 'Item', 'Brand', 'Model / code', 'Size / spec', 'Color', 'Qty', 'Unit', 'Ordered as']);
+    expect(rows[8]).toEqual([1, 'Cement', 'UltraTech', '', '53 grade', '', 10, 'Bag', '3 bundles of 12 mm']);
+    expect(rows.at(-1)).toEqual(['Unload at gate 2']);
+    expect(JSON.stringify(rows)).not.toContain('380');
+  });
+});

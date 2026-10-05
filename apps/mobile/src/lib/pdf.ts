@@ -154,6 +154,67 @@ export function buildQuoteComparisonPdf(boq: ListRow, comparison: QuoteCompariso
   return doc;
 }
 
+/** Where and to whom an order slip's material goes. */
+export interface OrderSlipDetails {
+  address: string;
+  /** YYYY-MM-DD, or blank. */
+  deliveryDate: string;
+  receiverName: string;
+  receiverPhone: string;
+  notes: string;
+}
+
+const formatDate = (iso: string) => (iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+
+/** An order to send a vendor: what to deliver, where, when and to whom. No rates. */
+export function buildOrderSlipPdf(items: ItemRow[], d: OrderSlipDetails): jsPDF {
+  const doc = new jsPDF();
+  drawTitle(doc, 'ORDER SLIP', 22);
+  doc.setFontSize(10);
+  doc.setTextColor(100);
+  doc.text(`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`, 14, 28);
+
+  const rows: [string, string][] = [];
+  if (d.address) rows.push(['Deliver to', d.address]);
+  if (d.deliveryDate) rows.push(['Delivery by', formatDate(d.deliveryDate)]);
+  const receiver = [d.receiverName, d.receiverPhone].filter(Boolean).join(' - ');
+  if (receiver) rows.push(['Receiver', receiver]);
+  let y = 34;
+  if (rows.length) {
+    autoTable(doc, {
+      body: rows,
+      startY: y,
+      theme: 'plain',
+      styles: { fontSize: 11, cellPadding: 1.5 },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 32, textColor: [90, 90, 90] }, 1: { textColor: [20, 20, 20] } },
+    });
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
+  }
+
+  autoTable(doc, {
+    head: [['Sr.', 'Item', 'Qty', 'Unit']],
+    // An estimated weight (TMT ordered in bundles) is marked ≈ so the bundle count is what's ordered.
+    body: items.map((item, i) => [i + 1, describe(item), `${/estimated/i.test(item.ordered_as) ? '≈' : ''}${Number(item.quantity.toFixed(3)).toLocaleString('en-IN')}`, item.unit]),
+    startY: y,
+    theme: 'grid',
+    headStyles: { fillColor: [18, 18, 18], textColor: [255, 255, 255] },
+    columnStyles: { 0: { cellWidth: 12 }, 1: { cellWidth: 'auto' }, 2: { halign: 'right', cellWidth: 25 }, 3: { halign: 'center', cellWidth: 22 } },
+  });
+  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
+
+  if (d.notes.trim()) {
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Specifications / Notes:', 14, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60);
+    const lines = doc.splitTextToSize(d.notes.trim(), 180);
+    doc.text(lines, 14, y + 6);
+  }
+  return doc;
+}
+
 const qty = (n: number) => Number(n.toFixed(3)).toLocaleString('en-IN');
 const lastY = (doc: jsPDF) => (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
 
