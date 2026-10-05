@@ -6,6 +6,7 @@ import { shareFile, textToBase64 } from '../lib/files.ts';
 import { testGeminiKey } from '../lib/gemini.ts';
 import { DEFAULT_MODEL } from '../lib/settings.ts';
 import { APP_VERSION } from '../lib/version.ts';
+import { latestNotes } from '../lib/whatsNew.ts';
 import { describeLastBackup, recordBackup } from '../lib/backupReminder.ts';
 import { useAppState } from '../state/AppState.tsx';
 import { useDialogs } from './Dialogs.tsx';
@@ -15,7 +16,7 @@ import { useBackHandler } from '../lib/backButton.ts';
  * API key, backup and storage info. On first launch it doubles as a short
  * welcome that asks for the key (skippable: typing items in works without one).
  */
-export function SettingsModal({ onClose, firstRun }: { onClose(): void; firstRun?: boolean }) {
+export function SettingsModal({ onClose, firstRun, onWhatsNew }: { onClose(): void; firstRun?: boolean; onWhatsNew?(): void }) {
   useBackHandler(onClose);
   return (
     <motion.div
@@ -54,7 +55,7 @@ export function SettingsModal({ onClose, firstRun }: { onClose(): void; firstRun
         ) : (
           <>
             <BackupSection />
-            <StorageSection />
+            <StorageSection onWhatsNew={onWhatsNew} />
           </>
         )}
       </motion.div>
@@ -245,7 +246,7 @@ function BackupSection() {
   );
 }
 
-function StorageSection() {
+function StorageSection({ onWhatsNew }: { onWhatsNew?(): void }) {
   const { history, snapshot, learningCount, hiddenMaterials, actions } = useAppState();
   const dialogs = useDialogs();
   const [showLearned, setShowLearned] = useState(false);
@@ -279,7 +280,14 @@ function StorageSection() {
           )}
         </dd>
         <dt className="text-gray-500">App version</dt>
-        <dd className="font-bold text-right font-mono">{APP_VERSION}</dd>
+        <dd className="font-bold text-right font-mono">
+          {APP_VERSION}
+          {onWhatsNew && latestNotes && (
+            <button onClick={onWhatsNew} className="ml-2 text-blue-600 font-bold underline font-sans">
+              What's new
+            </button>
+          )}
+        </dd>
       </dl>
       {showLearned && learningCount > 0 && <LearnedCorrections onForgetAll={resetLearning} />}
       {hiddenMaterials.length > 0 && (

@@ -6,6 +6,8 @@ import { filterMaterials, guessCategory, todayISO, type MaterialFilter } from '@
 import { useDialogs } from './components/Dialogs.tsx';
 import { useBackHandler } from './lib/backButton.ts';
 import { prefs } from './lib/prefs.ts';
+import { hasUnseenNotes, latestNotes, markNotesSeen } from './lib/whatsNew.ts';
+import { WhatsNewModal } from './components/WhatsNewModal.tsx';
 import { backupOverdue, describeLastBackup, snoozeBackupReminder } from './lib/backupReminder.ts';
 import { PdfPreviewModal } from './components/PdfPreviewModal.tsx';
 import { BoqPicker } from './features/BoqPicker.tsx';
@@ -70,6 +72,18 @@ export default function App() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(() => !settings.geminiApiKey && !prefs.get('nirmaan_onboarded', false));
   const [firstRun, setFirstRun] = useState(settingsOpen);
+  // After an update, show what's new once; a new install has nothing to compare with.
+  const [whatsNewOpen, setWhatsNewOpen] = useState(() => {
+    if (settingsOpen) {
+      markNotesSeen();
+      return false;
+    }
+    return hasUnseenNotes();
+  });
+  const closeWhatsNew = () => {
+    markNotesSeen();
+    setWhatsNewOpen(false);
+  };
 
   // Re-checked after Settings closes (a backup may have been made) or the reminder is snoozed.
   const [reminderTick, setReminderTick] = useState(0);
@@ -430,7 +444,8 @@ export default function App() {
           />
         )}
         {shareOpen && kind && <ShareSheet key="share" title={kind === 'audit' ? 'purchase list' : 'BOQ'} onShare={shareList} onClose={() => setShareOpen(false)} />}
-        {settingsOpen && <SettingsModal key="settings" onClose={closeSettings} firstRun={firstRun} />}
+        {settingsOpen && <SettingsModal key="settings" onClose={closeSettings} firstRun={firstRun} onWhatsNew={() => setWhatsNewOpen(true)} />}
+        {whatsNewOpen && latestNotes && <WhatsNewModal key="whats-new" notes={latestNotes} onClose={closeWhatsNew} />}
         {quoteTarget === 'pick' && (
           <BoqPicker
             key="boq-picker"

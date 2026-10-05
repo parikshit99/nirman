@@ -14,6 +14,6 @@ Builds are numbered `<series>.<build>`; the newest series is at the top.
 - **Add items by hand** without the AI, so lists and BOQs work fully offline.
 - **Data tab filters** for vendor, brand, size/spec and colour; vendor-quote prices now keep their BOQ's category and site, so category filters include them.
 - **Learned corrections** can be viewed, edited and deleted one by one in Settings.
-- A **Settings** button next to the online status.
+- A **Settings** button next to the online status, and this **What's new** screen (shown once after an update, and any time from *Settings → On this phone*).
 
 Backups from earlier versions still restore. Install over the existing app to keep your data.
