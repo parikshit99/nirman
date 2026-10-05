@@ -172,6 +172,17 @@ export function CapturePanel({
         </h2>
 
         <div className="space-y-4">
+          {manual ? (
+            <ManualEntry kind={kind} onClose={() => setManual(false)} />
+          ) : (
+            <button
+              onClick={() => setManual(true)}
+              className="w-full h-11 bg-white border border-[var(--color-brand-concrete)] text-[var(--color-brand-dark)] font-bold rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-gray-50"
+            >
+              <Keyboard size={16} /> Add item manually (no AI)
+            </button>
+          )}
+
           <div
             className={`relative border-2 border-dashed rounded-xl transition-all min-h-[8rem] md:min-h-[12rem] flex flex-col items-center justify-center gap-4 p-4
               ${dragActive ? 'border-[var(--color-brand-primary)] bg-orange-50' : 'border-[var(--color-brand-concrete)] hover:border-gray-400'}
@@ -307,17 +318,6 @@ export function CapturePanel({
             <ClipboardCheck size={20} />
             <span className="uppercase tracking-widest text-[16px]">AI Extraction</span>
           </button>
-
-          {manual ? (
-            <ManualEntry kind={kind} onClose={() => setManual(false)} />
-          ) : (
-            <button
-              onClick={() => setManual(true)}
-              className="w-full h-11 bg-white border border-[var(--color-brand-concrete)] text-[var(--color-brand-dark)] font-bold rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-gray-50"
-            >
-              <Keyboard size={16} /> Add item manually
-            </button>
-          )}
 
           {jobs.length > 0 && (
             <JobList jobs={jobs} offline={!status.online} hasKey={!!settings.geminiApiKey} onRetry={actions.retryJob} onDelete={(j) => actions.deleteJob(j.id)} />

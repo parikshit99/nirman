@@ -14,7 +14,7 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
   const { actions, itemDatabase, knownVendors } = useAppState();
   const dialogs = useDialogs();
   const [draft, setDraft] = useState(EMPTY);
-  const [added, setAdded] = useState(0);
+  const [added, setAdded] = useState<string[]>([]);
   const isAudit = kind === 'audit';
   const known = itemDatabase.find((e) => e.name.toLowerCase() === draft.item_name.trim().toLowerCase());
   const units = [...new Set(itemDatabase.map((e) => e.unit))].sort();
@@ -51,7 +51,7 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
         ...Object.fromEntries(VARIANT_FIELDS.map((f) => [f, draft[f].trim()])),
       },
     ]);
-    setAdded((n) => n + 1);
+    setAdded((list) => [...list, `${name} · ${quantity} ${draft.unit.trim() || 'unit'}${unitPrice ? ` · ₹${(quantity * unitPrice).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : ''}`]);
     // Keep the vendor for the next line from the same bill.
     setDraft({ ...EMPTY, vendor: draft.vendor });
   };
@@ -133,9 +133,10 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
       <button onClick={add} className="w-full h-11 bg-[var(--color-brand-dark)] text-white font-bold rounded-xl flex items-center justify-center gap-2 text-sm">
         <Check size={16} /> Add to {isAudit ? 'purchases' : 'BOQ'}
       </button>
-      {added > 0 && (
+      {added.length > 0 && (
         <p role="status" className="text-xs text-green-700 text-center">
-          {added} {added === 1 ? 'item' : 'items'} added. Add another, or close.
+          Added {added[added.length - 1]}
+          {added.length > 1 && ` (${added.length} so far)`}. Add another, or close.
         </p>
       )}
     </div>
