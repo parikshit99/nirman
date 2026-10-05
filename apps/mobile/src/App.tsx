@@ -6,6 +6,7 @@ import { filterMaterials, guessCategory, todayISO, type MaterialFilter } from '@
 import { useDialogs } from './components/Dialogs.tsx';
 import { useBackHandler } from './lib/backButton.ts';
 import { prefs } from './lib/prefs.ts';
+import { workTypeKey } from './lib/workType.ts';
 import { hasUnseenNotes, latestNotes, markNotesSeen } from './lib/whatsNew.ts';
 import { WhatsNewModal } from './components/WhatsNewModal.tsx';
 import { backupOverdue, describeLastBackup, snoozeBackupReminder } from './lib/backupReminder.ts';
@@ -15,7 +16,7 @@ import { QuotesView } from './features/QuotesView.tsx';
 import { SaveModal } from './components/SaveModal.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
 import { StatusChip } from './components/StatusChip.tsx';
-import type { ListKind, ListMeta } from './data/repo.ts';
+import { DRAFT_IDS, type ListKind, type ListMeta } from './data/repo.ts';
 import { CapturePanel } from './features/CapturePanel.tsx';
 import { DatabaseView } from './features/DatabaseView.tsx';
 import { HistorySidebar, HistoryView } from './features/HistoryView.tsx';
@@ -144,7 +145,7 @@ export default function App() {
       initial: {
         title: record?.title ?? '',
         address: record?.address ?? '',
-        category: record?.category || guessCategory(activeItems),
+        category: record?.category || prefs.get(workTypeKey(kind), '') || guessCategory(activeItems),
         site_date: todayISO(),
       },
     });
@@ -173,6 +174,19 @@ export default function App() {
     }
     const id = await actions.saveDraftToHistory(k, meta, asNew ? undefined : recordId);
     if (!asNew) linkRecord(k, id);
+    // The next bill shouldn't be added to this session by accident.
+    const fresh = await dialogs.confirm(`Saved “${meta.title || titlePrefix(k)}”`, {
+      message: 'Start a new list for the next bill, or keep editing this one (saving again updates it).',
+      confirmLabel: 'Start new list',
+      cancelLabel: 'Keep editing',
+    });
+    if (fresh) await startNewList(k);
+  };
+
+  const startNewList = async (k: ListKind) => {
+    await actions.clearListItems(k === 'audit' ? 'draft-audit' : 'draft-boq');
+    if (k === 'boq') await actions.setListNotes(DRAFT_IDS.boq, '');
+    linkRecord(k, null);
   };
 
   const openRecord = async (record: HistoryRecord) => {
@@ -197,8 +211,7 @@ export default function App() {
         danger: true,
       });
       if (!ok) return;
-      await actions.clearListItems(kind === 'audit' ? 'draft-audit' : 'draft-boq');
-      linkRecord(kind, null);
+      await startNewList(kind);
     } else if (activeTab === 'history') {
       const ok = await dialogs.confirm('Delete all saved sessions?', {
         message: `${history.length} sessions will be permanently deleted from this phone.`,
@@ -299,7 +312,7 @@ export default function App() {
             <div className="text-right pr-3 border-r border-gray-100 leading-tight">
               <div className="text-[11px] md:text-[11px] uppercase tracking-widest text-gray-400 font-mono">{kind === 'audit' ? 'Total Spent' : 'Items'}</div>
               <div className="text-xs md:text-sm font-mono font-bold">
-                {kind === 'audit' ? `₹${totalSpent.toLocaleString('en-IN')}` : `${filteredItems.length} Recs`}
+                {kind === 'audit' ? `₹${totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : `${filteredItems.length} Recs`}
               </div>
             </div>
           )}

@@ -17,7 +17,7 @@ interface Props {
   searching: boolean;
 }
 
-const rupees = (n: number) => `₹${(n || 0).toLocaleString('en-IN')}`;
+const rupees = (n: number) => `₹${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
 /** The current Audit or BOQ list: one card per item, sized for a phone screen. */
 export function ItemLog({ kind, items, searching }: Props) {
@@ -301,7 +301,7 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendin
           {dbMatch && dbMatch.latestPrice > 0 && !isIndexed && (
             <span className={`flex items-center gap-1 text-xs ${isHigher ? 'text-red-600' : isLower ? 'text-green-700' : 'text-gray-500'}`}>
               {(isHigher || isLower) && <AlertTriangle size={12} />}
-              Last indexed {rupees(dbMatch.latestPrice)}
+              Last paid {rupees(dbMatch.latestPrice)}
               {isHigher ? ' (this is higher)' : isLower ? ' (this is lower)' : ''}
             </span>
           )}

@@ -8,6 +8,7 @@ interface DialogRequest {
   title: string;
   message?: string;
   confirmLabel?: string;
+  cancelLabel?: string;
   danger?: boolean;
   defaultValue?: string;
   resolve: (value: boolean | string | null) => void;
@@ -15,7 +16,7 @@ interface DialogRequest {
 
 export interface Dialogs {
   alert(title: string, message?: string): Promise<void>;
-  confirm(title: string, opts?: { message?: string; confirmLabel?: string; danger?: boolean }): Promise<boolean>;
+  confirm(title: string, opts?: { message?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }): Promise<boolean>;
   prompt(title: string, defaultValue?: string): Promise<string | null>;
 }
 
@@ -102,7 +103,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
                     onClick={() => close(current.kind === 'confirm' ? false : null)}
                     className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl uppercase tracking-widest text-[11px] hover:bg-gray-200"
                   >
-                    Cancel
+                    {current.cancelLabel ?? 'Cancel'}
                   </button>
                 )}
                 <button

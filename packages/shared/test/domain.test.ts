@@ -260,3 +260,17 @@ describe('site report (#38)', () => {
     expect(siteHasDeliveries(lists, items, 'Site B')).toBe(false);
   });
 });
+
+describe('price counted once (bug)', () => {
+  it('ignores an indexed rate that a saved line already records', () => {
+    const lists = [list('l1')];
+    const items = [item('i1', 'l1', { unit_price: 380, vendor: 'Sharma', date: '2026-10-05' })];
+    const rate = (over: Partial<IndexedRateRow>): IndexedRateRow => ({
+      id: 'r', item_name: 'Cement', unit: 'Bag', date: '2026-10-05', price: 380, vendor: 'Sharma', brand: '', model: '', spec: '', color: '',
+      category: '', address: '', indexed_at: ts('2026-10-05'), ...over,
+    });
+    expect(buildItemDatabase(lists, items, [rate({})], {})[0].priceHistory).toHaveLength(1);
+    // A different price, date or vendor is a separate price.
+    expect(buildItemDatabase(lists, items, [rate({ price: 390 }), rate({ id: 'r2', date: '2026-10-06' }), rate({ id: 'r3', vendor: 'Gupta' })], {})[0].priceHistory).toHaveLength(4);
+  });
+});

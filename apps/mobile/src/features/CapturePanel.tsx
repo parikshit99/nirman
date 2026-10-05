@@ -25,6 +25,8 @@ import { compressImage, dataUrlToBase64, readFileAsDataUrl } from '../lib/images
 import { isNative } from '../lib/platform.ts';
 import { startDictation, type SpeechLanguage } from '../lib/speech.ts';
 import { useAppState } from '../state/AppState.tsx';
+import { prefs } from '../lib/prefs.ts';
+import { workTypeKey } from '../lib/workType.ts';
 import type { IncomingShare } from '../lib/sharedFiles.ts';
 import { ManualEntry } from './ManualEntry.tsx';
 
@@ -46,7 +48,12 @@ export function CapturePanel({
   const [images, setImages] = useState<string[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [sourceMenu, setSourceMenu] = useState(false);
-  const [category, setCategory] = useState(categoryNames[0] ?? 'Civil');
+  // Remembered (also for the next list), so the Save form starts with the same work type.
+  const [category, setCategoryState] = useState(() => prefs.get(workTypeKey(kind), '') || categoryNames[0] || 'Civil');
+  const setCategory = (c: string) => {
+    setCategoryState(c);
+    prefs.set(workTypeKey(kind), c);
+  };
   const [listening, setListening] = useState(false);
   const [manual, setManual] = useState(false);
   const [language, setLanguage] = useState<SpeechLanguage>('en-IN');
