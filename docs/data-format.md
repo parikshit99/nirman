@@ -24,7 +24,7 @@ The `nirmaan` names are the original internal ids. They stay unchanged so existi
 |---|---|---|
 | `lists` | purchase list or BOQ | `kind`: `audit` (Purchases) or `boq`; `status`: `draft` or `saved`; `title`, `address`, `category`, `site_date`, `notes` |
 | `items` | line in a list | `list_id`; `item_name` (standard English name); `original_term` (word as written or spoken, e.g. "bori"); `quantity`, `unit`, `unit_price`, `total_amount`, `vendor`, `date` |
-| `indexed_rates` | single price added on its own ("Index rate", or a confirmed vendor quote) | `item_name`, `unit`, `date`, `price`, `vendor`, `indexed_at` |
+| `indexed_rates` | single price added on its own ("Index rate", or a confirmed vendor quote) | `item_name`, `unit`, `date`, `price`, `vendor`, `indexed_at`; `category` and `address` of the BOQ a confirmed quote was for (blank for a rate added on its own) |
 | `learned_terms` | correction the app remembers | `id` is the original word, lower-cased; it maps to the `item_name` and `unit` to use instead |
 | `categories` | type of work (Civil, Electrical, …) | `name`; the built-in ones use the lower-cased name as `id` |
 | `quotes` | vendor's reply to a saved BOQ | `boq_id` (a `lists` id); `vendor`, `quote_date`; `status`: `review` or `confirmed` |
@@ -43,7 +43,7 @@ There is no separate price table. The Data tab is computed on the fly (`buildIte
 - every item with a price in a `saved` list (dated by the item's `date`, or else the list's creation date);
 - every row in `indexed_rates`.
 
-Names and units are first passed through `learned_terms`, and for materials listed in `hidden_materials`, rows recorded up to `hidden_at` are left out (saved-list items by the list's `created_at`, rates by `indexed_at`). Within a material, prices are also grouped by variant (the four variant fields, compared lower-cased). A price check for a line that names a brand, model, spec or colour only uses past prices with the same values for the fields it names; blank fields match anything.
+Each material's work categories and sites come from its saved lists and from its rates' `category` and `address`; a material with none gets a category guessed from its name. Names and units are first passed through `learned_terms`, and for materials listed in `hidden_materials`, rows recorded up to `hidden_at` are left out (saved-list items by the list's `created_at`, rates by `indexed_at`). Within a material, prices are also grouped by variant (the four variant fields, compared lower-cased). A price check for a line that names a brand, model, spec or colour only uses past prices with the same values for the fields it names; blank fields match anything.
 
 Renaming a material in the app rewrites `item_name` and `unit` on all of its items and rates, and records each original word in `learned_terms`. Renaming to the name and unit of another material therefore merges the two.
 
@@ -58,7 +58,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
 ```json
 {
   "app": "nirmaan-auditor",
-  "version": 4,
+  "version": 5,
   "exported_at": "2026-10-03T19:13:38.586Z",
   "lists": [], "items": [], "indexed_rates": [], "learned_terms": [],
   "categories": [], "quotes": [], "quote_lines": [], "hidden_materials": []
@@ -70,6 +70,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
 - Older files still restore:
   - version 1 (before vendor quotes) has no `quotes` or `quote_lines`;
   - version 2 (before hidden materials) has no `hidden_materials`;
-  - version 3 (before variant fields) has rows without `brand`, `model`, `spec`, `color`.
+  - version 3 (before variant fields) has rows without `brand`, `model`, `spec`, `color`;
+  - version 4 (before rate categories) has `indexed_rates` rows without `category` and `address`.
 - Restoring replaces everything on the phone.
 - Any reimplementation should read this format, so old backups keep working.

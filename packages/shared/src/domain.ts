@@ -233,6 +233,8 @@ export function buildItemDatabase(
       variant,
     });
     if (rate.vendor) e.vendors.add(rate.vendor);
+    if (rate.category) e.categories.add(rate.category);
+    if (rate.address) e.addresses.add(rate.address);
   }
 
   return [...db.values()]
@@ -252,7 +254,8 @@ export function buildItemDatabase(
         ...e,
         priceHistory,
         vendors: [...e.vendors],
-        categories: [...e.categories],
+        // A material only ever priced on its own still gets a work type to filter by.
+        categories: e.categories.size ? [...e.categories] : [guessCategory([{ item_name: e.name }])],
         addresses: [...e.addresses],
         ...priceStats(priceHistory),
         avgPrice: prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0,
@@ -260,6 +263,64 @@ export function buildItemDatabase(
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Narrow the price database to one vendor, brand, size/spec or colour; blank means any. */
+export interface MaterialFilter {
+  vendor?: string;
+  brand?: string;
+  spec?: string;
+  color?: string;
+}
+
+const sameText = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** The values each filter can take, from the whole database. */
+export function materialFilterOptions(entries: MaterialEntry[]): Required<{ [K in keyof MaterialFilter]: string[] }> {
+  const collect = (values: string[]) => {
+    const byLower = new Map<string, string>();
+    for (const v of values) if (v.trim() && !byLower.has(v.trim().toLowerCase())) byLower.set(v.trim().toLowerCase(), v.trim());
+    return [...byLower.values()].sort((a, b) => a.localeCompare(b));
+  };
+  const variants = entries.flatMap((e) => e.variants.map((v) => v.variant));
+  return {
+    vendor: collect(entries.flatMap((e) => e.priceHistory.map((p) => p.vendor))),
+    brand: collect(variants.map((v) => v.brand)),
+    spec: collect(variants.map((v) => v.spec)),
+    color: collect(variants.map((v) => v.color)),
+  };
+}
+
+/**
+ * Keep the materials with a variant (and, for a vendor, a price) matching the
+ * filter, showing only the matching variants and prices on each.
+ */
+export function filterMaterials(entries: MaterialEntry[], filter: MaterialFilter): MaterialEntry[] {
+  const { vendor = '', ...wanted } = filter;
+  const variantFields = (Object.entries(wanted) as [VariantField, string | undefined][]).filter(([, v]) => v?.trim());
+  if (!vendor.trim() && variantFields.length === 0) return entries;
+  const variantOk = (v: Variant) => variantFields.every(([f, value]) => sameText(v[f], value!));
+  const pointOk = (p: PricePoint) => variantOk(p.variant) && (!vendor.trim() || sameText(p.vendor, vendor));
+  return entries.flatMap((e) => {
+    const priceHistory = e.priceHistory.filter(pointOk);
+    const variants = e.variants
+      .filter((v) => variantOk(v.variant))
+      .map((v) => {
+        const points = v.priceHistory.filter(pointOk);
+        return { ...v, priceHistory: points, ...priceStats(points) };
+      })
+      .filter((v) => !vendor.trim() || v.priceHistory.length > 0);
+    if (variants.length === 0) return [];
+    const prices = priceHistory.map((p) => p.price);
+    return [{
+      ...e,
+      priceHistory,
+      variants,
+      vendors: vendor.trim() ? e.vendors.filter((v) => sameText(v, vendor)) : e.vendors,
+      ...priceStats(priceHistory),
+      avgPrice: prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0,
+    }];
+  });
 }
 
 // ---------------------------------------------------------------------------

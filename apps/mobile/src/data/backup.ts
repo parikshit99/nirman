@@ -5,12 +5,12 @@ import type { Db } from './sql.ts';
 
 const APP_ID = 'nirmaan-auditor';
 /** 2 added vendor quotes, 3 hidden materials, 4 brand/model/spec/colour; older files still restore. */
-const VERSION = 4;
-const READABLE_VERSIONS: unknown[] = [1, 2, 3, 4];
+const VERSION = 5;
+const READABLE_VERSIONS: unknown[] = [1, 2, 3, 4, 5];
 
 const backupSchema = z.object({
   app: z.literal(APP_ID),
-  version: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+  version: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
   exported_at: z.string().datetime({ offset: true }),
   lists: z.array(rowSchemas.lists),
   items: z.array(rowSchemas.items),

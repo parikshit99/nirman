@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildItemDatabase,
+  filterMaterials,
+  materialFilterOptions,
   guessCategory,
   materialDatabaseToCSV,
   materialKey,
@@ -54,7 +56,7 @@ describe('buildItemDatabase', () => {
       item('i3', 'l3', { unit_price: 420, date: '2026-02-01', vendor: 'Gupta' }),
     ];
     const rates: IndexedRateRow[] = [{
-      id: 'r1', item_name: 'cement', unit: 'bag', date: '2026-03-01', price: 450, vendor: 'Manual', brand: '', model: '', spec: '', color: '',
+      id: 'r1', item_name: 'cement', unit: 'bag', date: '2026-03-01', price: 450, vendor: 'Manual', brand: '', model: '', spec: '', color: '', category: '', address: '',
       indexed_at: ts('2026-03-01'),
     }];
     const db = buildItemDatabase(lists, items, rates, {});
@@ -166,12 +168,47 @@ describe('deleting a material from the database', () => {
     const lists = [list('old', { created_at: ts('2026-02-01') }), list('new', { created_at: ts('2026-04-01') })];
     const items = [item('a', 'old', { unit_price: 400 }), item('b', 'new', { unit_price: 420 })];
     const rates: IndexedRateRow[] = [{
-      id: 'r', item_name: 'Cement', unit: 'Bag', date: '2026-02-02', price: 410, vendor: 'X', brand: '', model: '', spec: '', color: '',
+      id: 'r', item_name: 'Cement', unit: 'Bag', date: '2026-02-02', price: 410, vendor: 'X', brand: '', model: '', spec: '', color: '', category: '', address: '',
       indexed_at: ts('2026-02-02'),
     }];
     const key = materialKey('Cement', 'Bag');
     expect(buildItemDatabase(lists, items, rates, {}, { [key]: ts('2026-05-01') })).toEqual([]);
     const [cement] = buildItemDatabase(lists, items, rates, {}, { [key]: ts('2026-03-01') });
     expect(cement.priceHistory.map((p) => p.price)).toEqual([420]);
+  });
+});
+
+describe('filtering the price database (#28)', () => {
+  const rate = (over: Partial<IndexedRateRow>): IndexedRateRow => ({
+    id: 'r', item_name: 'Switch', unit: 'piece', date: '2026-03-01', price: 100, vendor: 'Gupta', brand: '', model: '', spec: '', color: '',
+    category: '', address: '', indexed_at: ts('2026-03-01'), ...over,
+  });
+
+  it('files quote rates under their BOQ category and site, and guesses one for rates added on their own', () => {
+    const db = buildItemDatabase([], [], [
+      rate({ id: 'a', category: 'Electrical', address: 'Site B' }),
+      rate({ id: 'b', item_name: 'Copper wire', unit: 'coil' }),
+    ], {});
+    expect(db.map((e) => [e.name, e.categories, e.addresses])).toEqual([
+      ['Copper wire', ['Electrical'], []],
+      ['Switch', ['Electrical'], ['Site B']],
+    ]);
+  });
+
+  it('narrows to a vendor, brand, size or colour, keeping only matching prices', () => {
+    const db = buildItemDatabase([list('l1')], [
+      item('a', 'l1', { item_name: 'Switch', unit: 'piece', unit_price: 120, brand: 'Legrand', color: 'White', vendor: 'Sharma' }),
+      item('b', 'l1', { item_name: 'Switch', unit: 'piece', unit_price: 95, brand: 'Anchor', vendor: 'Gupta' }),
+      item('c', 'l1', { item_name: 'Wire', unit: 'coil', unit_price: 1500, brand: 'Polycab', spec: '2.5 sq mm', vendor: 'Gupta' }),
+    ], [], {});
+    expect(materialFilterOptions(db)).toEqual({
+      vendor: ['Gupta', 'Sharma'], brand: ['Anchor', 'Legrand', 'Polycab'], spec: ['2.5 sq mm'], color: ['White'],
+    });
+    const legrand = filterMaterials(db, { brand: 'legrand' });
+    expect(legrand.map((e) => [e.name, e.variants.map((v) => v.label), e.latestPrice])).toEqual([['Switch', ['Legrand · White'], 120]]);
+    const gupta = filterMaterials(db, { vendor: 'Gupta' });
+    expect(gupta.map((e) => [e.name, e.priceHistory.map((p) => p.price)])).toEqual([['Switch', [95]], ['Wire', [1500]]]);
+    expect(filterMaterials(db, { vendor: 'Sharma', brand: 'Anchor' })).toEqual([]);
+    expect(filterMaterials(db, {})).toBe(db);
   });
 });

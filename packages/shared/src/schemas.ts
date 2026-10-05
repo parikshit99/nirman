@@ -89,6 +89,9 @@ export const indexedRateRowSchema = z.object({
   price: z.number(),
   vendor: z.string().max(200),
   ...storedVariant,
+  /** Work category and site of the BOQ a confirmed quote was for; blank for a rate added on its own. */
+  category: z.string().max(100).default(''),
+  address: z.string().max(500).default(''),
   indexed_at: isoTimestamp,
 });
 export type IndexedRateRow = z.infer<typeof indexedRateRowSchema>;

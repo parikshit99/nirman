@@ -10,6 +10,7 @@ import {
   completeQuoteJob,
   confirmQuote,
   deleteJob,
+  deleteLearnedTerm,
   deleteCategory,
   deleteItem,
   deleteList,
@@ -27,6 +28,7 @@ import {
   setPrice,
   unhideMaterial,
   updateItem,
+  updateLearnedTerm,
   updateQuoteLine,
 } from '../src/data/repo.ts';
 import { migrateLocal } from '../src/data/schema.ts';
@@ -74,6 +76,18 @@ describe('local repository', () => {
     const snap = await loadSnapshot(db);
     expect(snap.items[0].total_amount).toBe(4500);
     expect(learningMap(snap.learned)).toEqual({ bori: { item_name: 'OPC Cement 53 Grade', unit: 'Bag' } });
+  });
+
+  it('edits and forgets single learned corrections', async () => {
+    const db = await freshDb();
+    await addItems(db, DRAFT_IDS.audit, [cement, sand]);
+    const items = (await loadSnapshot(db)).items;
+    await updateItem(db, items.find((i) => i.item_name === 'Cement')!.id, { item_name: 'OPC Cement' });
+    await updateItem(db, items.find((i) => i.item_name === 'Sand')!.id, { unit: 'Brass' });
+    await updateLearnedTerm(db, 'bori', { item_name: ' PPC Cement ', unit: 'Bag' });
+    await updateLearnedTerm(db, 'missing', { item_name: 'X', unit: 'Y' });
+    await deleteLearnedTerm(db, 'reti');
+    expect(learningMap((await loadSnapshot(db)).learned)).toEqual({ bori: { item_name: 'PPC Cement', unit: 'Bag' } });
   });
 
   it('saves drafts to history, updates records in place and restores them', async () => {
@@ -251,8 +265,25 @@ describe('local repository', () => {
         ['Cement', 'Bag', 380, 'Gupta', '2026-10-03'],
       ]);
       expect(learningMap(snap.learned)['acc bori']).toEqual({ item_name: 'Cement', unit: 'Bag' });
+      // Filed under the BOQ's work type and site, so the Data tab's filters find them.
+      expect(snap.rates.map((r) => [r.category, r.address])).toEqual([['Civil', 'Sector 44'], ['Civil', 'Sector 44']]);
       const entry = buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned)).find((e) => e.key === materialKey('Cement', 'Bag'));
       expect(entry?.latestPrice).toBe(380);
+    });
+
+    it('fills in the work type and site of rates confirmed before they were recorded', async () => {
+      const { db, quoteId } = await quoted();
+      await confirmQuote(db, quoteId);
+      // Back to how a phone stored them before migration 5.
+      await db.run('ALTER TABLE indexed_rates DROP COLUMN category');
+      await db.run('ALTER TABLE indexed_rates DROP COLUMN address');
+      await db.run('UPDATE schema_version SET version = 4');
+      await migrateLocal(db);
+      const rates = (await loadSnapshot(db)).rates.map((r) => [r.item_name, r.category, r.address]).sort();
+      expect(rates).toEqual([
+        ['Binding wire', 'Civil', 'Sector 44'],
+        ['Cement', 'Civil', 'Sector 44'],
+      ]);
     });
 
     it('records what the vendor priced: their brand where written, else what the BOQ asked for', async () => {

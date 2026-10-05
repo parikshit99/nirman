@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { Database, Download, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Save, ShoppingCart, Search, Trash2 } from 'lucide-react';
 import Fuse from 'fuse.js';
-import { guessCategory, todayISO } from '@nirman/shared';
+import { filterMaterials, guessCategory, todayISO, type MaterialFilter } from '@nirman/shared';
 import { useDialogs } from './components/Dialogs.tsx';
 import { useBackHandler } from './lib/backButton.ts';
 import { prefs } from './lib/prefs.ts';
@@ -56,6 +56,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [addressFilter, setAddressFilter] = useState('All');
+  const [materialFilter, setMaterialFilter] = useState<MaterialFilter>({});
   const [linkedRecord, setLinkedRecord] = useState<Record<ListKind, string | null>>(() =>
     prefs.get('nirmaan_linked_records', { audit: null, boq: null }),
   );
@@ -105,9 +106,9 @@ export default function App() {
 
   const filteredDatabase = useMemo(() => {
     const base = search ? new Fuse(itemDatabase, { keys: ['name', 'variants.label'], threshold: 0.4 }).search(search).map((r) => r.item) : itemDatabase;
-    return base.filter((e) => matchesFilters(e.categories, e.addresses));
+    return filterMaterials(base, materialFilter).filter((e) => matchesFilters(e.categories, e.addresses));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemDatabase, search, categoryFilter, addressFilter]);
+  }, [itemDatabase, search, categoryFilter, addressFilter, materialFilter]);
 
   const totalSpent = kind === 'audit' ? filteredItems.reduce((acc, i) => acc + (pendingDeletes.has(i.id) ? 0 : i.total_amount || 0), 0) : 0;
   const titlePrefix = (k: ListKind) => (k === 'audit' ? 'Purchases' : 'BOQ');
@@ -337,6 +338,8 @@ export default function App() {
             {activeTab === 'database' ? (
               <DatabaseView
                 entries={filteredDatabase}
+                materialFilter={materialFilter}
+                onMaterialFilter={setMaterialFilter}
                 categoryFilter={categoryFilter}
                 onCategory={setCategoryFilter}
                 addressFilter={addressFilter}

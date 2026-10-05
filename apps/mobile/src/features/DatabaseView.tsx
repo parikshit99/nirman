@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { Check, ChevronDown, Database, Download, GitMerge, Pencil, TrendingUp, Trash2, Truck, X } from 'lucide-react';
-import { materialDatabaseToCSV, materialKey, parseAmount, similarMaterials, todayISO, variantLabel, type MaterialEntry } from '@nirman/shared';
+import { materialDatabaseToCSV, materialFilterOptions, materialKey, parseAmount, similarMaterials, todayISO, variantLabel, type MaterialEntry, type MaterialFilter } from '@nirman/shared';
 import { FilterChips } from '../components/FilterChips.tsx';
+import { MaterialFilters } from '../components/MaterialFilters.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
 import { shareFile, textToBase64 } from '../lib/files.ts';
@@ -19,6 +20,8 @@ const SUB_TABS: { id: SubTab; label: string; about: string }[] = [
 
 interface Props {
   entries: MaterialEntry[];
+  materialFilter: MaterialFilter;
+  onMaterialFilter(f: MaterialFilter): void;
   categoryFilter: string;
   onCategory(c: string): void;
   addressFilter: string;
@@ -48,7 +51,7 @@ export function DatabaseView(props: Props) {
   );
 }
 
-function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddress }: Props) {
+function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, onCategory, addressFilter, onAddress }: Props) {
   const { actions, categoryNames, uniqueAddresses, itemDatabase, itemsFor, pendingDeletes } = useAppState();
   const dialogs = useDialogs();
   const totalMaterials = itemDatabase.length;
@@ -129,6 +132,7 @@ function Materials({ entries, categoryFilter, onCategory, addressFilter, onAddre
         onAddress={onAddress}
         addressLabel="Filter by Project Location"
       />
+      <MaterialFilters value={materialFilter} options={materialFilterOptions(itemDatabase)} onChange={onMaterialFilter} />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
