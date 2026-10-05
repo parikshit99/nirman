@@ -147,7 +147,7 @@ function LastPrice({ entry }: { entry: MaterialEntry }) {
   if (!last) return null;
   return (
     <p className="text-xs text-gray-500">
-      Last paid ₹{last.price.toLocaleString('en-IN')} / {entry.unit}
+      Last paid ₹{last.price.toLocaleString('en-IN', { maximumFractionDigits: 2 })} / {entry.unit}
       {last.vendor && ` · ${last.vendor}`} · {last.date}
     </p>
   );

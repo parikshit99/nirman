@@ -95,8 +95,8 @@ export function PdfPreviewModal({ kind, items, notes, onDownload, onClose }: Pro
                       </td>
                       <td className="border border-gray-300 p-2 text-center font-mono">{item.quantity}</td>
                       <td className="border border-gray-300 p-2 text-center">{item.unit}</td>
-                      <td className="border border-gray-300 p-2 text-right font-mono bg-gray-50/50">{isAudit ? item.unit_price.toLocaleString('en-IN') : ''}</td>
-                      <td className="border border-gray-300 p-2 text-right font-mono bg-gray-50/50">{isAudit ? item.total_amount.toLocaleString('en-IN') : ''}</td>
+                      <td className="border border-gray-300 p-2 text-right font-mono bg-gray-50/50">{isAudit ? item.unit_price.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : ''}</td>
+                      <td className="border border-gray-300 p-2 text-right font-mono bg-gray-50/50">{isAudit ? item.total_amount.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : ''}</td>
                       {isAudit && <td className="border border-gray-300 p-2 text-right">{item.vendor || '-'}</td>}
                     </tr>
                   ))}
@@ -105,7 +105,7 @@ export function PdfPreviewModal({ kind, items, notes, onDownload, onClose }: Pro
                       <td className="border border-gray-300 p-2" colSpan={5}>
                         TOTAL
                       </td>
-                      <td className="border border-gray-300 p-2 text-right font-mono">{total.toLocaleString('en-IN')}</td>
+                      <td className="border border-gray-300 p-2 text-right font-mono">{total.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
                       <td className="border border-gray-300 p-2" />
                     </tr>
                   )}

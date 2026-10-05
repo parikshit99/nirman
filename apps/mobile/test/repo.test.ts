@@ -155,14 +155,15 @@ describe('local repository', () => {
     snap = await loadSnapshot(db);
     expect(snap.items.every((i) => i.unit_price === 500 && i.vendor === 'Sharma')).toBe(true);
     let [entry] = buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned));
-    expect(entry.priceHistory.map((p) => p.price).sort()).toEqual([500, 500, 520]);
+    // The indexed 500 is the saved line's own price, so it counts once.
+    expect(entry.priceHistory.map((p) => p.price).sort()).toEqual([500, 520]);
     expect(entry.vendors.sort()).toEqual(['Gupta', 'Sharma']);
 
     await bulkEditMaterials(db, [ref], { unit: 'Bori' });
     snap = await loadSnapshot(db);
     [entry] = buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned));
     expect(entry.unit).toBe('Bori');
-    expect(entry.priceHistory).toHaveLength(3);
+    expect(entry.priceHistory).toHaveLength(2);
   });
 
   it('renames a material everywhere, merging duplicates and remembering the old words', async () => {

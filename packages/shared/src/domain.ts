@@ -191,6 +191,9 @@ export function buildItemDatabase(
   };
 
   const savedLists = new Map(lists.filter((l) => l.status === 'saved').map((l) => [l.id, l]));
+  const savedPrices = new Set<string>();
+  const pricePointKey = (key: string, variant: string, date: string, price: number, vendor: string) =>
+    [key, variant, date, price, vendor.trim().toLowerCase()].join('\u0000');
 
   for (const raw of items) {
     if (!raw.item_name) continue;
@@ -206,6 +209,7 @@ export function buildItemDatabase(
     if (list.category) e.categories.add(list.category);
     if (list.address) e.addresses.add(list.address);
     if (raw.unit_price > 0) {
+      savedPrices.add(pricePointKey(e.key, variantKey(variant), raw.date || list.created_at.slice(0, 10), raw.unit_price, raw.vendor || 'Unknown'));
       e.priceHistory.push({
         date: raw.date || list.created_at.slice(0, 10),
         price: raw.unit_price,
@@ -221,6 +225,8 @@ export function buildItemDatabase(
   for (const rate of rates) {
     const { item_name, unit } = applyLearning(learning, rate);
     if (isDeleted(item_name, unit, rate.indexed_at)) continue;
+    // "Index rate" on a line that was later saved: the saved line already counts this price.
+    if (savedPrices.has(pricePointKey(materialKey(item_name, unit), variantKey(rate), rate.date, rate.price, rate.vendor || 'Unknown'))) continue;
     const e = entry(item_name, unit);
     const variant = variantOf(rate);
     if (!e.variants.has(variantKey(variant))) e.variants.set(variantKey(variant), variant);

@@ -396,10 +396,10 @@ function VariantList({ material }: { material: MaterialEntry }) {
             </span>
           </span>
           <span className="text-right shrink-0">
-            <span className="font-mono font-bold block">{v.priceHistory.length ? `₹${v.latestPrice.toLocaleString('en-IN')}` : '—'}</span>
+            <span className="font-mono font-bold block">{v.priceHistory.length ? `₹${v.latestPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—'}</span>
             {v.minPrice !== v.maxPrice && (
               <span className="text-xs text-gray-500 font-mono">
-                ₹{v.minPrice.toLocaleString('en-IN')}–₹{v.maxPrice.toLocaleString('en-IN')}
+                ₹{v.minPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}–₹{v.maxPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
               </span>
             )}
           </span>
@@ -459,7 +459,7 @@ function PriceRow({ point: p }: { point: MaterialEntry['priceHistory'][number] }
               className="w-24 px-2 py-1 border border-orange-300 rounded-lg font-mono text-sm text-right outline-none"
             />
           ) : (
-            <span className="font-mono font-bold shrink-0">₹{p.price.toLocaleString('en-IN')}</span>
+            <span className="font-mono font-bold shrink-0">₹{p.price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
           )}
         </div>
         {variantLabel(p.variant) && <div className="text-xs font-bold text-gray-700 truncate">{variantLabel(p.variant)}</div>}
