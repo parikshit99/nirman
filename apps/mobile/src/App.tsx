@@ -26,6 +26,7 @@ import { buildPdf } from './lib/pdf.ts';
 import { listSheet, pdfFile, pdfToJpegs, sheetToXlsx, type ExportFormat } from './lib/exports.ts';
 import { shareFiles } from './lib/files.ts';
 import { ShareSheet } from './components/ShareSheet.tsx';
+import { BoqShareChoice, OrderSlipSheet } from './components/OrderSlipSheet.tsx';
 import { ShareTargetSheet, type ShareTarget } from './components/ShareTargetSheet.tsx';
 import { onIncomingShare, type IncomingShare } from './lib/sharedFiles.ts';
 import { useAppState, type HistoryRecord } from './state/AppState.tsx';
@@ -209,6 +210,10 @@ export default function App() {
   };
 
   const [shareOpen, setShareOpen] = useState(false);
+  const [boqChoiceOpen, setBoqChoiceOpen] = useState(false);
+  const [orderSlipOpen, setOrderSlipOpen] = useState(false);
+  // A BOQ can go out for quotes or as an order slip; a purchase list goes straight to the formats.
+  const openShare = () => (kind === 'boq' ? setBoqChoiceOpen(true) : setShareOpen(true));
   const [siteReportOpen, setSiteReportOpen] = useState(false);
   const [deliveriesFor, setDeliveriesFor] = useState<string | null>(null);
 
@@ -315,7 +320,7 @@ export default function App() {
                   <Eye size={14} /> <span>Preview</span>
                 </button>
                 <button
-                  onClick={() => setShareOpen(true)}
+                  onClick={openShare}
                   className="flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 bg-[var(--color-brand-primary)] text-white text-[11px] md:text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-md hover:brightness-110 transition-colors whitespace-nowrap"
                 >
                   <Share2 size={14} /> <span>Share</span>
@@ -439,8 +444,29 @@ export default function App() {
             kind={kind}
             items={activeItems}
             notes={kind === 'boq' ? boqNotes : ''}
-            onDownload={() => setShareOpen(true)}
+            onDownload={openShare}
             onClose={() => setPreviewOpen(false)}
+          />
+        )}
+        {boqChoiceOpen && (
+          <BoqShareChoice
+            key="boq-share"
+            onClose={() => setBoqChoiceOpen(false)}
+            onPick={(choice) => {
+              setBoqChoiceOpen(false);
+              if (choice === 'order') setOrderSlipOpen(true);
+              else setShareOpen(true);
+            }}
+          />
+        )}
+        {orderSlipOpen && kind === 'boq' && (
+          <OrderSlipSheet
+            key="order-slip"
+            items={activeItems}
+            notes={boqNotes}
+            address={history.find((r) => r.id === linkedRecord.boq)?.address ?? ''}
+            addresses={uniqueAddresses}
+            onClose={() => setOrderSlipOpen(false)}
           />
         )}
         {shareOpen && kind && <ShareSheet key="share" title={kind === 'audit' ? 'purchase list' : 'BOQ'} onShare={shareList} onClose={() => setShareOpen(false)} />}

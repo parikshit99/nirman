@@ -2,7 +2,7 @@ import type { jsPDF } from 'jspdf';
 import type { SheetData } from 'write-excel-file/browser';
 import type { ItemRow, ListRow, QuoteComparison, SiteReport } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
-import { pdfToBase64 } from './pdf.ts';
+import { pdfToBase64, type OrderSlipDetails } from './pdf.ts';
 import type { SharedFile } from './files.ts';
 
 /** The ways a report can be shared: the PDF, an Excel sheet, or a picture of each PDF page. */
@@ -28,6 +28,18 @@ export function listSheet(kind: ListKind, items: ItemRow[], notes: string): Shee
     rows.push([null, bold('TOTAL'), null, null, null, null, null, null, null, null, { ...money(total), fontWeight: 'bold' }]);
   }
   if (!isAudit && notes.trim()) rows.push([], [bold('Specifications / Notes')], [notes.trim()]);
+  return rows;
+}
+
+/** Order slip for Excel: delivery details, then items with sizes and quantities, no rates. */
+export function orderSlipSheet(items: ItemRow[], d: OrderSlipDetails): SheetData {
+  const rows: SheetData = [[bold('Order slip')], [`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`], []];
+  if (d.address) rows.push([bold('Deliver to'), d.address]);
+  if (d.deliveryDate) rows.push([bold('Delivery by'), d.deliveryDate]);
+  if (d.receiverName || d.receiverPhone) rows.push([bold('Receiver'), [d.receiverName, d.receiverPhone].filter(Boolean).join(' - ')]);
+  rows.push([], ['Sr.', 'Item', 'Brand', 'Model / code', 'Size / spec', 'Color', 'Qty', 'Unit', 'Ordered as'].map(bold));
+  items.forEach((item, i) => rows.push([i + 1, item.item_name, item.brand, item.model, item.spec, item.color, item.quantity, item.unit, item.ordered_as]));
+  if (d.notes.trim()) rows.push([], [bold('Specifications / Notes')], [d.notes.trim()]);
   return rows;
 }
 

@@ -2,6 +2,12 @@
 
 Builds are numbered `<series>.<build>`; the newest series is at the top.
 
+## 2.2 — Order slips
+
+- **Share → Order slip** on the BOQ tab: send a vendor the order itself instead of a blank BOQ. It lists each item with brand, size and quantity, and how it's ordered (e.g. "5 bundles of 12 mm"), with no rates.
+- Add where to deliver, the delivery date, and the receiver's name and phone; your specifications / notes are included. The site and receiver are remembered for next time.
+- Share it as PDF, Excel or JPG, like other reports. *BOQ for quotes* (rates left blank) is still there.
+
 ## 2.1 — TMT, tiles and ACP sheets
 
 **Ordered in one unit, billed in another**
