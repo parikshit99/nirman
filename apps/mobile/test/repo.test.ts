@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildItemDatabase, materialKey } from '@nirman/shared';
+import { buildItemDatabase, contractTotals, materialKey } from '@nirman/shared';
 import {
   DRAFT_IDS,
   addCategory,
@@ -12,6 +12,12 @@ import {
   deleteJob,
   deleteLearnedTerm,
   deleteCategory,
+  deleteContract,
+  deleteContractEntry,
+  saveContract,
+  saveContractEntry,
+  setContractStatus,
+  setRetentionReleased,
   deleteItem,
   deleteList,
   enqueueJob,
@@ -414,5 +420,43 @@ describe('typed vendor quotes', () => {
     expect(snap.quoteLines.map((l) => [l.item_name, l.quantity, l.unit_price, l.total_amount, l.brand])).toEqual([['Cement', 15, 385, 5775, 'UltraTech']]);
     await confirmQuote(db, id);
     expect((await loadSnapshot(db)).rates.map((r) => [r.item_name, r.price, r.vendor])).toEqual([['Cement', 385, 'Gupta']]);
+  });
+});
+
+describe('labour contracts', () => {
+  const terms = {
+    contractor: ' Ramesh ', phone: '98100', address: 'Sector 44', category: 'Civil', work: 'Plaster', kind: 'rate' as const,
+    rate: 18, unit: 'sqft', est_quantity: 4000, amount: 0, retention_pct: 5, start_date: '2026-09-01', notes: '',
+  };
+
+  it('adds contracts and entries, edits terms, closes with retention released, and deletes', async () => {
+    const db = await freshDb();
+    const id = await saveContract(db, terms);
+    const work = await saveContractEntry(db, { contract_id: id, kind: 'work', date: '2026-09-10', quantity: 1000, amount: 0, mode: 'cash', note: '' });
+    await saveContractEntry(db, { contract_id: id, kind: 'payment', date: '2026-09-11', quantity: 0, amount: 10000, mode: 'upi', note: ' advance ' });
+    let snap = await loadSnapshot(db);
+    expect(snap.contracts[0]).toMatchObject({ contractor: 'Ramesh', status: 'active' });
+    expect(snap.contractEntries.map((e) => [e.kind, e.mode, e.note])).toEqual([['work', '', ''], ['payment', 'upi', 'advance']]);
+    expect(contractTotals(snap.contracts[0], snap.contractEntries).balance).toBe(18000 - 900 - 10000);
+
+    // A new rate applies to work already measured; editing an entry keeps it in place.
+    await saveContract(db, { ...terms, rate: 20 }, id);
+    await saveContractEntry(db, { contract_id: id, kind: 'work', date: '2026-09-10', quantity: 1200, amount: 0, mode: '', note: '' }, work);
+    snap = await loadSnapshot(db);
+    expect(snap.contracts).toHaveLength(1);
+    expect(contractTotals(snap.contracts[0], snap.contractEntries).workDone).toBe(24000);
+
+    await setContractStatus(db, id, 'closed', '2026-10-01');
+    snap = await loadSnapshot(db);
+    expect(snap.contracts[0]).toMatchObject({ status: 'closed', retention_released_at: '2026-10-01' });
+    await setRetentionReleased(db, id, '');
+    await setContractStatus(db, id, 'active');
+    expect((await loadSnapshot(db)).contracts[0]).toMatchObject({ status: 'active', retention_released_at: '' });
+
+    await deleteContractEntry(db, work);
+    expect((await loadSnapshot(db)).contractEntries).toHaveLength(1);
+    await deleteContract(db, id);
+    snap = await loadSnapshot(db);
+    expect([snap.contracts.length, snap.contractEntries.length]).toEqual([0, 0]);
   });
 });

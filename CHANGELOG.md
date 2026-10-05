@@ -2,6 +2,24 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 3.0 — Labour contracts
+
+**New Labour tab**
+- Add a **contract** for each contractor: name and phone, the job ("Internal plaster, 2nd floor"), site and category, and how they're paid: a **rate** per unit of work (₹18 per sqft, with an optional estimated quantity) or a **lump sum** (₹2,50,000), with optional **retention %** and start date.
+- On a contract, record **work done** as it's measured (sqft done, or % of a lump-sum job), every **payment or advance** (cash, UPI, bank, cheque) and **deductions** (material you supplied, penalties). Tap an entry to correct it; deletes can be undone.
+- Each contract shows **work done, paid and the balance due** (or the advance paid ahead of work), progress against the estimate, and the retention held. Closing a contract releases the retention.
+- **Share a statement** with the contractor as PDF, Excel or JPG: the terms, each entry with a running balance, and what is due, for everything or a chosen period.
+- Filter contracts by site, category and Ongoing / Closed; the side panel totals what's shown.
+- The **site report** now adds a Labour section (work done and paid per contract), with materials + labour as the grand total. It's also on the Labour tab.
+
+**Also since 2.0**
+- Order slips, vendor-quote rates typed by hand, *Order from this vendor*, *Buy again* (2.2, 2.3).
+- TMT bundles, tiles and ACP sheets converted to billed kg and sqft (2.1).
+- *Settings → Report a problem*, the diagnostic log and optional crash reports (2.4). The log now includes what each step worked on (items, rates, vendors) so problems can be reproduced; photos and your API key are never included.
+- *Index rate* asks which site the purchase was for, so indexed spends appear under the right site.
+
+Backups now include contracts; backups from earlier versions still restore. Install over the existing app to keep your data.
+
 ## 2.4 — Report a problem
 
 - **Settings → Problems and diagnostics**: the app now keeps a short log on the phone of errors, AI readings (success or failure, time taken, lines read), the steps you take and slow screens. It never records what you bought, prices, addresses, names or your API key.

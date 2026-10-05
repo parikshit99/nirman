@@ -159,7 +159,67 @@ export const hiddenMaterialRowSchema = z.object({
 });
 export type HiddenMaterialRow = z.infer<typeof hiddenMaterialRowSchema>;
 
-export const dataTables = ['lists', 'items', 'indexed_rates', 'learned_terms', 'categories', 'quotes', 'quote_lines', 'hidden_materials'] as const;
+export const contractKinds = ['rate', 'lump_sum'] as const;
+export const contractStatuses = ['active', 'closed'] as const;
+
+/**
+ * A labour contract: a contractor doing one job at a site, paid per unit of
+ * work (rate) or a fixed amount in stages (lump sum).
+ */
+export const contractRowSchema = z.object({
+  id,
+  contractor: z.string().max(200),
+  phone: z.string().max(40),
+  address: z.string().max(500),
+  /** Work category, as for purchase lists (Civil, Electrical, …). */
+  category: z.string().max(100),
+  /** What the job is, e.g. "Internal plaster, 2nd floor". */
+  work: z.string().max(500),
+  kind: z.enum(contractKinds),
+  /** Rate contracts: amount per `unit` of work. */
+  rate: z.number(),
+  unit: z.string().max(50),
+  /** Rate contracts: expected quantity (0 = not known). */
+  est_quantity: z.number(),
+  /** Lump-sum contracts: the agreed amount. */
+  amount: z.number(),
+  /** Share of work done held back until completion, in %. */
+  retention_pct: z.number(),
+  start_date: z.string().max(20),
+  status: z.enum(contractStatuses),
+  /** Date the held-back retention was released; blank while held. */
+  retention_released_at: z.string().max(20),
+  notes: z.string().max(5000),
+  created_at: isoTimestamp,
+  updated_at: isoTimestamp,
+});
+export type ContractRow = z.infer<typeof contractRowSchema>;
+
+export const contractEntryKinds = ['work', 'payment', 'deduction'] as const;
+export type ContractEntryKind = (typeof contractEntryKinds)[number];
+
+/**
+ * Something that happened on a contract: work measured (quantity in the
+ * contract's unit, or % of a lump sum), a payment or advance, or a deduction
+ * (material supplied, penalty).
+ */
+export const contractEntryRowSchema = z.object({
+  id,
+  contract_id: id,
+  kind: z.enum(contractEntryKinds),
+  date: isoDate,
+  /** Work entries: quantity done (rate) or % of the job (lump sum). */
+  quantity: z.number(),
+  /** Payments and deductions: the amount. */
+  amount: z.number(),
+  /** Payments: cash, UPI, bank, cheque. */
+  mode: z.string().max(40),
+  note: z.string().max(500),
+  created_at: isoTimestamp,
+});
+export type ContractEntryRow = z.infer<typeof contractEntryRowSchema>;
+
+export const dataTables = ['lists', 'items', 'indexed_rates', 'learned_terms', 'categories', 'quotes', 'quote_lines', 'hidden_materials', 'contracts', 'contract_entries'] as const;
 export type DataTable = (typeof dataTables)[number];
 
 export const rowSchemas = {
@@ -171,6 +231,8 @@ export const rowSchemas = {
   quotes: quoteRowSchema,
   quote_lines: quoteLineRowSchema,
   hidden_materials: hiddenMaterialRowSchema,
+  contracts: contractRowSchema,
+  contract_entries: contractEntryRowSchema,
 } as const;
 
 /** Column names of each table, in schema order. */
@@ -187,6 +249,8 @@ export interface RowTypes {
   quotes: QuoteRow;
   quote_lines: QuoteLineRow;
   hidden_materials: HiddenMaterialRow;
+  contracts: ContractRow;
+  contract_entries: ContractEntryRow;
 }
 
 // ---------------------------------------------------------------------------

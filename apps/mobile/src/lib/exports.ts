@@ -1,6 +1,6 @@
 import type { jsPDF } from 'jspdf';
 import type { SheetData } from 'write-excel-file/browser';
-import type { ItemRow, ListRow, QuoteComparison, SiteReport } from '@nirman/shared';
+import { describeTerms, type ContractRow, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
 import { pdfToBase64, type OrderSlipDetails } from './pdf.ts';
 import type { SharedFile } from './files.ts';
@@ -80,14 +80,21 @@ export function comparisonSheet(boq: ListRow, comparison: QuoteComparison): Shee
 }
 
 /** Site report for Excel: the per-material summary, then every line. */
-export function siteReportSheet(address: string, filters: string, report: SiteReport): SheetData {
+export function siteReportSheet(address: string, filters: string, report: SiteReport, labour?: LabourReport): SheetData {
   const rows: SheetData = [[bold('Site report')], [address], [filters], [`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`], []];
   rows.push(['Category', 'Material', 'Quantity', 'Unit', 'Avg rate', 'Amount', 'Vendors', 'Bills'].map(bold));
   for (const c of report.categories) {
     for (const m of c.materials) rows.push([c.name, m.name, m.quantity, m.unit, m.avgRate ? money(m.avgRate) : null, money(m.amount), m.vendors.join(', '), m.bills]);
     rows.push([bold(`${c.name} total`), null, null, null, null, { ...money(c.amount), fontWeight: 'bold' }, null, null]);
   }
-  rows.push([bold('GRAND TOTAL'), null, null, null, null, { ...money(report.total), fontWeight: 'bold' }, null, null]);
+  const hasLabour = !!labour?.rows.length;
+  rows.push([bold(hasLabour ? 'MATERIALS TOTAL' : 'GRAND TOTAL'), null, null, null, null, { ...money(report.total), fontWeight: 'bold' }, null, null]);
+  if (hasLabour) {
+    rows.push([], [bold('Labour')], ['Contractor', 'Work', 'Category', 'Work done', 'Paid', 'Balance now'].map(bold));
+    for (const r of labour!.rows) rows.push([r.contract.contractor, r.contract.work, r.contract.category, money(r.workDone), money(r.paid), money(r.balance)]);
+    rows.push([null, null, bold('Labour total'), { ...money(labour!.workDone), fontWeight: 'bold' }, { ...money(labour!.paid), fontWeight: 'bold' }, { ...money(labour!.balance), fontWeight: 'bold' }]);
+    rows.push([bold('GRAND TOTAL (materials + labour work done)'), null, null, null, null, { ...money(report.total + labour!.workDone), fontWeight: 'bold' }]);
+  }
   rows.push([], [bold('All lines')]);
   rows.push(['Date', 'Category', 'Item', 'Brand', 'Model / code', 'Size / spec', 'Color', 'Qty', 'Unit', 'Ordered as', 'Rate', 'Amount', 'Vendor', 'Session', 'Delivered on'].map(bold));
   const lines = report.categories.flatMap((c) => c.materials.flatMap((m) => m.lines.map((l) => ({ ...l, category: c.name }))));
@@ -95,6 +102,26 @@ export function siteReportSheet(address: string, filters: string, report: SiteRe
   for (const { date, item, listTitle, category } of lines) {
     rows.push([date, category, item.item_name, item.brand, item.model, item.spec, item.color, item.quantity, item.unit, item.ordered_as, money(item.unit_price), money(item.total_amount), item.vendor, listTitle, item.delivered_at]);
   }
+  return rows;
+}
+
+/** A contractor's statement for Excel: terms, entries with running balance, then the summary. */
+export function contractStatementSheet(c: ContractRow, st: ContractStatement, period: string): SheetData {
+  const rupees = (n: number) => `Rs. ${Math.round(n).toLocaleString('en-IN')}`;
+  const rows: SheetData = [[bold('Labour statement')], [`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`], []];
+  rows.push([bold('Contractor'), [c.contractor, c.phone].filter(Boolean).join(' - ')]);
+  if (c.work) rows.push([bold('Work'), c.work]);
+  if (c.address) rows.push([bold('Site'), [c.address, c.category].filter(Boolean).join(' - ')]);
+  rows.push([bold('Terms'), describeTerms(c, rupees)], [bold('Period'), period || 'All entries'], []);
+  rows.push(['Date', 'Particulars', 'Work done', 'Deduction', 'Paid', 'Balance'].map(bold));
+  if (st.opening !== null) rows.push([null, 'Brought forward', null, null, null, money(st.opening)]);
+  for (const r of st.rows) rows.push([r.date, r.particulars, r.work ? money(r.work) : null, r.deduction ? money(r.deduction) : null, r.paid ? money(r.paid) : null, money(r.balance)]);
+  const t = st.totals;
+  rows.push([], [null, bold('Work done'), null, null, null, money(t.workDone)]);
+  if (c.retention_pct > 0) rows.push([null, `Less retention ${c.retention_pct}%${c.retention_released_at ? ' (released)' : ' (held)'}`, null, null, null, money(t.retention)]);
+  if (t.deductions) rows.push([null, 'Less deductions', null, null, null, money(t.deductions)]);
+  rows.push([null, 'Less paid', null, null, null, money(t.paid)]);
+  rows.push([null, bold(t.balance < 0 ? 'Paid in advance' : 'Balance due'), null, null, null, { ...money(Math.abs(t.balance)), fontWeight: 'bold' }]);
   return rows;
 }
 

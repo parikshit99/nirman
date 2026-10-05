@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { Share2, X } from 'lucide-react';
-import { buildSiteReport, financialYear, siteHasDeliveries, todayISO } from '@nirman/shared';
+import { buildLabourReport, buildSiteReport, financialYear, siteHasDeliveries, todayISO } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { ShareSheet } from '../components/ShareSheet.tsx';
 import { useBackHandler } from '../lib/backButton.ts';
@@ -18,8 +18,9 @@ export function SiteReport({ onClose }: { onClose(): void }) {
   const { snapshot, learning, categoryNames } = useAppState();
   const dialogs = useDialogs();
   const sites = useMemo(
-    () => [...new Set(snapshot.lists.filter((l) => l.kind === 'audit' && l.status === 'saved' && l.address).map((l) => l.address))].sort(),
-    [snapshot.lists],
+    () =>
+      [...new Set([...snapshot.lists.filter((l) => l.kind === 'audit' && l.status === 'saved' && l.address).map((l) => l.address), ...snapshot.contracts.map((c) => c.address).filter(Boolean)])].sort(),
+    [snapshot.lists, snapshot.contracts],
   );
   const [address, setAddress] = useState(sites[0] ?? '');
   const [from, setFrom] = useState('');
@@ -35,26 +36,34 @@ export function SiteReport({ onClose }: { onClose(): void }) {
   };
   const toggleCategory = (c: string) => setCategories((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
   const siteCategories = useMemo(() => {
-    const used = new Set(snapshot.lists.filter((l) => l.kind === 'audit' && l.status === 'saved' && l.address === address).map((l) => l.category || 'Uncategorised'));
+    const used = new Set([
+      ...snapshot.lists.filter((l) => l.kind === 'audit' && l.status === 'saved' && l.address === address).map((l) => l.category || 'Uncategorised'),
+      ...snapshot.contracts.filter((c) => c.address === address).map((c) => c.category || 'Uncategorised'),
+    ]);
     return [...categoryNames.filter((c) => used.has(c)), ...[...used].filter((c) => !categoryNames.includes(c))];
-  }, [snapshot.lists, address, categoryNames]);
+  }, [snapshot.lists, snapshot.contracts, address, categoryNames]);
 
   const report = useMemo(
     () => buildSiteReport(snapshot.lists, snapshot.items, learning, { address, from, to, categories, deliveredOnly }),
     [snapshot.lists, snapshot.items, learning, address, from, to, categories, deliveredOnly],
   );
+  const labour = useMemo(
+    () => buildLabourReport(snapshot.contracts, snapshot.contractEntries, { address, from, to, categories }),
+    [snapshot.contracts, snapshot.contractEntries, address, from, to, categories],
+  );
+  const empty = report.lineCount === 0 && labour.rows.length === 0;
   const materialCount = report.categories.reduce((n, c) => n + c.materials.length, 0);
   const period = from || to ? `${from || 'start'} to ${to || 'today'}` : 'All time';
   const filters = [period, categories.length ? categories.join(', ') : 'All categories', deliveredOnly ? 'Delivered only' : 'All saved purchases'].join(' · ');
 
   const share = async (format: ExportFormat) => {
-    logStep('share', { what: 'site report', format, lines: report.lineCount, deliveredOnly, categories: categories.length, dated: !!(from || to) });
+    logStep('share', { what: 'site report', format, lines: report.lineCount, contracts: labour.rows.length, deliveredOnly, categories: categories.length, dated: !!(from || to) });
     const name = `Site_report_${address.replace(/[^\w-]+/g, '_').slice(0, 40)}_${todayISO()}`;
     try {
       if (format === 'xlsx') {
-        await shareFiles([await sheetToXlsx(siteReportSheet(address, filters, report), `${name}.xlsx`, 'Site report', [16, 30, 12, 12, 12, 14, 24, 10, 8, 26, 12, 14, 18, 20, 14])]);
+        await shareFiles([await sheetToXlsx(siteReportSheet(address, filters, report, labour), `${name}.xlsx`, 'Site report', [16, 30, 12, 12, 12, 14, 24, 10, 8, 26, 12, 14, 18, 20, 14])]);
       } else {
-        const doc = buildSiteReportPdf(address, filters, report);
+        const doc = buildSiteReportPdf(address, filters, report, labour);
         await shareFiles(format === 'pdf' ? [pdfFile(doc, name)] : await pdfToJpegs(doc, name));
       }
     } catch (err) {
@@ -78,10 +87,10 @@ export function SiteReport({ onClose }: { onClose(): void }) {
             <X size={20} />
           </button>
         </div>
-        <p className="text-[11px] text-gray-500 mb-4">Everything bought for one site, grouped by work type and material, with every line listed.</p>
+        <p className="text-[11px] text-gray-500 mb-4">Everything bought for one site, grouped by work type and material, with every line listed, plus labour contracts.</p>
 
         {sites.length === 0 ? (
-          <p className="text-sm text-gray-500">Save a purchase list with a site address first.</p>
+          <p className="text-sm text-gray-500">Save a purchase list or add a labour contract with a site address first.</p>
         ) : (
           <div className="space-y-4">
             <label className="block">
@@ -142,15 +151,23 @@ export function SiteReport({ onClose }: { onClose(): void }) {
               </span>
               <span className="font-mono font-bold">{rupees(report.total)}</span>
             </div>
+            {labour.rows.length > 0 && (
+              <div className="p-3 bg-gray-50 rounded-xl text-sm flex justify-between items-center gap-2">
+                <span className="text-gray-600">
+                  Labour: {labour.rows.length} {labour.rows.length === 1 ? 'contract' : 'contracts'} · paid {rupees(labour.paid)}
+                </span>
+                <span className="font-mono font-bold">{rupees(labour.workDone)}</span>
+              </div>
+            )}
 
             <button
               onClick={() => setSharing(true)}
-              disabled={report.lineCount === 0}
+              disabled={empty}
               className="w-full h-12 bg-[var(--color-brand-primary)] text-white font-bold rounded-xl flex items-center justify-center gap-2 uppercase tracking-widest text-sm disabled:opacity-50"
             >
               <Share2 size={16} /> Share report
             </button>
-            {report.lineCount === 0 && (
+            {empty && (
               <p className="text-xs text-gray-500 text-center">
                 Nothing matches.{deliveredOnly ? ' Tick deliveries in History → Deliveries, or include all saved purchases.' : ''}
               </p>

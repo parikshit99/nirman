@@ -9,6 +9,8 @@ import {
   enqueueQuote,
   hideMaterial,
   indexRates,
+  saveContract,
+  saveContractEntry,
   loadSnapshot,
   saveDraftToHistory,
   setListNotes,
@@ -37,6 +39,10 @@ async function populated() {
   await completeQuoteJob(db, snap.jobs[0].id, [
     { boq_sr: 1, original_term: 'bori', item_name: 'Cement', quantity: 15, unit: 'Bag', unit_price: 380, total_amount: 0, note: '' },
   ], boqItemIds);
+  const contract = await saveContract(db, {
+    contractor: 'Ramesh', phone: '', address: 'Sector 44', category: 'Civil', work: 'Plaster', kind: 'lump_sum', rate: 0, unit: '', est_quantity: 0, amount: 90000, retention_pct: 0, start_date: '', notes: '',
+  });
+  await saveContractEntry(db, { contract_id: contract, kind: 'payment', date: '2026-10-02', quantity: 0, amount: 5000, mode: 'cash', note: '' });
   await enqueueQuote(db, { boqId, vendor: 'Unread', quoteDate: '2026-10-03', text: '', images: ['IMG'] });
   return db;
 }
@@ -58,6 +64,7 @@ describe('backup', () => {
     // The quote still waiting to be read is not a record yet.
     expect(strip(restored)).toEqual(strip({ ...original, quotes: original.quotes.filter((q) => q.vendor !== 'Unread') }));
     expect(restored.quoteLines).toHaveLength(1);
+    expect([restored.contracts.length, restored.contractEntries.length]).toEqual([1, 1]);
     expect(restored.jobs).toHaveLength(0);
     expect(restored.items.some((i) => i.item_name === 'Old data')).toBe(false);
   });

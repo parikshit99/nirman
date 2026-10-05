@@ -47,4 +47,24 @@ describe('order slip export', () => {
     expect(rows.at(-1)).toEqual(['Unload at gate 2']);
     expect(JSON.stringify(rows)).not.toContain('380');
   });
+
+  it('writes a contractor statement with terms, running balance and what is due, as Excel and PDF', async () => {
+    const { contractStatement } = await import('@nirman/shared');
+    const { contractStatementSheet } = await import('../src/lib/exports.ts');
+    const { buildContractStatementPdf } = await import('../src/lib/pdf.ts');
+    const ts = '2026-10-01T00:00:00.000Z';
+    const c = {
+      id: 'c', contractor: 'Ramesh', phone: '98', address: 'Sector 44', category: 'Civil', work: 'Plaster', kind: 'rate' as const, rate: 18, unit: 'sqft',
+      est_quantity: 0, amount: 0, retention_pct: 5, start_date: '', status: 'active' as const, retention_released_at: '', notes: '', created_at: ts, updated_at: ts,
+    };
+    const entries = [
+      { id: 'a', contract_id: 'c', kind: 'work' as const, date: '2026-10-02', quantity: 1000, amount: 0, mode: '', note: '', created_at: ts },
+      { id: 'b', contract_id: 'c', kind: 'payment' as const, date: '2026-10-03', quantity: 0, amount: 10000, mode: 'cash', note: '', created_at: ts },
+    ];
+    const st = contractStatement(c, entries);
+    const rows = values(contractStatementSheet(c, st, ''));
+    expect(rows).toContainEqual(['2026-10-02', 'Work: 1,000 sqft @ 18', 18000, null, null, 18000]);
+    expect(rows.at(-1)).toEqual([null, 'Balance due', null, null, null, 7100]);
+    expect(buildContractStatementPdf(c, st, '').getNumberOfPages()).toBe(1);
+  });
 });

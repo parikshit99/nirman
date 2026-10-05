@@ -11,6 +11,8 @@ import {
   tableColumns,
   todayISO,
   type CategoryRow,
+  type ContractEntryRow,
+  type ContractRow,
   type MaterialInput,
   type QuoteLineInput,
   type Variant,
@@ -58,6 +60,8 @@ export interface Snapshot {
   quotes: QuoteRow[];
   quoteLines: QuoteLineRow[];
   hidden: HiddenMaterialRow[];
+  contracts: ContractRow[];
+  contractEntries: ContractEntryRow[];
 }
 
 export interface ListMeta {
@@ -116,7 +120,9 @@ export async function loadSnapshot(db: Db): Promise<Snapshot> {
     const quotes = await tx.all<QuoteRow>(selectAll('quotes', 'created_at'));
     const quoteLines = await tx.all<QuoteLineRow>(selectAll('quote_lines', 'quote_id, position'));
     const hidden = await tx.all<HiddenMaterialRow>(selectAll('hidden_materials', 'hidden_at'));
-    return { lists, items, rates, learned, categories, jobs, quotes, quoteLines, hidden };
+    const contracts = await tx.all<ContractRow>(selectAll('contracts', 'created_at DESC'));
+    const contractEntries = await tx.all<ContractEntryRow>(selectAll('contract_entries', 'date, created_at'));
+    return { lists, items, rates, learned, categories, jobs, quotes, quoteLines, hidden, contracts, contractEntries };
   });
 }
 
@@ -804,6 +810,79 @@ export async function confirmQuote(db: Db, id: string) {
 // ---------------------------------------------------------------------------
 
 /** Delete all records and queued jobs, then restore the default categories and drafts. */
+// ---------------------------------------------------------------------------
+// Labour contracts
+// ---------------------------------------------------------------------------
+
+export type ContractInput = Omit<ContractRow, 'id' | 'status' | 'retention_released_at' | 'created_at' | 'updated_at'>;
+
+/** Add a contract, or update the terms of an existing one (its entries are kept). */
+export async function saveContract(db: Db, input: ContractInput, id?: string): Promise<string> {
+  return db.transaction(async (tx) => {
+    const existing = id ? await getRow(tx, 'contracts', id) : undefined;
+    const ts = nowISO();
+    const row: ContractRow = {
+      status: 'active',
+      retention_released_at: '',
+      ...existing,
+      ...input,
+      contractor: input.contractor.trim(),
+      phone: input.phone.trim(),
+      address: input.address.trim(),
+      work: input.work.trim(),
+      unit: input.unit.trim(),
+      notes: input.notes.trim(),
+      id: existing?.id ?? newId(),
+      created_at: existing?.created_at ?? ts,
+      updated_at: ts,
+    };
+    await writeRow(tx, 'contracts', row);
+    return row.id;
+  });
+}
+
+/** Close or reopen a contract; closing can release the retention on the same date. */
+export async function setContractStatus(db: Db, id: string, status: ContractRow['status'], releaseRetentionOn = '') {
+  await db.transaction(async (tx) => {
+    const c = await getRow(tx, 'contracts', id);
+    if (!c) return;
+    await writeRow(tx, 'contracts', { ...c, status, retention_released_at: releaseRetentionOn || (status === 'active' ? '' : c.retention_released_at), updated_at: nowISO() });
+  });
+}
+
+/** Release the held-back retention on a date, or hold it again with ''. */
+export async function setRetentionReleased(db: Db, id: string, date: string) {
+  await db.transaction(async (tx) => {
+    const c = await getRow(tx, 'contracts', id);
+    if (c) await writeRow(tx, 'contracts', { ...c, retention_released_at: date, updated_at: nowISO() });
+  });
+}
+
+export async function deleteContract(db: Db, id: string) {
+  await db.transaction(async (tx) => {
+    await tx.run('DELETE FROM contract_entries WHERE contract_id = ?', [id]);
+    await tx.run('DELETE FROM contracts WHERE id = ?', [id]);
+  });
+}
+
+export type ContractEntryInput = Omit<ContractEntryRow, 'id' | 'created_at'>;
+
+/** Record work, a payment or a deduction; with an id, change that entry. */
+export async function saveContractEntry(db: Db, input: ContractEntryInput, id?: string): Promise<string> {
+  return db.transaction(async (tx) => {
+    const existing = id ? await getRow(tx, 'contract_entries', id) : undefined;
+    const row: ContractEntryRow = { ...input, mode: input.kind === 'payment' ? input.mode : '', note: input.note.trim(), id: existing?.id ?? newId(), created_at: existing?.created_at ?? nowISO() };
+    await writeRow(tx, 'contract_entries', row);
+    const c = await getRow(tx, 'contracts', row.contract_id);
+    if (c) await writeRow(tx, 'contracts', { ...c, updated_at: nowISO() });
+    return row.id;
+  });
+}
+
+export async function deleteContractEntry(db: Db, id: string) {
+  await db.run('DELETE FROM contract_entries WHERE id = ?', [id]);
+}
+
 export async function clearAllData(tx: SqlExecutor, { seedDefaults = true } = {}) {
   for (const t of [...dataTables, 'jobs', 'job_images']) await tx.run(`DELETE FROM ${t}`);
   if (seedDefaults) {
