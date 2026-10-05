@@ -14,18 +14,18 @@ const money = (value: number) => ({ value: value || 0, type: Number, format: '#,
 /** The purchase list or BOQ as rows, with brand / model / size / colour in their own columns. */
 export function listSheet(kind: ListKind, items: ItemRow[], notes: string): SheetData {
   const isAudit = kind === 'audit';
-  const head = ['Sr.', 'Item', 'Brand', 'Model / code', 'Size / spec', 'Color', 'Qty', 'Unit', 'Rate', 'Total'];
+  const head = ['Sr.', 'Item', 'Brand', 'Model / code', 'Size / spec', 'Color', 'Qty', 'Unit', 'Ordered as', 'Rate', 'Total'];
   if (isAudit) head.push('Vendor', 'Date');
   const rows: SheetData = [[bold(isAudit ? 'Purchase report' : 'Bill of quantities')], [`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`], [], head.map(bold)];
   items.forEach((item, i) => {
-    const row: SheetData[number] = [i + 1, item.item_name, item.brand, item.model, item.spec, item.color, item.quantity, item.unit];
+    const row: SheetData[number] = [i + 1, item.item_name, item.brand, item.model, item.spec, item.color, item.quantity, item.unit, item.ordered_as];
     if (isAudit) row.push(money(item.unit_price), money(item.total_amount), item.vendor, item.date);
     else row.push(null, null);
     rows.push(row);
   });
   if (isAudit) {
     const total = items.reduce((sum, i) => sum + (i.total_amount || 0), 0);
-    rows.push([null, bold('TOTAL'), null, null, null, null, null, null, null, { ...money(total), fontWeight: 'bold' }]);
+    rows.push([null, bold('TOTAL'), null, null, null, null, null, null, null, null, { ...money(total), fontWeight: 'bold' }]);
   }
   if (!isAudit && notes.trim()) rows.push([], [bold('Specifications / Notes')], [notes.trim()]);
   return rows;
@@ -76,11 +76,11 @@ export function siteReportSheet(address: string, filters: string, report: SiteRe
   }
   rows.push([bold('GRAND TOTAL'), null, null, null, null, { ...money(report.total), fontWeight: 'bold' }, null, null]);
   rows.push([], [bold('All lines')]);
-  rows.push(['Date', 'Category', 'Item', 'Brand', 'Model / code', 'Size / spec', 'Color', 'Qty', 'Unit', 'Rate', 'Amount', 'Vendor', 'Session', 'Delivered on'].map(bold));
+  rows.push(['Date', 'Category', 'Item', 'Brand', 'Model / code', 'Size / spec', 'Color', 'Qty', 'Unit', 'Ordered as', 'Rate', 'Amount', 'Vendor', 'Session', 'Delivered on'].map(bold));
   const lines = report.categories.flatMap((c) => c.materials.flatMap((m) => m.lines.map((l) => ({ ...l, category: c.name }))));
   lines.sort((a, b) => a.date.localeCompare(b.date));
   for (const { date, item, listTitle, category } of lines) {
-    rows.push([date, category, item.item_name, item.brand, item.model, item.spec, item.color, item.quantity, item.unit, money(item.unit_price), money(item.total_amount), item.vendor, listTitle, item.delivered_at]);
+    rows.push([date, category, item.item_name, item.brand, item.model, item.spec, item.color, item.quantity, item.unit, item.ordered_as, money(item.unit_price), money(item.total_amount), item.vendor, listTitle, item.delivered_at]);
   }
   return rows;
 }

@@ -7,6 +7,8 @@ import { testGeminiKey } from '../lib/gemini.ts';
 import { DEFAULT_MODEL } from '../lib/settings.ts';
 import { APP_VERSION } from '../lib/version.ts';
 import { latestNotes } from '../lib/whatsNew.ts';
+import { loadConversions, resetConversions, saveConversions } from '../lib/conversionSettings.ts';
+import { parseSize, sizeLabel, type SheetSize } from '@nirman/shared';
 import { describeLastBackup, recordBackup } from '../lib/backupReminder.ts';
 import { useAppState } from '../state/AppState.tsx';
 import { useDialogs } from './Dialogs.tsx';
@@ -55,6 +57,7 @@ export function SettingsModal({ onClose, firstRun, onWhatsNew }: { onClose(): vo
         ) : (
           <>
             <BackupSection />
+            <ConversionsSection />
             <StorageSection onWhatsNew={onWhatsNew} />
           </>
         )}
@@ -393,5 +396,92 @@ function LearnedCorrections({ onForgetAll }: { onForgetAll(): void }) {
         Forget all learned corrections
       </button>
     </div>
+  );
+}
+
+const sizesText = (sizes: SheetSize[]) => sizes.map((z) => `${z.width}x${z.length}`).join(', ');
+const parseSizes = (text: string) => text.split(/[,;\n]+/).map((t) => parseSize(t)).filter((z): z is SheetSize => !!z);
+
+/** Bars per bundle, bar length and the tile / ACP sizes offered by the unit calculator. */
+function ConversionsSection() {
+  const [open, setOpen] = useState(false);
+  const [initial] = useState(loadConversions);
+  const [bars, setBars] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(initial.bundleBars).map(([d, n]) => [d, String(n)])));
+  const [length, setLength] = useState(String(initial.barLength));
+  const [tiles, setTiles] = useState(sizesText(initial.tileSizes));
+  const [acp, setAcp] = useState(sizesText(initial.acpSizes));
+  const [saved, setSaved] = useState(false);
+  const field = 'w-full min-w-0 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-blue-400';
+
+  const save = () => {
+    const bundleBars = Object.fromEntries(Object.entries(bars).map(([d, n]) => [d, Math.max(0, Math.round(Number(n) || 0))]));
+    const tileSizes = parseSizes(tiles);
+    const acpSizes = parseSizes(acp);
+    saveConversions({ bundleBars, barLength: Number(length) > 0 ? Number(length) : 12, tileSizes, acpSizes });
+    setTiles(sizesText(loadConversions().tileSizes));
+    setAcp(sizesText(loadConversions().acpSizes));
+    setSaved(true);
+  };
+
+  return (
+    <section className="space-y-2">
+      <SectionTitle>TMT, tiles and ACP</SectionTitle>
+      <p className="text-[11px] text-gray-500 leading-relaxed">
+        Used to turn TMT bundles into kg and sqft into whole tiles or sheets.{' '}
+        <button onClick={() => setOpen((v) => !v)} className="text-blue-600 font-bold underline" aria-expanded={open}>
+          {open ? 'Hide' : 'Edit'}
+        </button>
+      </p>
+      {open && (
+        <div className="space-y-3 text-xs">
+          <div>
+            <span className="font-bold text-gray-500">Bars per bundle</span>
+            <div className="grid grid-cols-3 gap-2 mt-1">
+              {Object.keys(bars)
+                .sort((a, b) => Number(a) - Number(b))
+                .map((d) => (
+                  <label key={d} className="flex items-center gap-1">
+                    <span className="w-12 shrink-0 font-mono">{d} mm</span>
+                    <input aria-label={`Bars per bundle for ${d} mm`} inputMode="numeric" className={field} value={bars[d]} onChange={(e) => { setBars((b) => ({ ...b, [d]: e.target.value })); setSaved(false); }} />
+                  </label>
+                ))}
+            </div>
+          </div>
+          <label className="block">
+            <span className="font-bold text-gray-500">Standard bar length (m)</span>
+            <input aria-label="Standard bar length" inputMode="decimal" className={field} value={length} onChange={(e) => { setLength(e.target.value); setSaved(false); }} />
+          </label>
+          <label className="block">
+            <span className="font-bold text-gray-500">Tile sizes (mm)</span>
+            <input aria-label="Tile sizes" className={field} value={tiles} onChange={(e) => { setTiles(e.target.value); setSaved(false); }} />
+          </label>
+          <label className="block">
+            <span className="font-bold text-gray-500">ACP sheet sizes (mm)</span>
+            <input aria-label="ACP sheet sizes" className={field} value={acp} onChange={(e) => { setAcp(e.target.value); setSaved(false); }} />
+          </label>
+          <p className="text-[11px] text-gray-500">Sizes are width x length, separated by commas, e.g. {sizeLabel({ width: 600, length: 1200 }).replace(' mm', '')}, 800x1600.</p>
+          <div className="flex gap-3 items-center">
+            <button onClick={save} className="px-4 py-2 bg-gray-900 text-white rounded-lg font-bold">
+              Save
+            </button>
+            <button
+              onClick={() => {
+                resetConversions();
+                const d = loadConversions();
+                setBars(Object.fromEntries(Object.entries(d.bundleBars).map(([k, n]) => [k, String(n)])));
+                setLength(String(d.barLength));
+                setTiles(sizesText(d.tileSizes));
+                setAcp(sizesText(d.acpSizes));
+                setSaved(true);
+              }}
+              className="text-blue-600 font-bold underline"
+            >
+              Reset to defaults
+            </button>
+            {saved && <span role="status" className="text-green-700 font-bold">Saved</span>}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }

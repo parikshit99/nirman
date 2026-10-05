@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { VARIANT_FIELDS, parseAmount, todayISO, type MaterialEntry } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
+import { QuantityHelper } from '../components/QuantityHelper.tsx';
 import { VariantFields } from '../components/VariantFields.tsx';
 import { DRAFT_IDS, type ListKind } from '../data/repo.ts';
 import { useAppState } from '../state/AppState.tsx';
 
-const EMPTY: Record<string, string> = { item_name: '', quantity: '', unit: '', unit_price: '', vendor: '', brand: '', model: '', spec: '', color: '' };
+const EMPTY: Record<string, string> = { item_name: '', quantity: '', unit: '', unit_price: '', vendor: '', brand: '', model: '', spec: '', color: '', ordered_as: '' };
 
 /** Add one line by hand, without the AI: works with no internet or API key. */
 export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void }) {
@@ -46,6 +47,7 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
         total_amount: quantity * unitPrice,
         vendor: isAudit ? draft.vendor.trim() : '',
         date: isAudit ? todayISO() : '',
+        ordered_as: draft.ordered_as.trim(),
         ...Object.fromEntries(VARIANT_FIELDS.map((f) => [f, draft[f].trim()])),
       },
     ]);
@@ -84,6 +86,12 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
       </label>
       {known && <LastPrice entry={known} />}
       <VariantFields value={draft} onChange={set} inputClassName={field} />
+      <QuantityHelper
+        itemName={draft.item_name}
+        spec={draft.spec}
+        fieldClassName={field}
+        onApply={(r) => setDraft((p) => ({ ...p, quantity: String(r.quantity), unit: r.unit, spec: r.spec, ordered_as: r.ordered_as }))}
+      />
       <div className={`grid gap-2 ${isAudit ? 'grid-cols-3' : 'grid-cols-2'}`}>
         <label className="block min-w-0">
           <span className="text-xs font-bold text-gray-500">Qty</span>
@@ -105,6 +113,12 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
           </label>
         )}
       </div>
+      {draft.ordered_as && (
+        <label className="block">
+          <span className="text-xs font-bold text-gray-500">Ordered as</span>
+          <input aria-label="Ordered as" className={field} value={draft.ordered_as} onChange={(e) => set('ordered_as', e.target.value)} />
+        </label>
+      )}
       {isAudit && (
         <label className="block">
           <span className="text-xs font-bold text-gray-500">Vendor</span>

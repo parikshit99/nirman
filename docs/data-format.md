@@ -23,7 +23,7 @@ The `nirmaan` names are the original internal ids. They stay unchanged so existi
 | Table | One row per | Key columns |
 |---|---|---|
 | `lists` | purchase list or BOQ | `kind`: `audit` (Purchases) or `boq`; `status`: `draft` or `saved`; `title`, `address`, `category`, `site_date`, `notes` |
-| `items` | line in a list | `list_id`; `item_name` (standard English name); `original_term` (word as written or spoken, e.g. "bori"); `quantity`, `unit`, `unit_price`, `total_amount`, `vendor`, `date`; `delivered_at`, the date a purchase line reached the site (blank = not marked) |
+| `items` | line in a list | `list_id`; `item_name` (standard English name); `original_term` (word as written or spoken, e.g. "bori"); `quantity`, `unit`, `unit_price`, `total_amount`, `vendor`, `date`; `delivered_at`, the date a purchase line reached the site (blank = not marked); `ordered_as`, how it was ordered when billed in another unit (e.g. "3 bundles of 12 mm" for a line in kg) |
 | `indexed_rates` | single price added on its own ("Index rate", or a confirmed vendor quote) | `item_name`, `unit`, `date`, `price`, `vendor`, `indexed_at`; `category` and `address` of the BOQ a confirmed quote was for (blank for a rate added on its own) |
 | `learned_terms` | correction the app remembers | `id` is the original word, lower-cased; it maps to the `item_name` and `unit` to use instead |
 | `categories` | type of work (Civil, Electrical, …) | `name`; the built-in ones use the lower-cased name as `id` |
@@ -62,7 +62,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
 ```json
 {
   "app": "nirmaan-auditor",
-  "version": 6,
+  "version": 7,
   "exported_at": "2026-10-03T19:13:38.586Z",
   "lists": [], "items": [], "indexed_rates": [], "learned_terms": [],
   "categories": [], "quotes": [], "quote_lines": [], "hidden_materials": []
@@ -76,6 +76,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
   - version 2 (before hidden materials) has no `hidden_materials`;
   - version 3 (before variant fields) has rows without `brand`, `model`, `spec`, `color`;
   - version 4 (before rate categories) has `indexed_rates` rows without `category` and `address`;
-  - version 5 (before delivery tracking) has `items` rows without `delivered_at`.
+  - version 5 (before delivery tracking) has `items` rows without `delivered_at`;
+  - version 6 (before order units) has `items` rows without `ordered_as`.
 - Restoring replaces everything on the phone.
 - Any reimplementation should read this format, so old backups keep working.

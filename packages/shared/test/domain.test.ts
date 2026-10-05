@@ -31,7 +31,7 @@ function list(id: string, over: Partial<ListRow> = {}): ListRow {
 function item(id: string, list_id: string, over: Partial<ItemRow> = {}): ItemRow {
   return {
     id, list_id, item_name: 'Cement', original_term: 'bori', quantity: 10, unit: 'Bag', unit_price: 400,
-    total_amount: 4000, vendor: 'Sharma', date: '2026-01-01', brand: '', model: '', spec: '', color: '', delivered_at: '', created_at: ts('2026-01-01'),
+    total_amount: 4000, vendor: 'Sharma', date: '2026-01-01', brand: '', model: '', spec: '', color: '', delivered_at: '', ordered_as: '', created_at: ts('2026-01-01'),
     updated_at: ts('2026-01-01'), ...over,
   };
 }
@@ -94,7 +94,7 @@ describe('buildItemDatabase', () => {
 describe('parseExtractionOutput', () => {
   it('parses clean JSON and fills defaults', () => {
     const out = parseExtractionOutput('[{"item_name":"Sand","original_term":"Reti","quantity":"2","unit":"MT","unit_price":1500}]');
-    expect(out).toEqual([{ item_name: 'Sand', original_term: 'Reti', quantity: 2, unit: 'MT', unit_price: 1500, total_amount: 3000, vendor: '', date: '', brand: '', model: '', spec: '', color: '' }]);
+    expect(out).toEqual([{ item_name: 'Sand', original_term: 'Reti', quantity: 2, unit: 'MT', unit_price: 1500, total_amount: 3000, vendor: '', date: '', brand: '', model: '', spec: '', color: '', ordered_as: '' }]);
   });
   it('recovers an array wrapped in prose and drops junk', () => {
     const out = parseExtractionOutput('Here you go:\n[{"item_name":"Bricks","quantity":500,"unit":"piece"}, {"foo":1}]\nThanks');

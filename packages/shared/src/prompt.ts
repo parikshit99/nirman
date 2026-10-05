@@ -7,6 +7,7 @@ import {
   type QuoteBoqItem,
 } from './schemas.ts';
 import { variantOf } from './domain.ts';
+import { DEFAULT_CONVERSIONS, toBilledUnits, type ConversionSettings } from './conversions.ts';
 
 export interface PromptOptions {
   learning?: LearningMap;
@@ -35,6 +36,13 @@ export function buildSystemInstruction({ learning, category, captureDate }: Prom
        (Jaquar, Havells, Polycab, UltraTech); model = model number or item code (e.g. "CON-WHT-101");
        spec = size, thickness, grade or rating (e.g. "2.5 sq mm", "53 grade", "6A", "15 mm"); color as written.
        Keep item_name generic and without these (e.g. item_name "Wash basin", brand "Jaquar").
+    7. Ordered in one unit, billed in another:
+       - TMT / steel bars (saria): put the diameter in spec (e.g. "12 mm"). If a weight in kg (or MT) is written,
+         use it as quantity with unit "kg" and write how it was ordered in ordered_as (e.g. "3 bundles + 4 bars").
+         If only bundles or bars are written, give that count as quantity with unit "bundle" or "bar".
+       - Tiles and ACP sheets: put the size in mm in spec as "600x1200". If sqft is written, quantity is the sqft with
+         unit "sqft"; if only a count of pieces is written, give it with unit "piece".
+       - Otherwise leave ordered_as "".
     ${learningContext(learning)}
     ${categoryContext}
 
@@ -139,18 +147,24 @@ export function parseQuoteOutput(text: string, boqSize: number): ExtractedQuoteL
  * Parse the model's JSON output into clean material rows. Tolerates stray text
  * around the array, fills in missing fields and computes missing totals.
  */
-export function parseExtractionOutput(text: string): ExtractedMaterial[] {
+export function parseExtractionOutput(text: string, conversions: ConversionSettings = DEFAULT_CONVERSIONS): ExtractedMaterial[] {
   const items: ExtractedMaterial[] = [];
   for (const entry of parseJsonArray(text)) {
     const item = extractedMaterialSchema.safeParse(entry);
     if (!item.success || !item.data.item_name.trim()) continue;
     const m = item.data;
-    items.push({
-      ...m,
-      unit: m.unit || 'unit',
-      total_amount: m.total_amount || m.quantity * m.unit_price,
-      ...variantOf(m),
-    });
+    // TMT read in bundles becomes kg, tiles / ACP read in pieces become sqft, so rates compare.
+    items.push(
+      toBilledUnits(
+        {
+          ...m,
+          unit: m.unit || 'unit',
+          total_amount: m.total_amount || m.quantity * m.unit_price,
+          ...variantOf(m),
+        },
+        conversions,
+      ),
+    );
   }
   return items;
 }

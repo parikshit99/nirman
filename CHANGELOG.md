@@ -2,6 +2,15 @@
 
 Builds are numbered `<series>.<build>`; the newest series is at the top.
 
+## 2.1 — TMT, tiles and ACP sheets
+
+**Ordered in one unit, billed in another**
+- **TMT bars**: a calculator turns bundles and loose bars into kg (using your bars per bundle: 8 mm 18, 10 mm 12, 12 mm 8, 16 mm 5, 20 mm 3, 25 mm 2, and the bar length). Enter the weighed kg from the slip and it shows the difference from standard weight.
+- **Tiles and ACP sheets**: enter the sqft needed and the size in mm (600×1200, 800×1600, 1200×1800, 1200×3000 for tiles; 1200×2400, 1200×3000, 1200×3600 for ACP, or any size) plus an optional wastage %; it rounds up to whole pieces and gives the billed sqft.
+- Each line keeps **how it was ordered** ("3 bundles + 4 bars of 12 mm", "37 tiles of 800×1600 mm"), shown on the list, in PDFs, Excel and site reports. Rates stay per kg or per sqft, so prices compare.
+- The AI does the same when a slip says "5 bundles 16 mm" or "62 tiles 600x1200".
+- Change bars per bundle, bar length and the sizes in *Settings → TMT, tiles and ACP*.
+
 ## 2.0 — Site reports and deliveries
 
 **Site reports and delivery tracking**

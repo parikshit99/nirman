@@ -235,7 +235,7 @@ export default function App() {
     const name = `${titlePrefix(kind)}_${todayISO()}_${Date.now() % 100000}`;
     try {
       if (format === 'xlsx') {
-        await shareFiles([await sheetToXlsx(listSheet(kind, activeItems, notes), `${name}.xlsx`, kind === 'audit' ? 'Purchases' : 'BOQ', [5, 30, 14, 14, 14, 10, 8, 8, 12, 14, 20, 12])]);
+        await shareFiles([await sheetToXlsx(listSheet(kind, activeItems, notes), `${name}.xlsx`, kind === 'audit' ? 'Purchases' : 'BOQ', [5, 30, 14, 14, 14, 10, 8, 8, 26, 12, 14, 20, 12])]);
       } else {
         const doc = buildPdf(kind, activeItems, notes);
         await shareFiles(format === 'pdf' ? [pdfFile(doc, name)] : await pdfToJpegs(doc, name));
