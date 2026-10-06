@@ -98,7 +98,7 @@ jobs:
           if unzip -p nirman.apk | grep -a -q -E "AIza[0-9A-Za-z_-]{35}"; then
             echo "The APK contains something that looks like a Google API key"; exit 1
           fi
-      - name: Publish as the latest release
+      - name: Publish as the latest release, and keep the last 5 builds
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -118,3 +118,13 @@ jobs:
           gh release view latest >/dev/null 2>&1 || gh release create latest --title "Nirman v$APP_VERSION" --notes "$NOTES"
           gh release edit latest --title "Nirman v$APP_VERSION" --notes "$NOTES" --prerelease=false --latest
           gh release upload latest nirman.apk --clobber
+
+          # The same APK under its version, to roll back to in an emergency (install it over the app; the key is the same).
+          cp nirman.apk "nirman-$APP_VERSION.apk"
+          gh release view "v$APP_VERSION" >/dev/null 2>&1 || gh release create "v$APP_VERSION" --title "Nirman v$APP_VERSION" --notes "$NOTES" --latest=false
+          gh release upload "v$APP_VERSION" "nirman-$APP_VERSION.apk" --clobber
+          # Keep the 5 newest version releases; older ones go, but their v… tags stay as history.
+          gh release list --limit 200 --json tagName,createdAt --jq '[.[] | select(.tagName | test("^v[0-9]"))] | sort_by(.createdAt) | reverse | .[5:] | .[].tagName' |
+            while read -r tag; do gh release delete "$tag" --yes; done
+          # The old debug download, replaced by "latest" in 4.3.
+          gh release delete latest-debug --yes --cleanup-tag 2>/dev/null || true
