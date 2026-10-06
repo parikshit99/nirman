@@ -7,6 +7,7 @@ Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major 
 - **Tick BOQ lines as delivered**, like purchases: on the open BOQ, or with *Delivered* on a saved BOQ, so you can see what is still to come on an order.
 - **Edit a material straight from Rates.** Tap a material (or *Edit*) to open the same editor as BOQ and purchase lines: change its name or unit everywhere, or its brand, size, rate and vendor, either correcting the latest price or with *Save as today's price*. Tapping a price under *Prices* still fixes just that one.
 - **Preview the site report** before sharing it, from Labour or Saved.
+- Automatic crash reports (Sentry) are gone; nothing leaves the phone unless you send it. *Report a problem* and *Share log* stay.
 - **Clear the *Deleted from Rates* list** (Settings → On this phone): their old added rates are deleted and their saved lines stop counting in Rates for good. Saved lists and site reports keep the lines.
 
 ## 4.1 — Bill photos and one line editor

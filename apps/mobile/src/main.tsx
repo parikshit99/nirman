@@ -10,7 +10,6 @@ import '@fontsource/playfair-display/400-italic.css';
 import App from './App.tsx';
 import { DialogProvider } from './components/Dialogs.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
-import { startCrashReports } from './lib/crashReports.ts';
 import { installErrorHandlers, logError, logPerf } from './lib/diagnostics.ts';
 import { ensureDrafts, loadSnapshot, resetStuckJobs } from './data/repo.ts';
 import { migrateLocal } from './data/schema.ts';
@@ -34,7 +33,6 @@ async function openDatabase(): Promise<Db> {
 
 async function bootstrap() {
   installErrorHandlers();
-  void startCrashReports().catch((err) => logError(err, 'crash reports'));
   const started = performance.now();
   const root = createRoot(document.getElementById('root')!);
   try {

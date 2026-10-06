@@ -5,8 +5,7 @@ import { APP_VERSION } from './version.ts';
  * take and slow screens, with what each step was given (item names, rates,
  * vendors, AI input and output) so a problem can be reproduced. Photos are
  * left out and the API key is always removed. It leaves the phone only when
- * the user sends it (Settings → Report a problem, to the private repo), or as
- * a crash report if automatic reporting is on.
+ * the user sends it (Settings → Report a problem, to the private repo, or Share log).
  */
 export type LogKind = 'error' | 'ai' | 'step' | 'perf';
 
@@ -28,7 +27,6 @@ const MAX_TEXT = 300;
 const MAX_DETAIL = 800;
 
 let entries: LogEntry[] | null = null;
-const listeners = new Set<(entry: LogEntry) => void>();
 
 function load(): LogEntry[] {
   if (entries) return entries;
@@ -79,7 +77,6 @@ export function log(kind: LogKind, msg: string, data?: LogEntry['data'], detail?
   list.push(entry);
   if (list.length > MAX_ENTRIES) list.splice(0, list.length - MAX_ENTRIES);
   save();
-  listeners.forEach((fn) => fn(entry));
 }
 
 export const logStep = (name: string, data?: LogEntry['data'], detail?: string) => log('step', name, data, detail);
@@ -106,10 +103,6 @@ export function clearLog() {
   entries = [];
   save();
 }
-export const onLogEntry = (fn: (entry: LogEntry) => void) => {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
-};
 
 /** Catch errors nothing else handled. */
 export function installErrorHandlers() {

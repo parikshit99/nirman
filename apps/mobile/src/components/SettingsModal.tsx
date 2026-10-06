@@ -7,7 +7,6 @@ import { DEFAULT_MODEL, type ReadingMode } from '../lib/settings.ts';
 import { APP_VERSION } from '../lib/version.ts';
 import { latestNotes } from '../lib/whatsNew.ts';
 import { clearLog, getLog, issueUrl, logAsText, logStep } from '../lib/diagnostics.ts';
-import { crashReportsAvailable, crashReportsEnabled, setCrashReportsEnabled } from '../lib/crashReports.ts';
 import { isNative } from '../lib/platform.ts';
 import { loadConversions, resetConversions, saveConversions } from '../lib/conversionSettings.ts';
 import { parseSize, sizeLabel, type SheetSize } from '@nirman/shared';
@@ -659,7 +658,6 @@ function DiagnosticsSection() {
   const dialogs = useDialogs();
   const [note, setNote] = useState('');
   const [, refresh] = useState(0);
-  const [crash, setCrash] = useState(crashReportsEnabled);
   const log = getLog();
   const errors = log.filter((e) => e.kind === 'error').length;
 
@@ -701,23 +699,6 @@ function DiagnosticsSection() {
         </button>
       </div>
       <p className="text-xs text-gray-500">Report a problem opens a GitHub issue with the phone details and recent errors filled in; you can add a screenshot there.</p>
-      {crashReportsAvailable() && (
-        <label className="flex items-start gap-2 text-xs text-gray-700">
-          <input
-            type="checkbox"
-            checked={crash}
-            onChange={(e) => {
-              setCrash(e.target.checked);
-              setCrashReportsEnabled(e.target.checked);
-            }}
-            className="mt-0.5"
-          />
-          <span>
-            Send crash reports automatically
-            <span className="block text-xs text-gray-500">Only errors, with the app version, phone model and recent steps. Takes effect after restarting the app.</span>
-          </span>
-        </label>
-      )}
       {log.length > 0 && (
         <button
           onClick={() => {
