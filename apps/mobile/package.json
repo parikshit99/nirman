@@ -1,11 +1,7 @@
 {
   "name": "@nirman/mobile",
   "private": true,
-<<<<<<< HEAD
   "version": "4.3.0",
-=======
-  "version": "4.2.0",
->>>>>>> origin/main
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
