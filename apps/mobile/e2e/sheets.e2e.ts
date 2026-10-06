@@ -116,11 +116,50 @@ test('suggestions show under the field, which stays in view', async ({ page }) =
   await work.fill('pla');
   const option = page.getByRole('option', { name: 'Plaster' });
   await expect(option).toBeVisible();
-  const field = (await work.boundingBox())!;
-  const list = (await page.getByRole('listbox', { name: 'Suggestions' }).boundingBox())!;
-  expect(list.y, 'the list starts below the field').toBeGreaterThanOrEqual(field.y + field.height - 1);
+  // Measured together: the sheet may still be sliding in.
+  const gap = await work.evaluate((el) => el.nextElementSibling!.getBoundingClientRect().top - el.getBoundingClientRect().bottom);
+  expect(gap, 'the list starts below the field').toBeGreaterThanOrEqual(-1);
   await option.click();
   await expect(work).toHaveValue('Plaster');
   await expect(work).toBeFocused();
   await expect(page.getByRole('listbox', { name: 'Suggestions' })).toHaveCount(0);
+});
+
+test('Rates: one Filter sheet, and sorting by name or date', async ({ page }) => {
+  await page.getByRole('button', { name: 'Add purchases' }).click();
+  await page.getByRole('button', { name: /add item manually/i }).click();
+  for (const [name, rate] of [
+    ['River sand', '60'],
+    ['Angle valve', '450'],
+  ]) {
+    await page.getByLabel('Item name').fill(name);
+    await page.getByLabel('Quantity').fill('2');
+    await page.getByLabel('Rate', { exact: true }).fill(rate);
+    await page.getByLabel('Vendor').fill(name === 'River sand' ? 'Sharma Traders' : 'Oberoi Electricals');
+    await page.getByRole('button', { name: /^add to/i }).click();
+  }
+  await page.getByLabel('Close manual entry').click();
+  await page.getByRole('dialog', { name: /^Add/ }).getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /^save$/i }).click();
+  await page.getByRole('button', { name: /keep editing/i }).click();
+  await page.getByRole('button', { name: 'Rates', exact: true }).click();
+
+  const names = () => page.getByRole('button', { name: /^Edit (River sand|Angle valve)$/ }).allTextContents();
+  await page.getByRole('button', { name: /^Sort:/ }).click();
+  await expectOnTop(page, page.getByRole('dialog', { name: 'Sort materials' }));
+  await page.getByRole('button', { name: /Name A–Z/ }).click();
+  expect((await names())[0]).toContain('Angle valve');
+  await page.getByRole('button', { name: /^Sort:/ }).click();
+  await page.getByRole('button', { name: /Name Z–A/ }).click();
+  expect((await names())[0]).toContain('River sand');
+
+  await page.getByRole('button', { name: /^Filter/ }).click();
+  const sheet = page.getByRole('dialog', { name: 'Filter materials' });
+  await expectOnTop(page, sheet);
+  await sheet.getByLabel('Filter by vendor').selectOption('Sharma Traders');
+  await sheet.getByRole('button', { name: 'Show 1 material' }).click();
+  await expect(page.getByRole('button', { name: 'Edit Angle valve' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Remove filter Vendor: Sharma Traders' }).click();
+  await expect(page.getByRole('button', { name: 'Edit Angle valve' })).toBeVisible();
 });

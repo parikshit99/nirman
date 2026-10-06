@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
-import { Check, ChevronDown, Database, Download, GitMerge, Pencil, TrendingUp, Trash2, Truck, X } from 'lucide-react';
+import { ArrowDownAZ, ArrowDownZA, ArrowUpDown, CalendarArrowDown, CalendarArrowUp, Check, ChevronDown, Database, Download, GitMerge, Pencil, SlidersHorizontal, TrendingUp, Trash2, Truck, X } from 'lucide-react';
 import {
   VARIANT_FIELDS,
   materialDatabaseToCSV,
@@ -14,8 +14,7 @@ import {
   type MaterialEntry,
   type MaterialFilter,
 } from '@nirman/shared';
-import { FilterChips } from '../components/FilterChips.tsx';
-import { MaterialFilters } from '../components/MaterialFilters.tsx';
+import { MATERIAL_FILTER_FIELDS, MaterialFilters } from '../components/MaterialFilters.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
 import { LineEditor, type LineValues } from '../components/LineEditor.tsx';
@@ -23,7 +22,9 @@ import { shareFile, textToBase64 } from '../lib/files.ts';
 import { useAppState } from '../state/AppState.tsx';
 import { EmptyState } from '../components/ui/EmptyState.tsx';
 import { Tabs } from '../components/ui/Tabs.tsx';
-import { Sheet, SheetHeader } from '../components/ui/Sheet.tsx';
+import { Sheet, SheetHeader, SheetLabel, SheetOption } from '../components/ui/Sheet.tsx';
+import { Button } from '../components/ui/Button.tsx';
+import { MATERIAL_SORTS, saveMaterialSort, savedMaterialSort, sortMaterials, type MaterialSort } from '../lib/materialSort.ts';
 
 type SubTab = 'materials' | 'categories';
 
@@ -54,8 +55,24 @@ export function DatabaseView(props: Props) {
   );
 }
 
-function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, onCategory, addressFilter, onAddress }: Props) {
+function Materials({ entries: filtered, materialFilter, onMaterialFilter, categoryFilter, onCategory, addressFilter, onAddress }: Props) {
   const { actions, categoryNames, uniqueAddresses, itemDatabase, itemsFor, pendingDeletes } = useAppState();
+  const [sort, setSort] = useState<MaterialSort>(savedMaterialSort);
+  const [sheet, setSheet] = useState<'filter' | 'sort' | null>(null);
+  const entries = sortMaterials(filtered, sort);
+  const filterChips = [
+    ...(categoryFilter !== 'All' ? [{ label: categoryFilter, clear: () => onCategory('All') }] : []),
+    ...(addressFilter !== 'All' ? [{ label: addressFilter, clear: () => onAddress('All') }] : []),
+    ...MATERIAL_FILTER_FIELDS.filter((f) => materialFilter[f.key]).map((f) => ({
+      label: `${f.label}: ${materialFilter[f.key]}`,
+      clear: () => onMaterialFilter({ ...materialFilter, [f.key]: '' }),
+    })),
+  ];
+  const clearFilters = () => {
+    onCategory('All');
+    onAddress('All');
+    onMaterialFilter({});
+  };
   const dialogs = useDialogs();
   const totalMaterials = itemDatabase.length;
   const unsavedPriced = itemsFor('audit').filter((i) => i.unit_price > 0 && !pendingDeletes.has(i.id)).length;
@@ -126,93 +143,84 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
   return (
     <>
       {totalMaterials > 0 && (
-        <>
-          <FilterChips
-            categories={categoryNames}
-            categoryFilter={categoryFilter}
-            onCategory={onCategory}
-            addresses={uniqueAddresses}
-            addressFilter={addressFilter}
-            onAddress={onAddress}
-            addressLabel="Filter by site"
-          />
-          <MaterialFilters value={materialFilter} options={materialFilterOptions(itemDatabase)} onChange={onMaterialFilter} />
-        </>
-      )}
-
-      {totalMaterials > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-2">
-            <button
+        <div className="space-y-2">
+          <div className="grid grid-cols-3 gap-2">
+            <Button size="sm" onClick={() => setSheet('filter')} aria-label={`Filter${filterChips.length ? `, ${filterChips.length} on` : ''}`} className={filterChips.length ? 'border-orange-300 text-orange-700' : ''}>
+              <SlidersHorizontal size={14} /> Filter{filterChips.length > 0 && ` (${filterChips.length})`}
+            </Button>
+            <Button size="sm" onClick={() => setSheet('sort')} aria-label={`Sort: ${MATERIAL_SORTS.find((o) => o.id === sort)!.label}`}>
+              <ArrowUpDown size={14} /> {MATERIAL_SORTS.find((o) => o.id === sort)!.short}
+            </Button>
+            <Button
+              size="sm"
               onClick={() => {
                 setSelectMode(!selectMode);
                 setSelected(new Set());
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border
-              ${selectMode ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
             >
-              {selectMode ? 'Cancel selection' : 'Select items'}
-            </button>
-            {selectMode && selected.size > 0 && (
-              <div className="text-xs font-mono font-bold text-orange-600 flex items-center bg-orange-50 px-3 rounded-lg border border-orange-100">{selected.size} selected</div>
-            )}
-            <button
-              onClick={exportCsv}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border bg-white text-green-600 border-green-200 hover:border-green-400 hover:bg-green-50 flex items-center gap-1.5"
-            >
-              <Download size={12} /> Export CSV
-            </button>
-            {!selectMode && entries.length > 0 && (
-              <button
-                onClick={() => deleteFromData(entries)}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border bg-white text-red-600 border-red-200 hover:border-red-400 hover:bg-red-50 flex items-center gap-1.5"
-              >
-                <Trash2 size={12} /> {entries.length === totalMaterials ? 'Delete all' : `Delete ${entries.length} shown`}
-              </button>
-            )}
+              {selectMode ? 'Cancel' : 'Select'}
+            </Button>
           </div>
-
+          {filterChips.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {filterChips.map((c) => (
+                <button
+                  key={c.label}
+                  onClick={c.clear}
+                  aria-label={`Remove filter ${c.label}`}
+                  className="h-10 max-w-full pl-3 pr-2 rounded-full bg-orange-50 border border-orange-200 text-xs font-bold text-orange-800 flex items-center gap-1"
+                >
+                  <span className="truncate">{c.label}</span>
+                  <X size={14} className="shrink-0" />
+                </button>
+              ))}
+              <span className="text-xs text-gray-500">
+                {entries.length} of {totalMaterials} {totalMaterials === 1 ? 'material' : 'materials'}
+              </span>
+            </div>
+          )}
+          {selectMode && (
+            <div className="text-xs text-gray-600">
+              {selected.size ? `${selected.size} selected: change their unit or vendor, add today's price, or delete them.` : 'Tap materials to select them.'}
+            </div>
+          )}
           <AnimatePresence>
             {selectMode && selected.size > 0 && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
-                className="flex flex-wrap items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200 shadow-sm"
+                className="space-y-2 bg-gray-50 p-2 rounded-xl border border-gray-200 shadow-sm"
               >
-                <input
-                  placeholder="New Unit"
-                  value={bulk.unit}
-                  onChange={(e) => setBulk((p) => ({ ...p, unit: e.target.value }))}
-                  className="px-2 py-1 text-xs border border-gray-200 rounded w-16 outline-none focus:border-orange-300"
-                />
-                <input
-                  placeholder="Vendor"
-                  value={bulk.vendor}
-                  onChange={(e) => setBulk((p) => ({ ...p, vendor: e.target.value }))}
-                  className="px-2 py-1 text-xs border border-gray-200 rounded w-20 outline-none focus:border-orange-300"
-                />
-                <input
-                  inputMode="decimal"
-                  placeholder="Today's price"
-                  value={bulk.price}
-                  onChange={(e) => setBulk((p) => ({ ...p, price: e.target.value }))}
-                  className="px-2 py-1 text-xs border border-gray-200 rounded w-16 outline-none focus:border-orange-300"
-                />
-                <button onClick={applyBulk} className="bg-orange-500 text-white px-3 py-1 rounded text-xs font-bold uppercase hover:bg-orange-600">
-                  Apply
-                </button>
-                <button
-                  onClick={async () => {
-                    if (await deleteFromData(itemDatabase.filter((e) => selected.has(e.key)))) {
-                      setSelected(new Set());
-                      setSelectMode(false);
-                    }
-                  }}
-                  className="bg-white text-red-600 border border-red-200 px-3 py-1 rounded text-xs font-bold uppercase hover:bg-red-50 flex items-center gap-1"
-                >
-                  <Trash2 size={11} /> Delete
-                </button>
+                <div className="grid grid-cols-3 gap-2">
+                  <input aria-label="New unit" placeholder="New unit" value={bulk.unit} onChange={(e) => setBulk((p) => ({ ...p, unit: e.target.value }))} className="h-10 w-full min-w-0 px-2 text-sm bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-400" />
+                  <input aria-label="Vendor" placeholder="Vendor" value={bulk.vendor} onChange={(e) => setBulk((p) => ({ ...p, vendor: e.target.value }))} className="h-10 w-full min-w-0 px-2 text-sm bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-400" />
+                  <input
+                    aria-label="Today's price"
+                    inputMode="decimal"
+                    placeholder="Today's ₹"
+                    value={bulk.price}
+                    onChange={(e) => setBulk((p) => ({ ...p, price: e.target.value }))}
+                    className="h-10 w-full min-w-0 px-2 text-sm bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-400 font-mono"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="dangerOutline"
+                    onClick={async () => {
+                      if (await deleteFromData(itemDatabase.filter((e) => selected.has(e.key)))) {
+                        setSelected(new Set());
+                        setSelectMode(false);
+                      }
+                    }}
+                  >
+                    <Trash2 size={14} /> Delete
+                  </Button>
+                  <Button size="sm" variant="primary" className="flex-1" onClick={applyBulk}>
+                    <Check size={14} /> Apply to {selected.size}
+                  </Button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -350,6 +358,17 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
         )}
       </div>
 
+      {entries.length > 0 && !selectMode && (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={exportCsv}>
+            <Download size={14} /> Export CSV
+          </Button>
+          <Button size="sm" variant="dangerOutline" onClick={() => deleteFromData(entries)}>
+            <Trash2 size={14} /> {entries.length === totalMaterials ? 'Delete all' : `Delete ${entries.length} shown`}
+          </Button>
+        </div>
+      )}
+
       <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl flex items-center gap-4">
         <TrendingUp className="text-orange-500 shrink-0" />
         <div>
@@ -360,8 +379,131 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
           </p>
         </div>
       </div>
+      <AnimatePresence>
+        {sheet === 'filter' && (
+          <FilterSheet
+            count={entries.length}
+            active={filterChips.length > 0}
+            onClear={clearFilters}
+            onClose={() => setSheet(null)}
+            categories={categoryNames}
+            categoryFilter={categoryFilter}
+            onCategory={onCategory}
+            addresses={uniqueAddresses}
+            addressFilter={addressFilter}
+            onAddress={onAddress}
+            materialFilter={materialFilter}
+            onMaterialFilter={onMaterialFilter}
+          />
+        )}
+        {sheet === 'sort' && (
+          <Sheet labelledBy="rates-sort-title" onClose={() => setSheet(null)} closeOnBackdrop className="p-5 space-y-3">
+            <SheetHeader id="rates-sort-title" title="Sort materials" onClose={() => setSheet(null)} />
+            <div className="space-y-2">
+              {MATERIAL_SORTS.map((o) => (
+                <SheetOption
+                  key={o.id}
+                  icon={SORT_ICONS[o.id]}
+                  aria-pressed={sort === o.id}
+                  label={
+                    <span className="flex items-center gap-2">
+                      {o.label}
+                      {sort === o.id && <Check size={16} className="text-orange-600" />}
+                    </span>
+                  }
+                  about={o.about}
+                  onClick={() => {
+                    setSort(o.id);
+                    saveMaterialSort(o.id);
+                    setSheet(null);
+                  }}
+                />
+              ))}
+            </div>
+          </Sheet>
+        )}
+      </AnimatePresence>
       <AnimatePresence>{editing && <MaterialEditor key={editing.key} material={editing} onClose={() => setEditing(null)} />}</AnimatePresence>
     </>
+  );
+}
+
+const SORT_ICONS: Record<MaterialSort, typeof ArrowDownAZ> = { newest: CalendarArrowDown, oldest: CalendarArrowUp, name: ArrowDownAZ, nameDesc: ArrowDownZA };
+
+/** Every way to narrow the materials, in one place: work type, site, vendor, brand, size and colour. */
+function FilterSheet({
+  count,
+  active,
+  onClear,
+  onClose,
+  categories,
+  categoryFilter,
+  onCategory,
+  addresses,
+  addressFilter,
+  onAddress,
+  materialFilter,
+  onMaterialFilter,
+}: {
+  count: number;
+  active: boolean;
+  onClear(): void;
+  onClose(): void;
+  categories: string[];
+  categoryFilter: string;
+  onCategory(c: string): void;
+  addresses: string[];
+  addressFilter: string;
+  onAddress(a: string): void;
+  materialFilter: MaterialFilter;
+  onMaterialFilter(f: MaterialFilter): void;
+}) {
+  const { itemDatabase } = useAppState();
+  return (
+    <Sheet labelledBy="rates-filter-title" onClose={onClose} closeOnBackdrop className="p-5 space-y-4">
+      <SheetHeader id="rates-filter-title" title="Filter materials" onClose={onClose} />
+      {categories.length > 0 && (
+        <section>
+          <SheetLabel>Work type</SheetLabel>
+          <ChoiceChips options={categories} value={categoryFilter} onChange={onCategory} />
+        </section>
+      )}
+      {addresses.length > 0 && (
+        <section>
+          <SheetLabel>Site address</SheetLabel>
+          <ChoiceChips options={addresses} value={addressFilter} onChange={onAddress} />
+        </section>
+      )}
+      <MaterialFilters value={materialFilter} options={materialFilterOptions(itemDatabase)} onChange={onMaterialFilter} clearable={false} />
+      <div className="flex gap-2 pt-1">
+        <Button variant="secondary" onClick={onClear} disabled={!active}>
+          Clear all
+        </Button>
+        <Button variant="primary" className="flex-1" onClick={onClose}>
+          Show {count} {count === 1 ? 'material' : 'materials'}
+        </Button>
+      </div>
+    </Sheet>
+  );
+}
+
+/** "All" and each option as a chip; one is picked. */
+function ChoiceChips({ options, value, onChange }: { options: string[]; value: string; onChange(v: string): void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {['All', ...options].map((o) => (
+        <button
+          key={o}
+          onClick={() => onChange(o)}
+          aria-pressed={value === o}
+          className={`h-10 max-w-full px-4 rounded-full text-xs font-bold truncate border transition-colors ${
+            value === o ? 'bg-orange-500 border-orange-500 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-orange-300'
+          }`}
+        >
+          {o}
+        </button>
+      ))}
+    </div>
   );
 }
 
