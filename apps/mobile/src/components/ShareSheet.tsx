@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { FileSpreadsheet, FileText, Image as ImageIcon } from 'lucide-react';
+import type { jsPDF } from 'jspdf';
+import { Eye, FileSpreadsheet, FileText, Image as ImageIcon } from 'lucide-react';
+import { DocumentPreview } from './DocumentPreview.tsx';
 import type { ExportFormat } from '../lib/exports.ts';
 import { Button } from './ui/Button.tsx';
 import { Sheet, SheetLabel, SheetOption } from './ui/Sheet.tsx';
@@ -10,9 +12,13 @@ const OPTIONS: { format: ExportFormat; label: string; about: string; icon: typeo
   { format: 'jpg', label: 'Image (JPG)', about: 'A picture of each page, easy to view in WhatsApp', icon: ImageIcon },
 ];
 
-/** Pick a file format, then the phone's share sheet opens (save to Files, WhatsApp, email…). */
-export function ShareSheet({ title, onShare, onClose }: { title: string; onShare(format: ExportFormat): Promise<void>; onClose(): void }) {
+/**
+ * Pick a file format, then the phone's share sheet opens (save to Files, WhatsApp, email…).
+ * With `preview`, the PDF can be looked at first.
+ */
+export function ShareSheet({ title, onShare, preview, onClose }: { title: string; onShare(format: ExportFormat): Promise<void>; preview?: () => jsPDF; onClose(): void }) {
   const [busy, setBusy] = useState<ExportFormat | null>(null);
+  const [previewing, setPreviewing] = useState(false);
   const pick = async (format: ExportFormat) => {
     setBusy(format);
     try {
@@ -24,6 +30,7 @@ export function ShareSheet({ title, onShare, onClose }: { title: string; onShare
   };
   return (
     <Sheet label={`Share ${title}`} onClose={onClose} busy={!!busy} closeOnBackdrop className="p-4 pb-6 space-y-2">
+      {preview && <SheetOption icon={Eye} label="Preview" about="See the PDF before sharing it" disabled={!!busy} onClick={() => setPreviewing(true)} />}
       <SheetLabel>Share {title} as</SheetLabel>
       {OPTIONS.map(({ format, label, about, icon }) => (
         <SheetOption key={format} icon={icon} label={label} about={about} busy={busy === format} disabled={!!busy} onClick={() => pick(format)} />
@@ -31,6 +38,17 @@ export function ShareSheet({ title, onShare, onClose }: { title: string; onShare
       <Button variant="ghost" block onClick={onClose} disabled={!!busy}>
         Cancel
       </Button>
+      {previewing && preview && (
+        <DocumentPreview
+          title={title[0].toUpperCase() + title.slice(1)}
+          build={preview}
+          onShare={() => {
+            setPreviewing(false);
+            void pick('pdf');
+          }}
+          onClose={() => setPreviewing(false)}
+        />
+      )}
     </Sheet>
   );
 }

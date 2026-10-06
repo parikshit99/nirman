@@ -82,6 +82,8 @@ export const itemRowSchema = z.object({
   delivered_at: z.string().max(20).default(''),
   /** How it was ordered when billed in another unit, e.g. "3 bundles of 12 mm" (billed in kg). */
   ordered_as: z.string().max(300).default(''),
+  /** The bill photos it was read from (bill_photos.id); blank for typed or spoken lines. */
+  photo_id: z.string().max(100).default(''),
   created_at: isoTimestamp,
   updated_at: isoTimestamp,
 });

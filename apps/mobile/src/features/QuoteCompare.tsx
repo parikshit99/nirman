@@ -216,7 +216,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
           <Share2 size={14} /> Share comparison
         </button>
       </div>
-      {shareOpen && <ShareSheet title="comparison" onShare={share} onClose={() => setShareOpen(false)} />}
+      {shareOpen && <ShareSheet title="comparison" onShare={share} preview={() => buildQuoteComparisonPdf(boq, comparison)} onClose={() => setShareOpen(false)} />}
       {orderFrom && (() => {
         const v = comparison.vendors.find((x) => x.quote.id === orderFrom);
         if (!v) return null;

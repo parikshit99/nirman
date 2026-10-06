@@ -364,6 +364,21 @@ function StorageSection({ onWhatsNew }: { onWhatsNew?(): void }) {
   const { history, snapshot, learningCount, hiddenMaterials, actions } = useAppState();
   const dialogs = useDialogs();
   const [showLearned, setShowLearned] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
+  const [billPhotos, setBillPhotos] = useState<number | null>(null);
+  useEffect(() => {
+    void actions.countBillPhotos().then(setBillPhotos);
+  }, [actions]);
+  const clearBillPhotos = async () => {
+    const ok = await dialogs.confirm(`Delete ${billPhotos} kept bill photos?`, {
+      message: 'Frees space on the phone. The lines read from them stay; only the photos to check them against go.',
+      confirmLabel: 'Delete photos',
+      danger: true,
+    });
+    if (!ok) return;
+    await actions.clearBillPhotos();
+    setBillPhotos(0);
+  };
   const resetLearning = async () => {
     const ok = await dialogs.confirm(`Forget ${learningCount} learned corrections?`, {
       message: 'The AI will go back to its default reading of these terms.',
@@ -382,6 +397,15 @@ function StorageSection({ onWhatsNew }: { onWhatsNew?(): void }) {
         <dd className="font-bold text-right">{snapshot.items.length}</dd>
         <dt className="text-gray-500">Added rates</dt>
         <dd className="font-bold text-right">{snapshot.rates.length}</dd>
+        <dt className="text-gray-500">Bill photos</dt>
+        <dd className="font-bold text-right">
+          {billPhotos ?? '…'}
+          {!!billPhotos && (
+            <button onClick={clearBillPhotos} className="ml-2 text-red-600 font-bold underline">
+              Delete
+            </button>
+          )}
+        </dd>
         <dt className="text-gray-500">Queued AI entries</dt>
         <dd className="font-bold text-right">{snapshot.jobs.length}</dd>
         <dt className="text-gray-500">Learned corrections</dt>
@@ -408,24 +432,39 @@ function StorageSection({ onWhatsNew }: { onWhatsNew?(): void }) {
         <div className="pt-2">
           <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
             <span>Deleted from Rates ({hiddenMaterials.length})</span>
-            {hiddenMaterials.length > 1 && (
-              <button onClick={async () => { for (const m of hiddenMaterials) await actions.unhideMaterial(m.id); }} className="text-blue-600 font-bold underline" aria-label="Restore all deleted materials to Data">
-                Restore all
-              </button>
-            )}
+            <button onClick={() => setShowHidden((v) => !v)} className="text-blue-600 font-bold underline" aria-expanded={showHidden}>
+              {showHidden ? 'Hide' : 'Show'}
+            </button>
           </div>
-          <ul className="space-y-1">
-            {hiddenMaterials.map((m) => (
-              <li key={m.id} className="flex items-center justify-between gap-2 text-xs bg-gray-50 rounded-lg px-3 py-1.5">
-                <span className="truncate">
-                  {m.name} <span className="text-gray-500">· per {m.unit}</span>
-                </span>
-                <button onClick={() => actions.unhideMaterial(m.id)} className="text-blue-600 font-bold underline shrink-0" aria-label={`Restore ${m.name} to Rates`}>
-                  Restore
+          {showHidden && (
+            <>
+              <p className="text-xs text-gray-500 leading-snug mb-2">
+                Each is remembered so its old prices stay out of Rates and price checks; new purchases of it still show. One leaves this list by itself once the
+                saved lists and rates it hid are deleted. Restore brings its old prices back.
+              </p>
+              <ul className="space-y-1">
+                {hiddenMaterials.map((m) => (
+                  <li key={m.id} className="flex items-center justify-between gap-2 text-xs bg-gray-50 rounded-lg px-3 py-1.5">
+                    <span className="truncate">
+                      {m.name} <span className="text-gray-500">· per {m.unit}</span>
+                    </span>
+                    <button onClick={() => actions.unhideMaterial(m.id)} className="text-blue-600 font-bold underline shrink-0" aria-label={`Restore ${m.name} to Rates`}>
+                      Restore
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {hiddenMaterials.length > 1 && (
+                <button
+                  onClick={() => actions.unhideMaterials(hiddenMaterials.map((m) => m.id))}
+                  className="mt-2 text-xs text-blue-600 font-bold underline"
+                  aria-label="Restore all deleted materials to Rates"
+                >
+                  Restore all
                 </button>
-              </li>
-            ))}
-          </ul>
+              )}
+            </>
+          )}
         </div>
       )}
     </section>

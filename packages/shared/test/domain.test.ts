@@ -12,6 +12,7 @@ import {
   parseAmount,
   parseExtractionOutput,
   similarMaterials,
+  unusedHiddenMaterials,
   variantDifferences,
   variantKey,
   variantLabel,
@@ -31,7 +32,7 @@ function list(id: string, over: Partial<ListRow> = {}): ListRow {
 function item(id: string, list_id: string, over: Partial<ItemRow> = {}): ItemRow {
   return {
     id, list_id, item_name: 'Cement', original_term: 'bori', quantity: 10, unit: 'Bag', unit_price: 400,
-    total_amount: 4000, vendor: 'Sharma', date: '2026-01-01', brand: '', model: '', spec: '', color: '', delivered_at: '', ordered_as: '', created_at: ts('2026-01-01'),
+    total_amount: 4000, vendor: 'Sharma', date: '2026-01-01', brand: '', model: '', spec: '', color: '', delivered_at: '', ordered_as: '', photo_id: '', created_at: ts('2026-01-01'),
     updated_at: ts('2026-01-01'), ...over,
   };
 }
@@ -272,5 +273,33 @@ describe('price counted once (bug)', () => {
     expect(buildItemDatabase(lists, items, [rate({})], {})[0].priceHistory).toHaveLength(1);
     // A different price, date or vendor is a separate price.
     expect(buildItemDatabase(lists, items, [rate({ price: 390 }), rate({ id: 'r2', date: '2026-10-06' }), rate({ id: 'r3', vendor: 'Gupta' })], {})[0].priceHistory).toHaveLength(4);
+  });
+});
+
+describe('unusedHiddenMaterials', () => {
+  const key = materialKey('Cement', 'Bag');
+  const rate = (over: Partial<IndexedRateRow> = {}): IndexedRateRow => ({
+    id: 'r1', item_name: 'Cement', unit: 'Bag', date: '2026-01-01', price: 400, vendor: '', brand: '', model: '', spec: '', color: '',
+    category: '', address: '', indexed_at: ts('2026-01-01'), ...over,
+  });
+
+  it('keeps a deletion that still hides saved lines or rates', () => {
+    const hidden = [{ id: key, hidden_at: ts('2026-02-01') }];
+    expect(unusedHiddenMaterials(hidden, [list('l1')], [item('i1', 'l1')], [], {})).toEqual([]);
+    expect(unusedHiddenMaterials(hidden, [], [], [rate()], {})).toEqual([]);
+  });
+
+  it('drops one whose lines were all deleted, or only recorded after it', () => {
+    const hidden = [{ id: key, hidden_at: ts('2026-02-01') }];
+    expect(unusedHiddenMaterials(hidden, [], [], [], {})).toEqual([key]);
+    expect(unusedHiddenMaterials(hidden, [list('l1', { created_at: ts('2026-03-01') })], [item('i1', 'l1')], [], {})).toEqual([key]);
+    // A draft line is not a recorded price.
+    expect(unusedHiddenMaterials(hidden, [list('l1', { status: 'draft' })], [item('i1', 'l1')], [], {})).toEqual([key]);
+  });
+
+  it('follows learned names', () => {
+    const hidden = [{ id: key, hidden_at: ts('2026-02-01') }];
+    const learning = { bori: { item_name: 'Cement', unit: 'Bag' } };
+    expect(unusedHiddenMaterials(hidden, [list('l1')], [item('i1', 'l1', { item_name: 'Bori', unit: 'nos' })], [], learning)).toEqual([]);
   });
 });

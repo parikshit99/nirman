@@ -155,7 +155,7 @@ async function ensureDraftRows(tx: SqlExecutor) {
  * (lists are shown newest first).
  */
 let lastInsertMs = 0;
-async function insertMaterials(tx: SqlExecutor, listId: string, input: MaterialInput[]): Promise<string[]> {
+async function insertMaterials(tx: SqlExecutor, listId: string, input: MaterialInput[], photoId = ''): Promise<string[]> {
   const materials = input.map((m) => extractedMaterialSchema.parse(m));
   const ids: string[] = [];
   const n = materials.length;
@@ -182,6 +182,7 @@ async function insertMaterials(tx: SqlExecutor, listId: string, input: MaterialI
       ...variantOf(m),
       delivered_at: '',
       ordered_as: m.ordered_as,
+      photo_id: photoId,
       created_at: ts,
       updated_at: ts,
     });
@@ -227,11 +228,17 @@ export async function updateItem(db: Db, id: string, patch: ItemPatch) {
 }
 
 export async function deleteItem(db: Db, id: string) {
-  await db.run('DELETE FROM items WHERE id = ?', [id]);
+  await db.transaction(async (tx) => {
+    await tx.run('DELETE FROM items WHERE id = ?', [id]);
+    await pruneBillPhotos(tx);
+  });
 }
 
 export async function clearListItems(db: Db, listId: string) {
-  await db.run('DELETE FROM items WHERE list_id = ?', [listId]);
+  await db.transaction(async (tx) => {
+    await tx.run('DELETE FROM items WHERE list_id = ?', [listId]);
+    await pruneBillPhotos(tx);
+  });
 }
 
 export async function setListNotes(db: Db, listId: string, notes: string) {
@@ -287,6 +294,11 @@ export async function saveDraftToHistory(db: Db, kind: ListKind, meta: ListMeta,
   });
 }
 
+/** Put one vendor on every line of a list, e.g. when the bill was read with the buyer's name as vendor. */
+export async function setListVendor(db: Db, listId: string, vendor: string) {
+  await db.run('UPDATE items SET vendor = ?, updated_at = ? WHERE list_id = ?', [vendor.trim(), nowISO(), listId]);
+}
+
 export async function updateListMeta(db: Db, id: string, meta: ListMeta) {
   await db.transaction(async (tx) => {
     const list = await getRow(tx, 'lists', id);
@@ -328,6 +340,7 @@ export async function deleteList(db: Db, id: string) {
     await deleteQuotesWhere(tx, 'boq_id = ?', [id]);
     await tx.run('DELETE FROM items WHERE list_id = ?', [id]);
     await tx.run('DELETE FROM lists WHERE id = ?', [id]);
+    await pruneBillPhotos(tx);
   });
 }
 
@@ -336,6 +349,7 @@ export async function deleteAllHistory(db: Db) {
     await deleteQuotesWhere(tx, `boq_id IN (SELECT id FROM lists WHERE status = 'saved')`);
     await tx.run(`DELETE FROM items WHERE list_id IN (SELECT id FROM lists WHERE status = 'saved')`);
     await tx.run(`DELETE FROM lists WHERE status = 'saved'`);
+    await pruneBillPhotos(tx);
   });
 }
 
@@ -460,6 +474,23 @@ export async function unhideMaterial(db: Db, key: string) {
   await db.run('DELETE FROM hidden_materials WHERE id = ?', [key]);
 }
 
+/** Forget deletions that no longer hide anything (see unusedHiddenMaterials), or restore several at once. */
+export async function unhideMaterials(db: Db, keys: string[]) {
+  await db.transaction(async (tx) => {
+    for (const key of keys) await tx.run('DELETE FROM hidden_materials WHERE id = ?', [key]);
+  });
+}
+
+export type RatePatch = Partial<Pick<IndexedRateRow, 'item_name' | 'unit' | 'price' | 'vendor' | 'date' | VariantField>>;
+
+/** Correct an added rate: its name, unit, size, brand, price or vendor. */
+export async function updateRate(db: Db, id: string, patch: RatePatch) {
+  await db.transaction(async (tx) => {
+    const rate = await getRow(tx, 'indexed_rates', id);
+    if (rate) await writeRow(tx, 'indexed_rates', { ...rate, ...patch, price: Number(patch.price ?? rate.price) || 0 });
+  });
+}
+
 /** Correct one recorded price: a line in a saved list (its total follows) or an added rate. */
 export async function setPrice(db: Db, ref: { itemId?: string; rateId?: string }, price: number) {
   await db.transaction(async (tx) => {
@@ -578,6 +609,30 @@ async function insertJob(tx: SqlExecutor, id: string, job: NewJob, quoteId: stri
   }
 }
 
+/** The photos of one bill, or none if they were deleted with their last line. */
+export async function getBillPhotos(db: Db, photoId: string): Promise<string[]> {
+  const [row] = await db.all<{ images: string }>('SELECT images FROM bill_photos WHERE id = ?', [photoId]);
+  return row ? (JSON.parse(row.images) as string[]) : [];
+}
+
+/** Bill photos no line points to any more (their lines and lists were deleted). */
+async function pruneBillPhotos(tx: SqlExecutor) {
+  await tx.run(`DELETE FROM bill_photos WHERE id NOT IN (SELECT photo_id FROM items WHERE photo_id != '')`);
+}
+
+export async function countBillPhotos(db: Db): Promise<number> {
+  const [row] = await db.all<{ n: number }>('SELECT COUNT(*) AS n FROM bill_photos');
+  return row?.n ?? 0;
+}
+
+/** Free space: drop every kept bill photo. The lines stay. */
+export async function clearBillPhotos(db: Db) {
+  await db.transaction(async (tx) => {
+    await tx.run('DELETE FROM bill_photos');
+    await tx.run(`UPDATE items SET photo_id = '' WHERE photo_id != ''`);
+  });
+}
+
 export async function getJobImages(db: Db, jobId: string): Promise<string[]> {
   const rows = await db.all<{ data: string }>('SELECT data FROM job_images WHERE job_id = ? ORDER BY idx', [jobId]);
   return rows.map((r) => r.data);
@@ -601,7 +656,14 @@ export async function completeJob(db: Db, jobId: string, materials: MaterialInpu
   return db.transaction(async (tx) => {
     const [job] = await tx.all<Job>('SELECT * FROM jobs WHERE id = ?', [jobId]);
     if (!job) return [];
-    const ids = await insertMaterials(tx, job.list_id, materials);
+    // Keep the bill photos with the lines they became, so they can be checked against the bill later.
+    const images = await tx.all<{ data: string }>('SELECT data FROM job_images WHERE job_id = ? ORDER BY idx', [jobId]);
+    let photoId = '';
+    if (images.length && materials.length) {
+      photoId = newId();
+      await tx.run('INSERT INTO bill_photos (id, created_at, images) VALUES (?, ?, ?)', [photoId, nowISO(), JSON.stringify(images.map((i) => i.data))]);
+    }
+    const ids = await insertMaterials(tx, job.list_id, materials, photoId);
     await tx.run('DELETE FROM job_images WHERE job_id = ?', [jobId]);
     await tx.run('DELETE FROM jobs WHERE id = ?', [jobId]);
     return ids;
@@ -964,4 +1026,4 @@ export async function clearAllData(tx: SqlExecutor, { seedDefaults = true } = {}
 }
 
 /** Make sure drafts exist after rows were replaced wholesale (e.g. by a restore). */
-export { ensureDraftRows };
+export { ensureDraftRows, pruneBillPhotos };

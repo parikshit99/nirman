@@ -208,6 +208,15 @@ const MIGRATIONS: string[] = [
     category TEXT NOT NULL DEFAULT ''
   );
   `,
+  // 11: the bill photos purchase and BOQ lines were read from (JSON array of base64 JPEGs), to check them later. Not in backups.
+  `
+  CREATE TABLE IF NOT EXISTS bill_photos (
+    id TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    images TEXT NOT NULL DEFAULT '[]'
+  );
+  ALTER TABLE items ADD COLUMN photo_id TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 /** Default categories sort before anything the user adds. */

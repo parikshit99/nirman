@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildItemDatabase,
+  unusedHiddenMaterials,
   type ContractEntryRow,
   type ExtractedMaterial,
   type ItemRow,
@@ -151,6 +152,12 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       /** Delete from Data after the undo window; the card shows struck through until then. */
       deleteMaterialLater: (m: repo.MaterialRef) => deleteLater((d) => repo.hideMaterial(d, m))(m.key),
       unhideMaterial: write(repo.unhideMaterial),
+      unhideMaterials: write(repo.unhideMaterials),
+      updateRate: write(repo.updateRate),
+      setListVendor: write(repo.setListVendor),
+      getBillPhotos: (photoId: string) => repo.getBillPhotos(db, photoId),
+      countBillPhotos: () => repo.countBillPhotos(db),
+      clearBillPhotos: write(repo.clearBillPhotos),
       setPrice: write(repo.setPrice),
       clearLearning: write(repo.clearLearning),
       updateLearnedTerm: write(repo.updateLearnedTerm),
@@ -218,7 +225,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
         await restoreBackup(db, backup);
         await refresh();
       },
-    }, ['flushDeletes', 'processQueue', 'parseBackup']),
+    }, ['flushDeletes', 'processQueue', 'parseBackup', 'getBillPhotos']),
     [db, worker, settingsRef, refresh, write, deleteLater, finishDelete, syncPending],
   );
 
@@ -271,6 +278,15 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       jobsFor: (kind: ListKind) => snapshot.jobs.filter((j) => j.list_id === DRAFT_IDS[kind]),
     };
   }, [snapshot]);
+
+  // A material deleted from Rates stays listed in Settings only while it still hides an old price.
+  const unusedHidden = useMemo(
+    () => unusedHiddenMaterials(snapshot.hidden, snapshot.lists, snapshot.items, snapshot.rates, derived.learning),
+    [snapshot, derived.learning],
+  );
+  useEffect(() => {
+    if (unusedHidden.length) void actions.unhideMaterials(unusedHidden);
+  }, [unusedHidden, actions]);
 
   return { snapshot, status, settings, actions, pendingDeletes, ...derived };
 }

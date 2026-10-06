@@ -12,6 +12,17 @@
   --color-brand-concrete: #E4E3E0;
 }
 
+/*
+ * Space taken by Android's status bar (top) and navigation / gesture bar (bottom).
+ * Capacitor sets --safe-area-inset-* from the real window insets; env() is the
+ * fallback in a browser. Older Android WebViews report env() as 0 or late, which
+ * let content run under the bars.
+ */
+:root {
+  --inset-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --inset-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+}
+
 @layer base {
   body {
     @apply bg-[var(--color-brand-gray)] text-[var(--color-brand-dark)] font-sans antialiased;
