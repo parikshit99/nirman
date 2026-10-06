@@ -5,6 +5,7 @@ import {
   addCategory,
   addItems,
   bulkEditMaterials,
+  clearHiddenMaterials,
   clearListItems,
   completeJob,
   completeQuoteJob,
@@ -198,8 +199,9 @@ describe('local repository', () => {
     await addItems(db, DRAFT_IDS.audit, [cement]);
     await saveDraftToHistory(db, 'audit', meta);
     await db.run(`UPDATE indexed_rates SET address = '', category = ''`);
-    // Migration 11 added a column; drop it so the migrations after 7 can run again.
+    // Migrations 11 and 12 added columns; drop them so the migrations after 7 can run again.
     await db.run('ALTER TABLE items DROP COLUMN photo_id');
+    await db.run('ALTER TABLE items DROP COLUMN rates_excluded');
     await db.run('UPDATE schema_version SET version = 7');
     await migrateLocal(db);
     const [rate] = (await loadSnapshot(db)).rates;
@@ -317,6 +319,27 @@ describe('local repository', () => {
     expect(await getBillPhotos(db, photoId)).toEqual([]);
   });
 
+  it('clears deleted materials for good: rates deleted, saved lines kept but out of Rates', async () => {
+    const db = await freshDb();
+    await addItems(db, DRAFT_IDS.audit, [cement, sand]);
+    await saveDraftToHistory(db, 'audit', meta);
+    await indexRates(db, [{ ...cement, unit_price: 505 }]);
+    await hideMaterial(db, { key: materialKey('Cement', 'Bag'), name: 'Cement', unit: 'Bag' });
+    await clearHiddenMaterials(db);
+
+    const snap = await loadSnapshot(db);
+    expect(snap.hidden).toEqual([]);
+    expect(snap.rates).toEqual([]);
+    const saved = snap.items.filter((i) => i.list_id !== DRAFT_IDS.audit);
+    expect(saved.map((i) => [i.item_name, i.rates_excluded]).sort()).toEqual([['Cement', 1], ['Sand', 0]]);
+    expect(buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned)).map((e) => e.name)).toEqual(['Sand']);
+
+    // A later purchase of it shows in Rates again.
+    await saveDraftToHistory(db, 'audit', meta);
+    const after = await loadSnapshot(db);
+    expect(buildItemDatabase(after.lists, after.items, after.rates, learningMap(after.learned)).map((e) => e.name)).toEqual(['Cement', 'Sand']);
+  });
+
   it('puts one vendor on every line of a list', async () => {
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.audit, [cement, sand]);
@@ -376,6 +399,7 @@ describe('local repository', () => {
       await db.run('ALTER TABLE items DROP COLUMN delivered_at');
       await db.run('ALTER TABLE items DROP COLUMN ordered_as');
       await db.run('ALTER TABLE items DROP COLUMN photo_id');
+    await db.run('ALTER TABLE items DROP COLUMN rates_excluded');
       await db.run('UPDATE schema_version SET version = 4');
       await migrateLocal(db);
       const rates = (await loadSnapshot(db)).rates.map((r) => [r.item_name, r.category, r.address]).sort();

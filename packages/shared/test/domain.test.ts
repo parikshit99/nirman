@@ -32,7 +32,7 @@ function list(id: string, over: Partial<ListRow> = {}): ListRow {
 function item(id: string, list_id: string, over: Partial<ItemRow> = {}): ItemRow {
   return {
     id, list_id, item_name: 'Cement', original_term: 'bori', quantity: 10, unit: 'Bag', unit_price: 400,
-    total_amount: 4000, vendor: 'Sharma', date: '2026-01-01', brand: '', model: '', spec: '', color: '', delivered_at: '', ordered_as: '', photo_id: '', created_at: ts('2026-01-01'),
+    total_amount: 4000, vendor: 'Sharma', date: '2026-01-01', brand: '', model: '', spec: '', color: '', delivered_at: '', ordered_as: '', photo_id: '', rates_excluded: 0, created_at: ts('2026-01-01'),
     updated_at: ts('2026-01-01'), ...over,
   };
 }

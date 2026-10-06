@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { Check, ChevronDown, Database, Download, GitMerge, Pencil, TrendingUp, Trash2, Truck, X } from 'lucide-react';
 import {
+  VARIANT_FIELDS,
   materialDatabaseToCSV,
   materialFilterOptions,
   materialKey,
@@ -17,10 +18,9 @@ import { FilterChips } from '../components/FilterChips.tsx';
 import { MaterialFilters } from '../components/MaterialFilters.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
-import { LineEditor } from '../components/LineEditor.tsx';
+import { LineEditor, type LineValues } from '../components/LineEditor.tsx';
 import { shareFile, textToBase64 } from '../lib/files.ts';
 import { useAppState } from '../state/AppState.tsx';
-import { Button } from '../components/ui/Button.tsx';
 import { EmptyState } from '../components/ui/EmptyState.tsx';
 import { Tabs } from '../components/ui/Tabs.tsx';
 import { Sheet, SheetHeader } from '../components/ui/Sheet.tsx';
@@ -28,7 +28,7 @@ import { Sheet, SheetHeader } from '../components/ui/Sheet.tsx';
 type SubTab = 'materials' | 'categories';
 
 const SUB_TABS: { id: SubTab; label: string; about: string }[] = [
-  { id: 'materials', label: 'Materials', about: 'One card per material. Open Prices and tap a price to correct its name, size, rate or vendor, or remove it. Edit renames, merges or deletes the material.' },
+  { id: 'materials', label: 'Materials', about: 'One card per material. Tap it (or Edit) to change its name, size, rate or vendor, merge it or delete it. Open Prices and tap a price to fix just that one.' },
   { id: 'categories', label: 'Work types', about: 'Types of work (e.g. Earthwork) you can tag a saved purchase list or BOQ with, to filter by later.' },
 ];
 
@@ -264,16 +264,26 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
                   </div>
                 )}
                 <div className="flex-1 min-w-0 md:grid md:grid-cols-[1.5fr_1fr_1.5fr] md:gap-4 md:items-center">
-                  <div className="flex justify-between gap-2 md:block">
+                  {/* Tapping the material opens its editor (in select mode the whole row selects instead). */}
+                  <button
+                    type="button"
+                    onClick={() => !selectMode && setEditing(item)}
+                    tabIndex={selectMode ? -1 : 0}
+                    aria-label={selectMode ? undefined : `Edit ${item.name}`}
+                    className="w-full text-left flex justify-between gap-2 md:block"
+                  >
                     <div className="min-w-0">
-                      <div className="font-bold text-sm text-gray-900">{item.name}</div>
+                      <div className="font-bold text-sm text-gray-900 flex items-center gap-1.5">
+                        {item.name}
+                        {!selectMode && <Pencil size={12} className="text-gray-500 shrink-0" />}
+                      </div>
                       <div className="text-xs text-gray-500">per {item.unit}</div>
                       {item.variants.length === 1 && item.variants[0].label && <div className="text-xs font-bold text-gray-700">{item.variants[0].label}</div>}
                     </div>
                     <div className="text-right md:hidden shrink-0">
                       <PriceSummary item={item} />
                     </div>
-                  </div>
+                  </button>
                   <div className="hidden md:block">
                     <PriceSummary item={item} />
                   </div>
@@ -325,7 +335,7 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
                             <ChevronDown size={14} className={`transition-transform ${openVariants === item.key ? 'rotate-180' : ''}`} /> Variants ({item.variants.length})
                           </button>
                         )}
-                        <button onClick={() => setEditing(item)} className="text-xs font-bold text-gray-600 flex items-center gap-1 py-1" aria-label={`Edit ${item.name}`}>
+                        <button onClick={() => setEditing(item)} className="text-xs font-bold text-gray-600 flex items-center gap-1 py-1">
                           <Pencil size={13} /> Edit
                         </button>
                       </div>
@@ -481,14 +491,32 @@ function PriceRow({ point: p }: { point: MaterialEntry['priceHistory'][number] }
   );
 }
 
-/** Rename a material, change its unit, merge it into a similar one, or hide it. */
+/**
+ * The line editor for a whole material: renaming it or changing its unit changes every price
+ * (and merges into a material with the same name and unit); brand, size, rate and vendor correct
+ * its latest price, or are recorded as today's price. Also merges duplicates and deletes it.
+ */
 function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClose(): void }) {
-  const { actions, itemDatabase, hiddenMaterials } = useAppState();
+  const { actions, itemDatabase, hiddenMaterials, snapshot } = useAppState();
   const dialogs = useDialogs();
-  const [name, setName] = useState(material.name);
-  const [unit, setUnit] = useState(material.unit);
   const others = itemDatabase.filter((e) => e.key !== material.key);
   const similar = similarMaterials(material, itemDatabase);
+  const latest = material.priceHistory.at(-1);
+  const latestItem = latest?.itemId ? snapshot.items.find((i) => i.id === latest.itemId) : undefined;
+  const latestRate = latest?.rateId ? snapshot.rates.find((r) => r.id === latest.rateId) : undefined;
+  const latestRow = latestItem ?? latestRate;
+  const initial: LineValues = {
+    item_name: material.name,
+    unit: material.unit,
+    quantity: 0,
+    ordered_as: '',
+    unit_price: latest?.price ?? 0,
+    vendor: latestRow?.vendor ?? '',
+    brand: latestRow?.brand ?? '',
+    model: latestRow?.model ?? '',
+    spec: latestRow?.spec ?? '',
+    color: latestRow?.color ?? '',
+  };
 
   const mergeInto = async (target: MaterialEntry) => {
     const sameUnit = target.unit.toLowerCase() === material.unit.toLowerCase();
@@ -498,17 +526,15 @@ function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClos
       }`,
       confirmLabel: 'Merge',
     });
-    if (!ok) return;
+    if (!ok) return false;
     await actions.renameMaterial(material.key, { item_name: target.name, unit: target.unit });
-    onClose();
+    return true;
   };
 
-  const save = async () => {
-    const nextName = name.trim();
-    const nextUnit = unit.trim() || 'unit';
-    if (!nextName) return;
-    const key = materialKey(nextName, nextUnit);
-    if (key === material.key && nextName === material.name && nextUnit === material.unit) return onClose();
+  /** Rename (or merge) when the name or unit changed; false if the person backed out. */
+  const renameIfChanged = async (v: LineValues): Promise<boolean> => {
+    const key = materialKey(v.item_name, v.unit);
+    if (key === material.key && v.item_name === material.name && v.unit === material.unit) return true;
     const existing = others.find((e) => e.key === key);
     if (existing) return mergeInto(existing);
     const hidden = hiddenMaterials.find((h) => h.id === key);
@@ -517,9 +543,33 @@ function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClos
         message: 'Saving merges into it and shows it in Rates again, with both price histories.',
         confirmLabel: 'Merge and unhide',
       });
-      if (!ok) return;
+      if (!ok) return false;
     }
-    await actions.renameMaterial(material.key, { item_name: nextName, unit: nextUnit });
+    await actions.renameMaterial(material.key, { item_name: v.item_name, unit: v.unit });
+    return true;
+  };
+
+  const tidy = (v: LineValues): LineValues | null => (v.item_name ? { ...v, unit: v.unit || 'unit' } : null);
+  const variantOf = (v: LineValues) => ({ brand: v.brand, model: v.model, spec: v.spec, color: v.color });
+
+  const save = async (raw: LineValues) => {
+    const v = tidy(raw);
+    if (!v || !(await renameIfChanged(v))) return;
+    const changed = v.unit_price !== initial.unit_price || v.vendor !== initial.vendor || VARIANT_FIELDS.some((f) => v[f] !== initial[f]);
+    if (changed && latestItem) await actions.updateItem(latestItem.id, { unit_price: v.unit_price, vendor: v.vendor, ...variantOf(v) });
+    else if (changed && latestRate) await actions.updateRate(latestRate.id, { price: v.unit_price, vendor: v.vendor, ...variantOf(v) });
+    else if (changed && v.unit_price > 0) await saveAsToday(v);
+    onClose();
+  };
+
+  const saveAsToday = async (raw: LineValues) => {
+    const v = tidy(raw);
+    if (!v || !(await renameIfChanged(v))) return;
+    if (v.unit_price <= 0) {
+      await dialogs.alert('Enter the rate', "Today's price needs a rate.");
+      return;
+    }
+    await actions.indexRates([{ item_name: v.item_name, unit: v.unit, unit_price: v.unit_price, vendor: v.vendor, date: todayISO(), ...variantOf(v) }]);
     onClose();
   };
 
@@ -528,29 +578,23 @@ function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClos
     onClose();
   };
 
-  const field = 'mt-1 w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500';
   return (
     <Sheet labelledBy="material-editor-title" onClose={onClose} className="p-5 space-y-5">
       <SheetHeader id="material-editor-title" title="Edit material" onClose={onClose} />
 
-      <div className="space-y-3">
-        <div className="flex gap-2">
-          <label className="block flex-1 min-w-0">
-            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Name</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
-          </label>
-          <label className="block w-24">
-            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Unit</span>
-            <input value={unit} onChange={(e) => setUnit(e.target.value)} className={field} />
-          </label>
-        </div>
+      <div className="space-y-2">
         <p className="text-xs text-gray-500">
-          Changes its {material.priceHistory.length === 1 ? 'price' : `${material.priceHistory.length} prices`} and the lines in saved lists. Using the name and unit of another
-          material merges the two.
+          A new name or unit changes {material.priceHistory.length === 1 ? 'its price' : `all ${material.priceHistory.length} prices`} and the lines in saved lists
+          (the name and unit of another material merges the two). Brand, size, rate and vendor correct the latest price
+          {latest ? ` (${new Date(latest.date).toLocaleDateString('en-IN')}${latest.listTitle ? `, “${latest.listTitle}”` : ''})` : ''}, or add them as today's price.
         </p>
-        <Button variant="primary" block onClick={save}>
-          Save
-        </Button>
+        <LineEditor
+          initial={initial}
+          showQuantity={false}
+          onSave={save}
+          onCancel={onClose}
+          alsoSave={{ label: "Save as today's price", onSave: saveAsToday }}
+        />
       </div>
 
       {similar.length > 0 && (
@@ -570,7 +614,7 @@ function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClos
                     per {e.unit} · {e.priceHistory.length ? `₹${Math.round(e.latestPrice).toLocaleString('en-IN')} latest` : 'no prices'}
                   </span>
                 </span>
-                <button onClick={() => mergeInto(e)} className="shrink-0 px-3 py-2 text-xs font-bold text-orange-700 bg-orange-50 rounded-lg flex items-center gap-1">
+                <button onClick={async () => (await mergeInto(e)) && onClose()} className="shrink-0 px-3 py-2 text-xs font-bold text-orange-700 bg-orange-50 rounded-lg flex items-center gap-1">
                   <GitMerge size={13} /> Merge into this
                 </button>
               </li>

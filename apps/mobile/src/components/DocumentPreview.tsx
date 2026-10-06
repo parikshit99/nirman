@@ -6,7 +6,19 @@ import { Button } from './ui/Button.tsx';
 import { Sheet, SheetHeader } from './ui/Sheet.tsx';
 
 /** The PDF exactly as it will be shared, page by page, before sharing it. */
-export function DocumentPreview({ title, build, onShare, onClose }: { title: string; build(): jsPDF; onShare(): void; onClose(): void }) {
+export function DocumentPreview({
+  title,
+  build,
+  onShare,
+  shareLabel = 'Share PDF',
+  onClose,
+}: {
+  title: string;
+  build(): jsPDF;
+  onShare(): void;
+  shareLabel?: string;
+  onClose(): void;
+}) {
   const [pages, setPages] = useState<string[] | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -42,7 +54,7 @@ export function DocumentPreview({ title, build, onShare, onClose }: { title: str
         )}
       </div>
       <Button variant="primary" block onClick={onShare}>
-        <Share2 size={14} /> Share PDF
+        <Share2 size={14} /> {shareLabel}
       </Button>
     </Sheet>
   );

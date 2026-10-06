@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Share2 } from 'lucide-react';
+import { Eye, Share2 } from 'lucide-react';
 import { buildLabourReport, buildSiteReport, financialYear, siteHasDeliveries, todayISO } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
+import { DocumentPreview } from '../components/DocumentPreview.tsx';
 import { ShareSheet } from '../components/ShareSheet.tsx';
 import { Button } from '../components/ui/Button.tsx';
 import { Sheet, SheetHeader } from '../components/ui/Sheet.tsx';
@@ -33,6 +34,7 @@ export function SiteReport({ onClose }: { onClose(): void }) {
   const [categories, setCategories] = useState<string[]>([]);
   const [deliveredOnly, setDeliveredOnly] = useState(() => siteHasDeliveries(snapshot.lists, snapshot.items, sites[0] ?? ''));
   const [sharing, setSharing] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
 
   const pickSite = (a: string) => {
     setAddress(a);
@@ -84,7 +86,7 @@ export function SiteReport({ onClose }: { onClose(): void }) {
 
   return (
     <>
-      <Sheet kind="screen" size="lg" labelledBy="site-report-title" onClose={onClose} backEnabled={!sharing} className="p-5 gap-4">
+      <Sheet kind="screen" size="lg" labelledBy="site-report-title" onClose={onClose} backEnabled={!sharing && !previewing} className="p-5 gap-4">
         <SheetHeader
           id="site-report-title"
           title="Site report"
@@ -163,9 +165,14 @@ export function SiteReport({ onClose }: { onClose(): void }) {
               </div>
             )}
 
-            <Button variant="primary" block onClick={() => setSharing(true)} disabled={empty}>
-              <Share2 size={16} /> Share report
-            </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button onClick={() => setPreviewing(true)} disabled={empty}>
+                <Eye size={16} /> Preview
+              </Button>
+              <Button variant="primary" onClick={() => setSharing(true)} disabled={empty}>
+                <Share2 size={16} /> Share
+              </Button>
+            </div>
             {empty && (
               <p className="text-xs text-gray-500 text-center">
                 Nothing matches.{deliveredOnly ? ' Tick deliveries in Saved → Deliveries, or include all saved purchases.' : ''}
@@ -174,6 +181,18 @@ export function SiteReport({ onClose }: { onClose(): void }) {
           </div>
         )}
       </Sheet>
+      {previewing && (
+        <DocumentPreview
+          title={`Site report: ${address}`}
+          build={() => buildSiteReportPdf(address, filters, report, labour)}
+          onShare={() => {
+            setPreviewing(false);
+            setSharing(true);
+          }}
+          shareLabel="Share"
+          onClose={() => setPreviewing(false)}
+        />
+      )}
       {sharing && <ShareSheet title="site report" onShare={share} preview={() => buildSiteReportPdf(address, filters, report, labour)} onClose={() => setSharing(false)} />}
     </>
   );

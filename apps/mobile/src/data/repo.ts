@@ -183,6 +183,7 @@ async function insertMaterials(tx: SqlExecutor, listId: string, input: MaterialI
       delivered_at: '',
       ordered_as: m.ordered_as,
       photo_id: photoId,
+      rates_excluded: 0,
       created_at: ts,
       updated_at: ts,
     });
@@ -478,6 +479,33 @@ export async function unhideMaterial(db: Db, key: string) {
 export async function unhideMaterials(db: Db, keys: string[]) {
   await db.transaction(async (tx) => {
     for (const key of keys) await tx.run('DELETE FROM hidden_materials WHERE id = ?', [key]);
+  });
+}
+
+/**
+ * Make the deletions in hidden_materials final and empty it: the added rates they hid are
+ * deleted, and the saved-list lines they hid stay in their lists but never count in Rates again.
+ */
+export async function clearHiddenMaterials(db: Db) {
+  await db.transaction(async (tx) => {
+    const hidden = new Map((await tx.all<HiddenMaterialRow>(selectAll('hidden_materials', 'hidden_at'))).map((h) => [h.id, h.hidden_at]));
+    if (!hidden.size) return;
+    const learning = learningMap(await tx.all<LearnedTermRow>(selectAll('learned_terms', 'id')));
+    const hiddenAt = (row: { item_name: string; unit: string; original_term?: string }) => {
+      const { item_name, unit } = applyLearning(learning, row);
+      return hidden.get(materialKey(item_name, unit));
+    };
+    const lists = new Map((await tx.all<ListRow>(selectAll('lists', 'created_at'))).map((l) => [l.id, l]));
+    for (const item of await tx.all<ItemRow>(selectAll('items', 'created_at'))) {
+      const list = lists.get(item.list_id);
+      const at = hiddenAt(item);
+      if (list?.status === 'saved' && at && list.created_at <= at) await tx.run('UPDATE items SET rates_excluded = 1 WHERE id = ?', [item.id]);
+    }
+    for (const rate of await tx.all<IndexedRateRow>(selectAll('indexed_rates', 'indexed_at'))) {
+      const at = hiddenAt(rate);
+      if (at && rate.indexed_at <= at) await tx.run('DELETE FROM indexed_rates WHERE id = ?', [rate.id]);
+    }
+    await tx.run('DELETE FROM hidden_materials');
   });
 }
 

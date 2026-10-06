@@ -196,7 +196,7 @@ export function buildItemDatabase(
     [key, variant, date, price, vendor.trim().toLowerCase()].join('\u0000');
 
   for (const raw of items) {
-    if (!raw.item_name) continue;
+    if (!raw.item_name || raw.rates_excluded) continue;
     const list = savedLists.get(raw.list_id);
     if (!list) continue;
 
@@ -292,7 +292,7 @@ export function unusedHiddenMaterials(
   const savedLists = new Map(lists.filter((l) => l.status === 'saved').map((l) => [l.id, l]));
   for (const raw of items) {
     const list = savedLists.get(raw.list_id);
-    if (!list || !raw.item_name) continue;
+    if (!list || !raw.item_name || raw.rates_excluded) continue;
     const { item_name, unit } = applyLearning(learning, raw);
     seen(item_name, unit, list.created_at);
   }

@@ -153,6 +153,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       deleteMaterialLater: (m: repo.MaterialRef) => deleteLater((d) => repo.hideMaterial(d, m))(m.key),
       unhideMaterial: write(repo.unhideMaterial),
       unhideMaterials: write(repo.unhideMaterials),
+      clearHiddenMaterials: write(repo.clearHiddenMaterials),
       updateRate: write(repo.updateRate),
       setListVendor: write(repo.setListVendor),
       getBillPhotos: (photoId: string) => repo.getBillPhotos(db, photoId),
