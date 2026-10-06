@@ -72,3 +72,39 @@ test('Settings → Appearance → Dark darkens the app and is remembered', async
   await page.reload();
   expect(await darkBackground()).toBe(true);
 });
+
+test('a material in Rates opens the line editor, and a saved BOQ can be ticked delivered', async ({ page }) => {
+  await page.getByRole('button', { name: 'Add purchases' }).click();
+  await page.getByRole('button', { name: /add item manually/i }).click();
+  await page.getByLabel('Item name').fill('OPC Cement 53 grade');
+  await page.getByLabel('Quantity').fill('10');
+  await page.getByLabel('Rate', { exact: true }).fill('385');
+  await page.getByRole('button', { name: /^add to/i }).click();
+  await page.getByLabel('Close manual entry').click();
+  await page.getByRole('dialog', { name: /^Add/ }).getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /^save$/i }).click();
+  await page.getByRole('button', { name: /keep editing/i }).click();
+
+  await page.getByRole('button', { name: 'Rates', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit OPC Cement 53 grade' }).click();
+  const editor = page.getByRole('dialog', { name: 'Edit material' });
+  await expectOnTop(page, editor);
+  await expect(editor.getByLabel('Rate', { exact: true })).toHaveValue('385');
+  await editor.getByRole('button', { name: 'Cancel' }).click();
+
+  await page.getByRole('button', { name: 'BOQ', exact: true }).click();
+  await page.getByRole('button', { name: 'Add items' }).click();
+  await page.getByRole('button', { name: /add item manually/i }).click();
+  await page.getByLabel('Item name').fill('River sand');
+  await page.getByRole('button', { name: /^add to/i }).click();
+  await page.getByLabel('Close manual entry').click();
+  await page.getByRole('dialog', { name: /^Add/ }).getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByRole('button', { name: 'Mark River sand delivered' })).toBeVisible();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /^save$/i }).click();
+  await page.getByRole('button', { name: /keep editing/i }).click();
+  await page.getByRole('button', { name: 'Saved', exact: true }).click();
+  await page.getByRole('button', { name: /^Mark delivered: BOQ/ }).click();
+  await expectOnTop(page, page.getByRole('dialog', { name: 'Deliveries' }));
+});

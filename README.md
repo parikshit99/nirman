@@ -7,7 +7,7 @@ An Android app for tracking construction materials on site. You photograph bills
 - **saved sessions** per site;
 - a **material price database** built from everything you record.
 
-Everything is stored **only on your phone**. There is no server or account. The app keeps a small diagnostic log (errors, AI reading results, steps taken, slow screens; never bill contents, prices, addresses or keys), which leaves the phone only when you send it from *Settings → Report a problem*, or as an automatic crash report when that is switched on.
+Everything is stored **only on your phone**. There is no server or account. The app keeps a small diagnostic log (errors, AI reading results, steps taken, slow screens; never bill contents, prices, addresses or keys), which leaves the phone only when you send it from *Settings → Report a problem* or *Share log*.
 
 **[⬇ Download the latest APK](https://github.com/parikshit99/nirman/releases/download/latest-debug/nirmaan-auditor-debug.apk)**: rebuilt automatically every time a change is merged into `main`. While this repository is private, you need to be signed in to GitHub for the link to work.
 
@@ -22,7 +22,7 @@ Everything is stored **only on your phone**. There is no server or account. The 
 - **Share in any format.** *Share* on a purchase list, BOQ or quote comparison offers a PDF, an Excel sheet (.xlsx) or a picture (JPG) of each page, then opens the phone's share sheet. *Preview* shows the PDF first. A BOQ can also go out as an **order slip**: items and quantities without rates, with delivery address, date and receiver.
 - **Share into the app.** In WhatsApp (or any app), share a bill photo or a text message to *Nirman* and choose Purchases, BOQ or a vendor quote for a saved BOQ; the photos are put into that entry, ready to read.
 - **Labour contracts.** The *Labour* tab keeps each contractor's job, site and terms (rate per unit or lump sum, optional retention), with work measured, payments and deductions. It shows the balance due and shares a statement (PDF, Excel or JPG); site reports include labour.
-- **Deliveries and site reports.** Tick each purchase line when it reaches the site, on the open list or later under *Saved → Deliveries*. *Saved → Site report* lists everything bought for one address, for all time or any dates, for some or all work types, and optionally only what was delivered, as a PDF, Excel sheet or JPG.
+- **Deliveries and site reports.** Tick each purchase or BOQ line when it reaches the site, on the open list or later with *Delivered* on a saved list. *Saved → Site report* lists everything bought for one address, for all time or any dates, for some or all work types, and optionally only what was delivered, as a PDF, Excel sheet or JPG.
 - **Bill photos.** Photographed bills are kept with the lines read from them: *Bill* on a line or *Bills* on a saved list shows them, to check the reading.
 - **Backup.** *Settings → Save backup* shares one `.json` file with everything; save it to Google Drive, WhatsApp or email. *Restore* on any phone brings it all back. Queued, unread entries and bill photos are not included.
 

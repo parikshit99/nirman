@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Download, Eye, EyeOff, KeyRound, Loader2, Settings as SettingsIcon, Upload } from 'lucide-react';
+import { CheckCircle2, Download, Eye, EyeOff, KeyRound, Loader2, Settings as SettingsIcon, Trash2, Upload } from 'lucide-react';
 import { backupFilename, BackupError } from '../data/backup.ts';
 import { shareFile, textToBase64 } from '../lib/files.ts';
 import { FALLBACK_MODELS, listReadingModels, testGeminiKey, type ModelOption } from '../lib/gemini.ts';
@@ -7,7 +7,6 @@ import { DEFAULT_MODEL, type ReadingMode } from '../lib/settings.ts';
 import { APP_VERSION } from '../lib/version.ts';
 import { latestNotes } from '../lib/whatsNew.ts';
 import { clearLog, getLog, issueUrl, logAsText, logStep } from '../lib/diagnostics.ts';
-import { crashReportsAvailable, crashReportsEnabled, setCrashReportsEnabled } from '../lib/crashReports.ts';
 import { isNative } from '../lib/platform.ts';
 import { loadConversions, resetConversions, saveConversions } from '../lib/conversionSettings.ts';
 import { parseSize, sizeLabel, type SheetSize } from '@nirman/shared';
@@ -379,6 +378,15 @@ function StorageSection({ onWhatsNew }: { onWhatsNew?(): void }) {
     await actions.clearBillPhotos();
     setBillPhotos(0);
   };
+  const clearHidden = async () => {
+    const ok = await dialogs.confirm(`Clear ${hiddenMaterials.length} deleted ${hiddenMaterials.length === 1 ? 'material' : 'materials'} for good?`, {
+      message:
+        'Their old added rates are deleted, and their lines in saved lists stop counting in Rates and price checks for good. The saved lists and site reports keep the lines. This can\'t be restored.',
+      confirmLabel: 'Clear for good',
+      danger: true,
+    });
+    if (ok) await actions.clearHiddenMaterials();
+  };
   const resetLearning = async () => {
     const ok = await dialogs.confirm(`Forget ${learningCount} learned corrections?`, {
       message: 'The AI will go back to its default reading of these terms.',
@@ -440,7 +448,7 @@ function StorageSection({ onWhatsNew }: { onWhatsNew?(): void }) {
             <>
               <p className="text-xs text-gray-500 leading-snug mb-2">
                 Each is remembered so its old prices stay out of Rates and price checks; new purchases of it still show. One leaves this list by itself once the
-                saved lists and rates it hid are deleted. Restore brings its old prices back.
+                saved lists and rates it hid are deleted. Restore brings its old prices back; Clear list makes the deletions final and empties the list.
               </p>
               <ul className="space-y-1">
                 {hiddenMaterials.map((m) => (
@@ -454,15 +462,22 @@ function StorageSection({ onWhatsNew }: { onWhatsNew?(): void }) {
                   </li>
                 ))}
               </ul>
-              {hiddenMaterials.length > 1 && (
-                <button
-                  onClick={() => actions.unhideMaterials(hiddenMaterials.map((m) => m.id))}
-                  className="mt-2 text-xs text-blue-600 font-bold underline"
-                  aria-label="Restore all deleted materials to Rates"
-                >
-                  Restore all
-                </button>
-              )}
+              <div className="mt-2 flex items-center justify-between gap-2">
+                {hiddenMaterials.length > 1 ? (
+                  <button
+                    onClick={() => actions.unhideMaterials(hiddenMaterials.map((m) => m.id))}
+                    className="text-xs text-blue-600 font-bold underline"
+                    aria-label="Restore all deleted materials to Rates"
+                  >
+                    Restore all
+                  </button>
+                ) : (
+                  <span />
+                )}
+                <Button variant="dangerOutline" size="sm" onClick={clearHidden}>
+                  <Trash2 size={14} /> Clear list
+                </Button>
+              </div>
             </>
           )}
         </div>
@@ -643,7 +658,6 @@ function DiagnosticsSection() {
   const dialogs = useDialogs();
   const [note, setNote] = useState('');
   const [, refresh] = useState(0);
-  const [crash, setCrash] = useState(crashReportsEnabled);
   const log = getLog();
   const errors = log.filter((e) => e.kind === 'error').length;
 
@@ -685,23 +699,6 @@ function DiagnosticsSection() {
         </button>
       </div>
       <p className="text-xs text-gray-500">Report a problem opens a GitHub issue with the phone details and recent errors filled in; you can add a screenshot there.</p>
-      {crashReportsAvailable() && (
-        <label className="flex items-start gap-2 text-xs text-gray-700">
-          <input
-            type="checkbox"
-            checked={crash}
-            onChange={(e) => {
-              setCrash(e.target.checked);
-              setCrashReportsEnabled(e.target.checked);
-            }}
-            className="mt-0.5"
-          />
-          <span>
-            Send crash reports automatically
-            <span className="block text-xs text-gray-500">Only errors, with the app version, phone model and recent steps. Takes effect after restarting the app.</span>
-          </span>
-        </label>
-      )}
       {log.length > 0 && (
         <button
           onClick={() => {

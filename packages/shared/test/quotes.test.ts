@@ -15,7 +15,7 @@ const ts = (d: string) => `${d}T10:00:00.000Z`;
 function boqItem(id: string, item_name: string, quantity: number, unit: string, over: Partial<ItemRow> = {}): ItemRow {
   return {
     id, list_id: 'boq', item_name, original_term: '', quantity, unit, unit_price: 0, total_amount: 0,
-    vendor: '', date: '', brand: '', model: '', spec: '', color: '', delivered_at: '', ordered_as: '', photo_id: '', created_at: ts('2026-10-01'), updated_at: ts('2026-10-01'), ...over,
+    vendor: '', date: '', brand: '', model: '', spec: '', color: '', delivered_at: '', ordered_as: '', photo_id: '', rates_excluded: 0, created_at: ts('2026-10-01'), updated_at: ts('2026-10-01'), ...over,
   };
 }
 const quote = (id: string, vendor: string, quote_date = '2026-10-03'): QuoteRow => ({

@@ -24,13 +24,13 @@ The `nirmaan` names are the original internal ids. They stay unchanged so existi
 | Table | One row per | Key columns |
 |---|---|---|
 | `lists` | purchase list or BOQ | `kind`: `audit` (Purchases) or `boq`; `status`: `draft` or `saved`; `title`, `address`, `category`, `site_date`, `notes` |
-| `items` | line in a list | `list_id`; `item_name` (standard English name); `original_term` (word as written or spoken, e.g. "bori"); `quantity`, `unit`, `unit_price`, `total_amount`, `vendor`, `date`; `delivered_at`, the date a purchase line reached the site (blank = not marked); `ordered_as`, how it was ordered when billed in another unit (e.g. "3 bundles of 12 mm" for a line in kg); `photo_id`, the `bill_photos` row it was read from (blank for typed or spoken lines) |
+| `items` | line in a list | `list_id`; `item_name` (standard English name); `original_term` (word as written or spoken, e.g. "bori"); `quantity`, `unit`, `unit_price`, `total_amount`, `vendor`, `date`; `delivered_at`, the date a purchase line reached the site (blank = not marked); `ordered_as`, how it was ordered when billed in another unit (e.g. "3 bundles of 12 mm" for a line in kg); `photo_id`, the `bill_photos` row it was read from (blank for typed or spoken lines); `rates_excluded`, 1 when its price was cleared from Rates for good (the line stays in its list and in site reports) |
 | `indexed_rates` | single price added on its own (a confirmed vendor quote; versions up to 3.0.0 also stored "Index rate" here, which now saves the purchase list to History instead) | `item_name`, `unit`, `date`, `price`, `vendor`, `indexed_at`; `category` and `address`: the BOQ's for a confirmed quote; for "Index rate", the site picked when indexing, or the purchase list's once it is saved with the same line |
 | `learned_terms` | correction the app remembers | `id` is the original word, lower-cased; it maps to the `item_name` and `unit` to use instead |
 | `categories` | type of work (Civil, Electrical, …) | `name`; the built-in ones use the lower-cased name as `id` |
 | `quotes` | vendor's reply to a saved BOQ | `boq_id` (a `lists` id); `vendor`, `quote_date`; `status`: `review` or `confirmed` |
 | `quote_lines` | line in a vendor quote | `quote_id`, `position`; `boq_item_id`, the BOQ `items` row it was matched to (empty = not in the BOQ); plus `original_term`, `item_name`, `quantity`, `unit`, `unit_price`, `total_amount`, `note` |
-| `hidden_materials` | material deleted from the Rates tab and price checks | `id` is the material's key (see Conventions); `name`, `unit`, `hidden_at`. Prices recorded up to `hidden_at` are left out; later ones show again. Saved lists are not changed; removing the row restores it. The app removes a row once no saved line or rate recorded up to `hidden_at` is left for it (`unusedHiddenMaterials`). |
+| `hidden_materials` | material deleted from the Rates tab and price checks | `id` is the material's key (see Conventions); `name`, `unit`, `hidden_at`. Prices recorded up to `hidden_at` are left out; later ones show again. Saved lists are not changed; removing the row restores it. The app removes a row once no saved line or rate recorded up to `hidden_at` is left for it (`unusedHiddenMaterials`). *Clear* in Settings makes them final: the `indexed_rates` they hid are deleted, the saved lines they hid get `rates_excluded = 1`, and the rows go. |
 | `contracts` | labour contract | `contractor`, `phone`, `address`, `category`, `work`; `kind`: `rate` (paid `rate` per `unit`, optional `est_quantity`) or `lump_sum` (`amount`); `retention_pct`; `start_date`; `status`: `active` or `closed`; `retention_released_at` (blank while held); `notes` |
 | `contract_entries` | something recorded on a contract | `contract_id`, `date`; `kind`: `work` (`quantity` in the contract's unit, or % of a lump sum), `payment` (`amount`, `mode`: cash / upi / bank / cheque) or `deduction` (`amount`); `note` |
 | `jobs`, `job_images` | entry waiting to be read by Gemini (with its photos as base64) | temporary; deleted once read |
@@ -44,8 +44,8 @@ The two working drafts always exist, with fixed ids: `draft-audit` (the open Pur
 
 ### How the material price database is built
 
-There is no separate price table. The Data tab is computed on the fly (`buildItemDatabase`) from:
-- every item with a price in a `saved` list (dated by the item's `date`, or else the list's creation date);
+There is no separate price table. The Rates tab is computed on the fly (`buildItemDatabase`) from:
+- every item with a price in a `saved` list, except those with `rates_excluded = 1` (dated by the item's `date`, or else the list's creation date);
 - every row in `indexed_rates`.
 
 Each material's work categories and sites come from its saved lists and from its rates' `category` and `address`; a material with none gets a category guessed from its name. Names and units are first passed through `learned_terms`, and for materials listed in `hidden_materials`, rows recorded up to `hidden_at` are left out (saved-list items by the list's `created_at`, rates by `indexed_at`). Within a material, prices are also grouped by variant (the four variant fields, compared lower-cased). A price check for a line that names a brand, model, spec or colour only uses past prices with the same values for the fields it names; blank fields match anything.
@@ -67,7 +67,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
 ```json
 {
   "app": "nirmaan-auditor",
-  "version": 9,
+  "version": 10,
   "exported_at": "2026-10-03T19:13:38.586Z",
   "lists": [], "items": [], "indexed_rates": [], "learned_terms": [],
   "categories": [], "quotes": [], "quote_lines": [], "hidden_materials": [],
@@ -85,6 +85,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
   - version 5 (before delivery tracking) has `items` rows without `delivered_at`;
   - version 6 (before order units) has `items` rows without `ordered_as`;
   - version 7 (before labour contracts) has no `contracts` or `contract_entries`;
-  - version 8 (before bill photos) has `items` rows without `photo_id`.
+  - version 8 (before bill photos) has `items` rows without `photo_id`;
+  - version 9 (before clearing deleted rates) has `items` rows without `rates_excluded`.
 - Restoring replaces everything on the phone.
 - Any reimplementation should read this format, so old backups keep working.

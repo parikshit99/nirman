@@ -84,6 +84,8 @@ export const itemRowSchema = z.object({
   ordered_as: z.string().max(300).default(''),
   /** The bill photos it was read from (bill_photos.id); blank for typed or spoken lines. */
   photo_id: z.string().max(100).default(''),
+  /** 1: its price was cleared from Rates for good (Settings → Deleted from Rates → Clear); the line itself stays. */
+  rates_excluded: z.number().int().min(0).max(1).default(0),
   created_at: isoTimestamp,
   updated_at: isoTimestamp,
 });

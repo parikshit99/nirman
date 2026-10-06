@@ -95,8 +95,8 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
                     <span className="text-xs font-mono text-gray-500">{new Date(record.created_at).toLocaleString('en-IN')}</span>
                     {record.address && <span className="text-xs text-gray-500 italic truncate">📍 {record.address}</span>}
                     <span className="text-xs font-bold text-gray-500 uppercase">
-                      {record.items.length} Items
-                      {record.kind === 'audit' && record.items.length > 0 && (
+                      {record.items.length} {record.items.length === 1 ? 'item' : 'items'}
+                      {record.items.length > 0 && (
                         <span className={record.items.every((i) => i.delivered_at) ? 'text-green-700' : ''}>
                           {' · '}
                           {record.items.filter((i) => i.delivered_at).length} of {record.items.length} delivered
@@ -135,7 +135,7 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
                 <Button variant="primary" size="sm" className="flex-1" onClick={() => onOpen(record)}>
                   <Eye size={12} /> Open
                 </Button>
-                {record.kind === 'audit' && record.items.length > 0 && (
+                {record.items.length > 0 && (
                   <Button size="sm" className="flex-1" onClick={() => onDeliveries(record)} aria-label={`Mark delivered: ${record.title}`}>
                     <CheckSquare size={12} className="text-green-700" /> Delivered
                   </Button>

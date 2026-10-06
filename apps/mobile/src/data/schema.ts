@@ -217,6 +217,10 @@ const MIGRATIONS: string[] = [
   );
   ALTER TABLE items ADD COLUMN photo_id TEXT NOT NULL DEFAULT '';
   `,
+  // 12: saved lines whose price was cleared from Rates for good (Settings → Deleted from Rates → Clear).
+  `
+  ALTER TABLE items ADD COLUMN rates_excluded INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 /** Default categories sort before anything the user adds. */

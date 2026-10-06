@@ -28,6 +28,8 @@ interface Props {
   /** Shown as Delete beside Save, so deleting is never one stray tap on a list. */
   onDelete?(): void;
   deleteLabel?: string;
+  /** A second way to save, e.g. "Save as today's price" in Rates. */
+  alsoSave?: { label: string; onSave(values: LineValues): void | Promise<void> };
 }
 
 const rupees = (n: number) => `₹${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
@@ -38,7 +40,7 @@ const field = 'w-full px-3 py-2 bg-white border border-orange-200 rounded-lg tex
  * with the size helper, unit, rate and vendor. Used for purchase and BOQ lines and
  * for prices in Rates.
  */
-export function LineEditor({ initial, showQuantity = true, showPrice = true, onSave, onCancel, onDelete, deleteLabel }: Props) {
+export function LineEditor({ initial, showQuantity = true, showPrice = true, onSave, onCancel, onDelete, deleteLabel, alsoSave }: Props) {
   const { knownVendors } = useAppState();
   const dialogs = useDialogs();
   const vendorList = useId();
@@ -53,14 +55,14 @@ export function LineEditor({ initial, showQuantity = true, showPrice = true, onS
   }));
   const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) => setDraft((p) => ({ ...p, [key]: e.target.value }));
 
-  const save = async () => {
+  const save = async (to: Props['onSave'] = onSave) => {
     const quantity = draft.quantity.trim() ? parseAmount(draft.quantity) : 0;
     const unitPrice = draft.unit_price.trim() ? parseAmount(draft.unit_price) : 0;
     if (quantity === null || unitPrice === null) {
       await dialogs.alert('Check the number', `“${quantity === null ? draft.quantity : draft.unit_price}” is not a number. Use digits, e.g. 1500 or 1,500.`);
       return;
     }
-    await onSave({
+    await to({
       ...(Object.fromEntries(VARIANT_FIELDS.map((f) => [f, (draft[f] ?? '').trim()])) as Record<VariantField, string>),
       item_name: draft.item_name.trim(),
       quantity,
@@ -135,10 +137,15 @@ export function LineEditor({ initial, showQuantity = true, showPrice = true, onS
         <Button variant="ghost" size="sm" onClick={onCancel} aria-label="Cancel">
           Cancel
         </Button>
-        <Button variant="primary" size="sm" onClick={save} aria-label="Save changes">
+        <Button variant="primary" size="sm" onClick={() => save()} aria-label="Save changes">
           <Check size={14} /> Save
         </Button>
       </div>
+      {alsoSave && (
+        <Button block size="sm" onClick={() => save(alsoSave.onSave)}>
+          {alsoSave.label}
+        </Button>
+      )}
     </div>
   );
 }

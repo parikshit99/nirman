@@ -36,7 +36,7 @@ export function ItemLog({ kind, items, searching, onIndex, onAdd }: Props) {
   // Leaving the list carries out any delete still waiting for undo.
   useEffect(() => () => void actions.flushDeletes(), [actions]);
 
-  const undelivered = isAudit ? items.filter((i) => !i.delivered_at && !pendingDeletes.has(i.id)) : [];
+  const undelivered = items.filter((i) => !i.delivered_at && !pendingDeletes.has(i.id));
   const indexable = itemsFor('audit').filter((i) => i.item_name && i.unit_price && !pendingDeletes.has(i.id));
 
   return (
@@ -109,7 +109,7 @@ export function ItemLog({ kind, items, searching, onIndex, onAdd }: Props) {
         <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-[var(--color-brand-concrete)] rounded-full text-xs text-gray-500 shadow-sm order-2 sm:order-1 font-semibold">
           <History size={12} /> {items.length} {items.length === 1 ? 'item' : 'items'}
         </div>
-        {isAudit && undelivered.length > 0 && (
+        {undelivered.length > 0 && (
           <button
             onClick={() => actions.setDelivered(undelivered.map((i) => i.id), todayISO())}
             className="w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-4 py-3 bg-white border border-green-300 text-green-800 text-xs font-bold uppercase tracking-wider rounded-xl"
@@ -209,9 +209,11 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onPhotos, onIndex, onDeliver
         </button>
       </div>
 
-      {!isAudit && item.photo_id && (
-        <div className="mt-1.5">
-          <PhotoChip onClick={onPhotos} name={item.item_name} />
+      {/* A BOQ is what was ordered: its lines can be ticked off as they arrive too. */}
+      {!isAudit && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          {item.photo_id && <PhotoChip onClick={onPhotos} name={item.item_name} />}
+          <DeliveredToggle name={item.item_name} deliveredAt={item.delivered_at} onChange={onDelivered} />
         </div>
       )}
       {isAudit && (

@@ -4,7 +4,7 @@ import { DeliveredToggle } from '../components/DeliveredToggle.tsx';
 import { Sheet, SheetHeader } from '../components/ui/Sheet.tsx';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
 
-/** Tick which lines of a saved purchase session have reached the site. */
+/** Tick which lines of a saved purchase list or BOQ (an order) have reached the site. */
 export function DeliveriesSheet({ recordId, onClose }: { recordId: string; onClose(): void }) {
   const { history, actions } = useAppState();
   const record: HistoryRecord | undefined = history.find((h) => h.id === recordId);
@@ -14,7 +14,9 @@ export function DeliveriesSheet({ recordId, onClose }: { recordId: string; onClo
   return (
     <Sheet labelledBy="deliveries-title" size="lg" onClose={onClose} closeOnBackdrop className="p-5">
       <SheetHeader id="deliveries-title" title="Deliveries" subtitle={`${record.title}${record.address ? ` · ${record.address}` : ''}`} onClose={onClose} />
-      <p className="text-xs text-gray-500 mt-2">Tick each line when it reaches the site. Site reports can count only delivered material.</p>
+      <p className="text-xs text-gray-500 mt-2">
+        Tick each line when it reaches the site.{record.kind === 'audit' ? ' Site reports can count only delivered material.' : ' See what is still to come on this order.'}
+      </p>
       <ul className="mt-3 divide-y divide-gray-100 overflow-y-auto flex-1">
         {record.items.map((item) => (
           <li key={item.id} className="py-2 space-y-1">
