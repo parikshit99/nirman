@@ -455,7 +455,7 @@ function JobList({
   const waitingReason = !hasKey ? 'Add your Gemini API key in Settings' : offline ? 'Will be read when online' : 'Queued';
   return (
     <div className="space-y-2">
-      <div className="text-xs text-gray-500 font-semibold">Extraction Queue</div>
+      <div className="text-xs text-gray-500 font-semibold">Being read</div>
       {jobs.map((job) => {
         const label = job.text ? `“${job.text.slice(0, 60)}${job.text.length > 60 ? '…' : ''}”` : '';
         const photos = job.image_count ? `${job.image_count} photo${job.image_count > 1 ? 's' : ''}` : '';

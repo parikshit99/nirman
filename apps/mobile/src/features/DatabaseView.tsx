@@ -292,11 +292,11 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
                           <AreaChart data={points}>
                             <defs>
                               <linearGradient id={`colorPrice-${idx}`} x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                                <stop offset="5%" stopColor="var(--color-brand-primary)" stopOpacity={0.3} />
+                                <stop offset="95%" stopColor="var(--color-brand-primary)" stopOpacity={0} />
                               </linearGradient>
                             </defs>
-                            <Area type="monotone" dataKey="price" stroke="#f97316" fillOpacity={1} fill={`url(#colorPrice-${idx})`} strokeWidth={2} />
+                            <Area type="monotone" dataKey="price" stroke="var(--color-brand-primary)" fillOpacity={1} fill={`url(#colorPrice-${idx})`} strokeWidth={2} />
                             <Tooltip
                               labelFormatter={(_, payload) => payload?.[0]?.payload?.date ?? ''}
                               labelStyle={{ fontSize: '12px' }}

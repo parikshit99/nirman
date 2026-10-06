@@ -10,7 +10,7 @@ interface Props {
   recentAddresses: string[];
   /** Editing an existing record (shows "Update" instead of "Save"). */
   editing: boolean;
-  /** Offer "Save as new record" next to "Update". */
+  /** Offer "Save as a new list" next to "Update saved list". */
   allowSaveAsNew: boolean;
   /** Used for the automatic title when left blank, e.g. "BOQ 30/09/2026". */
   titlePrefix: string;
