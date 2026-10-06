@@ -174,7 +174,7 @@ export function SiteReport({ onClose }: { onClose(): void }) {
           </div>
         )}
       </Sheet>
-      {sharing && <ShareSheet title="site report" onShare={share} onClose={() => setSharing(false)} />}
+      {sharing && <ShareSheet title="site report" onShare={share} preview={() => buildSiteReportPdf(address, filters, report, labour)} onClose={() => setSharing(false)} />}
     </>
   );
 }

@@ -1,7 +1,8 @@
-import { motion } from 'motion/react';
-import { CheckSquare, ClipboardList, Eye, History, Pencil, Plus, RotateCcw, Trash2, Truck } from 'lucide-react';
+import { useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Camera, CheckSquare, ClipboardList, Eye, History, Pencil, Plus, RotateCcw, Trash2, Truck } from 'lucide-react';
+import { BillPhotosSheet, photoIdsOf } from '../components/BillPhotos.tsx';
 import { FilterChips } from '../components/FilterChips.tsx';
-import { useDialogs } from '../components/Dialogs.tsx';
 import { EmptyState } from '../components/ui/EmptyState.tsx';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
 import { Button } from '../components/ui/Button.tsx';
@@ -46,20 +47,12 @@ interface Props {
   onQuotes(record: HistoryRecord): void;
   onDeliveries(record: HistoryRecord): void;
   onBuyAgain(record: HistoryRecord): void;
+  onDeleteAll(): void;
 }
 
-export function HistoryView({ records, categoryFilter, onCategory, addressFilter, onAddress, onEdit, onOpen, onQuotes, onDeliveries, onBuyAgain }: Props) {
-  const { actions, categoryNames, uniqueAddresses, quotesFor, history } = useAppState();
-  const dialogs = useDialogs();
-
-  const remove = async (record: HistoryRecord) => {
-    const ok = await dialogs.confirm(`Delete “${record.title}”?`, {
-      message: `${record.items.length} items${quotesFor(record.id).length ? ` and ${quotesFor(record.id).length} vendor quotes` : ''} will be removed from this phone.`,
-      confirmLabel: 'Delete',
-      danger: true,
-    });
-    if (ok) await actions.deleteList(record.id);
-  };
+export function HistoryView({ records, categoryFilter, onCategory, addressFilter, onAddress, onEdit, onOpen, onQuotes, onDeliveries, onBuyAgain, onDeleteAll }: Props) {
+  const { categoryNames, uniqueAddresses, quotesFor, history } = useAppState();
+  const [photosOf, setPhotosOf] = useState<HistoryRecord | null>(null);
 
   return (
     <div className="space-y-6">
@@ -112,19 +105,15 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
                     </span>
                   </div>
                 </button>
-                <div className="flex gap-1 items-center">
-                  <button
-                    onClick={() => onEdit(record)}
-                    className="p-2.5 -m-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all flex items-center"
-                    aria-label={`Edit details of ${record.title}`}
-                  >
-                    <Pencil size={14} />
-                    <span className="text-xs font-bold uppercase ml-1">Edit</span>
-                  </button>
-                  <button onClick={() => remove(record)} className="p-2.5 -m-1.5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" aria-label={`Delete ${record.title}`}>
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+                {/* Delete is in the details sheet, next to Update, so it isn't tapped by accident. */}
+                <button
+                  onClick={() => onEdit(record)}
+                  className="p-2.5 -m-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all flex items-center"
+                  aria-label={`Edit details of ${record.title}`}
+                >
+                  <Pencil size={14} />
+                  <span className="text-xs font-bold uppercase ml-1">Edit</span>
+                </button>
               </div>
 
               <div className="space-y-1 mb-4 max-h-20 overflow-hidden relative">
@@ -142,40 +131,45 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
 
               {record.notes && <div className="mb-4 text-xs text-gray-500 italic line-clamp-1 border-l border-gray-200 pl-2">"{record.notes}"</div>}
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button variant="primary" size="sm" className="flex-1" onClick={() => onOpen(record)}>
                   <Eye size={12} /> Open
                 </Button>
                 {record.kind === 'audit' && record.items.length > 0 && (
-                  <button
-                    onClick={() => onBuyAgain(record)}
-                    className="py-2 px-3 bg-white text-gray-700 border border-gray-300 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
-                    aria-label={`Buy again: ${record.title}`}
-                  >
-                    <RotateCcw size={12} /> Again
-                  </button>
-                )}
-                {record.kind === 'audit' && record.items.length > 0 && (
-                  <button
-                    onClick={() => onDeliveries(record)}
-                    className="flex-1 py-2 bg-green-50 text-green-800 border border-green-200 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <CheckSquare size={12} /> Deliveries
-                  </button>
+                  <Button size="sm" className="flex-1" onClick={() => onDeliveries(record)} aria-label={`Mark delivered: ${record.title}`}>
+                    <CheckSquare size={12} className="text-green-700" /> Delivered
+                  </Button>
                 )}
                 {record.kind === 'boq' && (
-                  <button
-                    onClick={() => onQuotes(record)}
-                    className="flex-1 py-2 bg-orange-50 text-orange-700 border border-orange-200 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-orange-100 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Truck size={12} /> Quotes ({quotesFor(record.id).length})
-                  </button>
+                  <Button size="sm" className="flex-1" onClick={() => onQuotes(record)}>
+                    <Truck size={12} className="text-orange-600" /> Quotes ({quotesFor(record.id).length})
+                  </Button>
+                )}
+                {record.kind === 'audit' && record.items.length > 0 && (
+                  <Button size="sm" onClick={() => onBuyAgain(record)} aria-label={`Buy again: ${record.title}`}>
+                    <RotateCcw size={12} /> Again
+                  </Button>
+                )}
+                {photoIdsOf(record.items).length > 0 && (
+                  <Button size="sm" onClick={() => setPhotosOf(record)} aria-label={`Bill photos of ${record.title}`}>
+                    <Camera size={12} /> Bills ({photoIdsOf(record.items).length})
+                  </Button>
                 )}
               </div>
             </motion.div>
           ))
         )}
       </div>
+      {history.length > 1 && (
+        <div className="flex justify-center pt-2">
+          <Button variant="dangerOutline" size="sm" onClick={onDeleteAll}>
+            <Trash2 size={14} /> Delete all saved lists
+          </Button>
+        </div>
+      )}
+      <AnimatePresence>
+        {photosOf && <BillPhotosSheet key="photos" photoIds={photoIdsOf(photosOf.items)} title={photosOf.title} onClose={() => setPhotosOf(null)} />}
+      </AnimatePresence>
     </div>
   );
 }

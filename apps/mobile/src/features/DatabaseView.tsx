@@ -17,6 +17,7 @@ import { FilterChips } from '../components/FilterChips.tsx';
 import { MaterialFilters } from '../components/MaterialFilters.tsx';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
+import { LineEditor } from '../components/LineEditor.tsx';
 import { shareFile, textToBase64 } from '../lib/files.ts';
 import { useAppState } from '../state/AppState.tsx';
 import { Button } from '../components/ui/Button.tsx';
@@ -27,7 +28,7 @@ import { Sheet, SheetHeader } from '../components/ui/Sheet.tsx';
 type SubTab = 'materials' | 'categories';
 
 const SUB_TABS: { id: SubTab; label: string; about: string }[] = [
-  { id: 'materials', label: 'Materials', about: 'One card per material. Tap Prices to fix or remove a price, Edit to rename or merge duplicates, or 🗑 to delete it from Rates.' },
+  { id: 'materials', label: 'Materials', about: 'One card per material. Open Prices and tap a price to correct its name, size, rate or vendor, or remove it. Edit renames, merges or deletes the material.' },
   { id: 'categories', label: 'Work types', about: 'Types of work (e.g. Earthwork) you can tag a saved purchase list or BOQ with, to filter by later.' },
 ];
 
@@ -327,13 +328,6 @@ function Materials({ entries, materialFilter, onMaterialFilter, categoryFilter, 
                         <button onClick={() => setEditing(item)} className="text-xs font-bold text-gray-600 flex items-center gap-1 py-1" aria-label={`Edit ${item.name}`}>
                           <Pencil size={13} /> Edit
                         </button>
-                        <button
-                          onClick={() => actions.deleteMaterialLater({ key: item.key, name: item.name, unit: item.unit })}
-                          className="p-2.5 -m-1.5 ml-auto text-red-500 hover:bg-red-50 rounded-lg"
-                          aria-label={`Delete ${item.name}`}
-                        >
-                          <Trash2 size={16} />
-                        </button>
                       </div>
                     )}
                   </div>
@@ -423,68 +417,66 @@ function PriceList({ points }: { points: MaterialEntry['priceHistory'] }) {
 }
 
 function PriceRow({ point: p }: { point: MaterialEntry['priceHistory'][number] }) {
-  const { actions, pendingDeletes } = useAppState();
-  const dialogs = useDialogs();
-  const [draft, setDraft] = useState<string | null>(null);
+  const { actions, pendingDeletes, snapshot } = useAppState();
+  const [editing, setEditing] = useState(false);
   const id = p.rateId ?? p.itemId;
   const pendingDelete = !!id && pendingDeletes.has(id);
   const label = `₹${p.price} from ${p.date}`;
-
-  const save = async () => {
-    if (draft === null) return;
-    const value = parseAmount(draft);
-    setDraft(null);
-    if (value === null || value <= 0) {
-      await dialogs.alert('Check the price', `“${draft}” is not a price. Use digits, e.g. 1500 or 1,500.`);
-      return;
-    }
-    if (value !== p.price) await actions.setPrice({ itemId: p.itemId, rateId: p.rateId }, value);
-  };
+  const item = p.itemId ? snapshot.items.find((i) => i.id === p.itemId) : undefined;
+  const rate = p.rateId ? snapshot.rates.find((r) => r.id === p.rateId) : undefined;
   const remove = () => (p.rateId ? actions.deleteIndexedRateLater(p.rateId) : p.itemId && actions.deleteItemLater(p.itemId));
 
+  if (editing && (item || rate)) {
+    return (
+      <li className="px-2 py-3 bg-orange-50/60">
+        <p className="text-xs text-gray-500 mb-2">{p.listTitle ? `Line in the saved list “${p.listTitle}”; the list changes too.` : 'Added rate'}</p>
+        <LineEditor
+          initial={item ?? { ...rate!, quantity: 0, unit_price: rate!.price, ordered_as: '' }}
+          showQuantity={!!item}
+          onSave={async (values) => {
+            if (item) await actions.updateItem(item.id, values);
+            else {
+              const { quantity: _q, ordered_as: _o, unit_price, ...rest } = values;
+              await actions.updateRate(rate!.id, { ...rest, price: unit_price });
+            }
+            setEditing(false);
+          }}
+          onCancel={() => setEditing(false)}
+          onDelete={() => {
+            setEditing(false);
+            remove();
+          }}
+          deleteLabel={`Remove price ${label}`}
+        />
+      </li>
+    );
+  }
+
   return (
-    <li className={`px-3 py-2 flex items-center gap-2 ${pendingDelete ? 'bg-red-50/40' : ''}`}>
-      <div className={`flex-1 min-w-0 ${pendingDelete ? 'line-through opacity-60' : ''}`}>
-        <div className="flex justify-between items-center gap-2 text-sm">
-          <span className="text-gray-700 truncate">
-            {new Date(p.date).toLocaleDateString('en-IN')} · {p.vendor}
-          </span>
-          {draft !== null ? (
-            <input
-              autoFocus
-              inputMode="decimal"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={save}
-              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-              aria-label={`New price for ${label}`}
-              className="w-24 px-2 py-1 border border-orange-300 rounded-lg font-mono text-sm text-right outline-none"
-            />
-          ) : (
-            <span className="font-mono font-bold shrink-0">₹{p.price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-          )}
-        </div>
-        {variantLabel(p.variant) && <div className="text-xs font-bold text-gray-700 truncate">{variantLabel(p.variant)}</div>}
-        <div className="text-xs text-gray-500 truncate">
-          {p.listTitle ? `Saved list: ${p.listTitle}` : 'Added rate'}
-          {pendingDelete && p.itemId && ' (line removed from the list)'}
-        </div>
-      </div>
-      {id &&
-        (pendingDelete ? (
-          <UndoButton onUndo={() => actions.undoDelete(id)} label={label} />
-        ) : (
-          draft === null && (
-            <div className="flex shrink-0 -mr-1">
-              <button onClick={() => setDraft(String(p.price))} className="p-2.5 -m-1.5 text-gray-500 hover:bg-gray-100 rounded-lg" aria-label={`Change price ${label}`}>
-                <Pencil size={15} />
-              </button>
-              <button onClick={remove} className="p-2.5 -m-1.5 text-red-500 hover:bg-red-50 rounded-lg" aria-label={`Remove price ${label}`}>
-                <Trash2 size={16} />
-              </button>
-            </div>
-          )
-        ))}
+    <li className={`flex items-center gap-2 ${pendingDelete ? 'bg-red-50/40 px-3 py-2' : ''}`}>
+      {pendingDelete ? (
+        <>
+          <div className="flex-1 min-w-0 line-through opacity-60 text-sm">
+            {new Date(p.date).toLocaleDateString('en-IN')} · {p.vendor} · ₹{p.price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+            {p.itemId && <div className="text-xs">(line removed from the list)</div>}
+          </div>
+          <UndoButton onUndo={() => actions.undoDelete(id!)} label={label} />
+        </>
+      ) : (
+        <button onClick={() => id && setEditing(true)} disabled={!id} className="flex-1 min-w-0 text-left px-3 py-2" aria-label={`Edit price ${label}`}>
+          <div className="flex justify-between items-center gap-2 text-sm">
+            <span className="text-gray-700 truncate">
+              {new Date(p.date).toLocaleDateString('en-IN')} · {p.vendor}
+            </span>
+            <span className="font-mono font-bold shrink-0 flex items-center gap-1.5">
+              ₹{p.price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+              {id && <Pencil size={12} className="text-gray-500" />}
+            </span>
+          </div>
+          {variantLabel(p.variant) && <div className="text-xs font-bold text-gray-700 truncate">{variantLabel(p.variant)}</div>}
+          <div className="text-xs text-gray-500 truncate">{p.listTitle ? `Saved list: ${p.listTitle}` : 'Added rate'}</div>
+        </button>
+      )}
     </li>
   );
 }

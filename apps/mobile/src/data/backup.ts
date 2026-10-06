@@ -1,16 +1,16 @@
 import { z } from 'zod';
 import { dataTables, rowSchemas, todayISO, type RowTypes } from '@nirman/shared';
-import { clearAllData, ensureDraftRows, selectAll, writeRow } from './repo.ts';
+import { clearAllData, ensureDraftRows, pruneBillPhotos, selectAll, writeRow } from './repo.ts';
 import type { Db } from './sql.ts';
 
 const APP_ID = 'nirmaan-auditor';
-/** 2 added vendor quotes, 3 hidden materials, 4 brand/model/spec/colour, 8 labour contracts; older files still restore. */
-const VERSION = 8;
-const READABLE_VERSIONS: unknown[] = [1, 2, 3, 4, 5, 6, 7, 8];
+/** 2 added vendor quotes, 3 hidden materials, 4 brand/model/spec/colour, 8 labour contracts, 9 items.photo_id; older files still restore. */
+const VERSION = 9;
+const READABLE_VERSIONS: unknown[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 const backupSchema = z.object({
   app: z.literal(APP_ID),
-  version: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7), z.literal(8)]),
+  version: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7), z.literal(8), z.literal(9)]),
   exported_at: z.string().datetime({ offset: true }),
   lists: z.array(rowSchemas.lists),
   items: z.array(rowSchemas.items),
@@ -69,6 +69,8 @@ export async function restoreBackup(db: Db, backup: Backup): Promise<void> {
       for (const row of backup[table]) await writeRow(tx, table, row as RowTypes[typeof table]);
     }
     await ensureDraftRows(tx);
+    // Bill photos aren't in backups; on this phone, those of restored lines still show.
+    await pruneBillPhotos(tx);
   });
 }
 

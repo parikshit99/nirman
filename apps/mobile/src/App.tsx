@@ -57,6 +57,14 @@ interface SaveState {
   kind?: ListKind;
   initial: ListMeta;
   titlePrefix: string;
+  /** Purchase lists: the lines' vendor, to change on all of them at once. */
+  vendor?: { initial: string; mixed: boolean };
+}
+
+/** One vendor on every line, or several. */
+function vendorOf(items: { vendor: string }[]): { initial: string; mixed: boolean } {
+  const vendors = [...new Set(items.map((i) => i.vendor.trim()).filter(Boolean))];
+  return { initial: vendors.length === 1 ? vendors[0] : '', mixed: vendors.length > 1 };
 }
 
 /** Below 480 px Preview and Share show only their icons (Save below 360 px), so the header fits 320 px. */
@@ -66,7 +74,7 @@ const kindOf = (tab: AppTab): ListKind | null => (tab === 'auditor' ? 'audit' : 
 
 export default function App() {
   const state = useAppState();
-  const { actions, history, itemDatabase, itemsFor, boqNotes, categoryNames, uniqueAddresses, settings, pendingDeletes, savedBoqs, contracts, allAddresses } = state;
+  const { actions, history, itemDatabase, itemsFor, boqNotes, categoryNames, uniqueAddresses, settings, pendingDeletes, savedBoqs, contracts, allAddresses, knownVendors, quotesFor } = state;
   const dialogs = useDialogs();
 
   const [activeTab, setActiveTab] = useState<AppTab>('auditor');
@@ -181,6 +189,7 @@ export default function App() {
         category: record?.category || prefs.get(workTypeKey(kind), '') || guessCategory(activeItems),
         site_date: todayISO(),
       },
+      vendor: kind === 'audit' ? vendorOf(activeItems) : undefined,
     });
   };
 
@@ -194,17 +203,36 @@ export default function App() {
         category: record.category || 'Civil',
         site_date: record.site_date || record.created_at.slice(0, 10),
       },
+      vendor: record.kind === 'audit' && record.items.length ? vendorOf(record.items) : undefined,
     });
 
-  const handleSave = async (meta: ListMeta, asNew: boolean) => {
+  const deleteRecord = async (recordId: string) => {
+    const record = history.find((r) => r.id === recordId);
+    if (!record) return;
+    const quotes = quotesFor(record.id).length;
+    const ok = await dialogs.confirm(`Delete “${record.title}”?`, {
+      message: `${record.items.length} items${quotes ? ` and ${quotes} vendor quotes` : ''} will be removed from this phone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    setSaveState(null);
+    await actions.deleteList(record.id);
+  };
+
+  const handleSave = async (meta: ListMeta, asNew: boolean, vendor?: string) => {
     if (!saveState) return;
     await actions.flushDeletes();
     const { kind: k, recordId } = saveState;
     setSaveState(null);
     if (!k) {
-      if (recordId) await actions.updateListMeta(recordId, meta);
+      if (recordId) {
+        await actions.updateListMeta(recordId, meta);
+        if (vendor) await actions.setListVendor(recordId, vendor);
+      }
       return;
     }
+    if (vendor && k === 'audit') await actions.setListVendor(DRAFT_IDS.audit, vendor);
     const id = await actions.saveDraftToHistory(k, meta, asNew ? undefined : recordId);
     if (!asNew) linkRecord(k, id);
     // The next bill shouldn't be added to this session by accident.
@@ -256,22 +284,23 @@ export default function App() {
   };
 
   const clearCurrent = async () => {
-    if (kind) {
-      const ok = await dialogs.confirm(`Clear the ${titlePrefix(kind)} draft?`, {
-        message: `${activeItems.length === 1 ? 'The 1 item' : `All ${activeItems.length} items`} in the current draft will be removed. Saved lists are not affected.`,
-        confirmLabel: 'Clear',
-        danger: true,
-      });
-      if (!ok) return;
-      await startNewList(kind);
-    } else if (activeTab === 'history') {
-      const ok = await dialogs.confirm('Delete all saved lists?', {
-        message: `${history.length} saved ${history.length === 1 ? 'list' : 'lists'} will be permanently deleted from this phone.`,
-        confirmLabel: 'Delete all',
-        danger: true,
-      });
-      if (ok) await actions.deleteAllHistory();
-    }
+    if (!kind) return;
+    const ok = await dialogs.confirm(`Clear the ${titlePrefix(kind)} draft?`, {
+      message: `${activeItems.length === 1 ? 'The 1 item' : `All ${activeItems.length} items`} in the current draft will be removed. Saved lists are not affected.`,
+      confirmLabel: 'Clear',
+      danger: true,
+    });
+    if (!ok) return;
+    await startNewList(kind);
+  };
+
+  const deleteAllSaved = async () => {
+    const ok = await dialogs.confirm('Delete all saved lists?', {
+      message: `${history.length} saved ${history.length === 1 ? 'list' : 'lists'} will be permanently deleted from this phone.`,
+      confirmLabel: 'Delete all',
+      danger: true,
+    });
+    if (ok) await actions.deleteAllHistory();
   };
 
   const [shareOpen, setShareOpen] = useState(false);
@@ -349,11 +378,12 @@ export default function App() {
     setFirstRun(false);
   };
 
-  const canClear = kind ? activeItems.length > 0 : activeTab === 'history' && history.length > 0;
+  // Saved has its own labelled "Delete all saved lists" at the end of the list, not a bare bin up here.
+  const canClear = !!kind && activeItems.length > 0;
 
   return (
     <div className="min-h-screen lg:h-screen bg-[var(--color-brand-gray)] flex flex-col overflow-x-hidden lg:overflow-hidden">
-      <header className="bg-white border-b border-[var(--color-brand-concrete)] sticky top-0 z-20 pt-[env(safe-area-inset-top)]">
+      <header className="bg-white border-b border-[var(--color-brand-concrete)] sticky top-0 z-20 pt-[var(--inset-top)]">
         <div className="px-4 md:px-6 h-14 flex items-center gap-3">
           <div className="w-8 h-8 bg-[var(--color-brand-primary)] rounded flex items-center justify-center text-white shrink-0">
             <HardHat size={18} />
@@ -439,7 +469,7 @@ export default function App() {
       )}
 
       {/* Phones: the bottom tab bar (and the Add button above it) need room under the page. */}
-      <main className={`flex-1 flex flex-col lg:flex-row lg:min-h-0 mt-3 lg:mt-0 lg:pb-0 ${kind ? 'pb-[calc(9rem+env(safe-area-inset-bottom))]' : 'pb-[calc(5rem+env(safe-area-inset-bottom))]'}`}>
+      <main className={`flex-1 flex flex-col lg:flex-row lg:min-h-0 mt-3 lg:mt-0 lg:pb-0 ${kind ? 'pb-[calc(9rem+var(--inset-bottom))]' : 'pb-[calc(5rem+var(--inset-bottom))]'}`}>
         {activeTab !== 'database' && (wide || !kind) && (
           <section className="w-full lg:w-[400px] bg-white border-r border-[var(--color-brand-concrete)] flex flex-col p-4 md:p-6 lg:overflow-y-auto">
             {kind ? (
@@ -505,6 +535,7 @@ export default function App() {
                 onQuotes={(record) => setQuoteTarget(record.id)}
                 onDeliveries={(record) => setDeliveriesFor(record.id)}
                 onBuyAgain={buyAgain}
+                onDeleteAll={deleteAllSaved}
               />
             ) : (
               <>
@@ -519,14 +550,14 @@ export default function App() {
       {kind && !wide && listedItems.length > 0 && (
         <button
           onClick={() => setAddOpen(true)}
-          className="fixed right-4 z-30 bottom-[calc(5rem+env(safe-area-inset-bottom))] h-14 pl-4 pr-5 rounded-full bg-[var(--color-brand-primary)] text-white font-bold shadow-lg shadow-orange-200 flex items-center gap-2"
+          className="fixed right-4 z-30 bottom-[calc(5rem+var(--inset-bottom))] h-14 pl-4 pr-5 rounded-full bg-[var(--color-brand-primary)] text-white font-bold shadow-lg shadow-orange-200 flex items-center gap-2"
         >
           <Plus size={22} /> Add
         </button>
       )}
 
       <nav
-        className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-[var(--color-brand-concrete)] grid grid-cols-5 pb-[env(safe-area-inset-bottom)]"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-[var(--color-brand-concrete)] grid grid-cols-5 pb-[var(--inset-bottom)]"
         aria-label="Sections"
       >
         {TABS.map(({ id, label, icon: Icon }) => (
@@ -563,6 +594,8 @@ export default function App() {
             editing={!!saveState.recordId}
             allowSaveAsNew={!!saveState.recordId && !!saveState.kind}
             titlePrefix={saveState.titlePrefix}
+            vendor={saveState.vendor && { ...saveState.vendor, known: knownVendors }}
+            onDelete={saveState.recordId && !saveState.kind ? () => deleteRecord(saveState.recordId!) : undefined}
             onSave={handleSave}
             onClose={() => setSaveState(null)}
           />

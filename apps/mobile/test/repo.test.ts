@@ -22,6 +22,7 @@ import {
   deleteList,
   enqueueJob,
   enqueueQuote,
+  getBillPhotos,
   getJobImages,
   hideMaterial,
   indexRates,
@@ -31,12 +32,14 @@ import {
   restoreToDraft,
   saveDraftToHistory,
   setListNotes,
+  setListVendor,
   setDelivered,
   setPrice,
   unhideMaterial,
   updateItem,
   updateLearnedTerm,
   updateQuoteLine,
+  updateRate,
 } from '../src/data/repo.ts';
 import { migrateLocal } from '../src/data/schema.ts';
 import { freshDb } from './helpers.ts';
@@ -195,6 +198,8 @@ describe('local repository', () => {
     await addItems(db, DRAFT_IDS.audit, [cement]);
     await saveDraftToHistory(db, 'audit', meta);
     await db.run(`UPDATE indexed_rates SET address = '', category = ''`);
+    // Migration 11 added a column; drop it so the migrations after 7 can run again.
+    await db.run('ALTER TABLE items DROP COLUMN photo_id');
     await db.run('UPDATE schema_version SET version = 7');
     await migrateLocal(db);
     const [rate] = (await loadSnapshot(db)).rates;
@@ -290,6 +295,43 @@ describe('local repository', () => {
     expect(await getJobImages(db, jobId)).toEqual([]);
   });
 
+  it('keeps the bill photos with the lines read from them until the last line goes', async () => {
+    const db = await freshDb();
+    const jobId = await enqueueJob(db, { listId: DRAFT_IDS.audit, text: '', images: ['AAA', 'BBB'], category: 'Civil', captureDate: '2026-09-30' });
+    await completeJob(db, jobId, [cement, sand]);
+    await addItems(db, DRAFT_IDS.audit, [{ ...sand, item_name: 'Typed' }]);
+    let snap = await loadSnapshot(db);
+    const photoId = snap.items.find((i) => i.item_name === 'Cement')!.photo_id;
+    expect(photoId).not.toBe('');
+    expect(snap.items.find((i) => i.item_name === 'Typed')!.photo_id).toBe('');
+    expect(await getBillPhotos(db, photoId)).toEqual(['AAA', 'BBB']);
+
+    // Saving copies the lines; clearing the draft keeps the photos the saved list uses.
+    const listId = await saveDraftToHistory(db, 'audit', meta);
+    await clearListItems(db, DRAFT_IDS.audit);
+    snap = await loadSnapshot(db);
+    expect(snap.items.filter((i) => i.list_id === listId && i.photo_id === photoId)).toHaveLength(2);
+    expect(await getBillPhotos(db, photoId)).toEqual(['AAA', 'BBB']);
+
+    await deleteList(db, listId);
+    expect(await getBillPhotos(db, photoId)).toEqual([]);
+  });
+
+  it('puts one vendor on every line of a list', async () => {
+    const db = await freshDb();
+    await addItems(db, DRAFT_IDS.audit, [cement, sand]);
+    await setListVendor(db, DRAFT_IDS.audit, ' Gupta Traders ');
+    expect((await loadSnapshot(db)).items.map((i) => i.vendor)).toEqual(['Gupta Traders', 'Gupta Traders']);
+  });
+
+  it('corrects an added rate', async () => {
+    const db = await freshDb();
+    await indexRates(db, [cement]);
+    const [rate] = (await loadSnapshot(db)).rates;
+    await updateRate(db, rate.id, { item_name: 'OPC Cement', spec: '53 grade', price: 520, vendor: 'Gupta' });
+    expect((await loadSnapshot(db)).rates[0]).toMatchObject({ item_name: 'OPC Cement', unit: 'Bag', spec: '53 grade', price: 520, vendor: 'Gupta' });
+  });
+
   describe('vendor quotes', () => {
     const boqMeta = { title: 'Tower A', address: 'Sector 44', category: 'Civil', site_date: '2026-10-01' };
     const line = (over: object) => ({ boq_sr: null, original_term: '', item_name: '', quantity: 0, unit: 'Bag', unit_price: 0, total_amount: 0, note: '', ...over });
@@ -333,6 +375,7 @@ describe('local repository', () => {
       await db.run('ALTER TABLE indexed_rates DROP COLUMN address');
       await db.run('ALTER TABLE items DROP COLUMN delivered_at');
       await db.run('ALTER TABLE items DROP COLUMN ordered_as');
+      await db.run('ALTER TABLE items DROP COLUMN photo_id');
       await db.run('UPDATE schema_version SET version = 4');
       await migrateLocal(db);
       const rates = (await loadSnapshot(db)).rates.map((r) => [r.item_name, r.category, r.address]).sort();
