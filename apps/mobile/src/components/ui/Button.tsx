@@ -1,4 +1,5 @@
 import type React from 'react';
+import { haptic } from '../../lib/haptics.ts';
 
 /**
  * - `primary` (orange): the one main action on a screen or sheet.
@@ -23,6 +24,7 @@ export function Button({
   size = 'md',
   block,
   className = '',
+  onClick,
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
@@ -33,7 +35,13 @@ export function Button({
   return (
     <button
       {...props}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-xl font-bold uppercase tracking-wide whitespace-nowrap transition-colors disabled:opacity-50 disabled:pointer-events-none ${VARIANT[variant]} ${SIZE[size]} ${block ? 'w-full' : ''} ${className}`}
+      onClick={(e) => {
+        // A buzz for the main action and for confirming a delete, like a native app.
+        if (variant === 'primary') haptic('tap');
+        else if (variant === 'danger') haptic('reject');
+        onClick?.(e);
+      }}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-xl font-bold uppercase tracking-wide whitespace-nowrap transition duration-100 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none ${VARIANT[variant]} ${SIZE[size]} ${block ? 'w-full' : ''} ${className}`}
     />
   );
 }

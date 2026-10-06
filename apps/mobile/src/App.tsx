@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AnimatePresence } from 'motion/react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, animate } from 'motion/react';
 import { Database, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Plus, Save, Share2, ShoppingCart, Search, Trash2, Users, X } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { filterMaterials, guessCategory, todayISO, type ContractRow, type MaterialFilter } from '@nirman/shared';
 import { useDialogs } from './components/Dialogs.tsx';
 import { Button } from './components/ui/Button.tsx';
 import { useBackHandler } from './lib/backButton.ts';
+import { haptic } from './lib/haptics.ts';
 import { prefs } from './lib/prefs.ts';
 import { workTypeKey } from './lib/workType.ts';
 import { logStep } from './lib/diagnostics.ts';
@@ -81,6 +82,19 @@ export default function App() {
   useEffect(() => logStep('tab', { to: activeTab }), [activeTab]);
   // On another tab, back returns to the Purchases tab before leaving the app.
   useBackHandler(() => setActiveTab('auditor'), activeTab !== 'auditor');
+  const pickTab = (id: AppTab) => {
+    if (id !== activeTab) haptic('tick');
+    setActiveTab(id);
+  };
+  // A new tab opens at its top and fades in, like a native app, instead of swapping in mid-scroll.
+  const mainRef = useRef<HTMLElement>(null);
+  const shownTab = useRef(activeTab);
+  useEffect(() => {
+    if (shownTab.current === activeTab) return;
+    shownTab.current = activeTab;
+    window.scrollTo(0, 0);
+    if (mainRef.current) animate(mainRef.current, { opacity: [0, 1], y: [8, 0] }, { duration: 0.18, ease: 'easeOut' });
+  }, [activeTab]);
   /** Vendor quotes screen: a saved BOQ's id, or 'pick' to choose the BOQ first. */
   const [quoteTarget, setQuoteTarget] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -395,7 +409,7 @@ export default function App() {
             {TABS.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
-                onClick={() => setActiveTab(id)}
+                onClick={() => pickTab(id)}
                 aria-label={label}
                 aria-current={activeTab === id ? 'page' : undefined}
                 className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap ${
@@ -469,7 +483,7 @@ export default function App() {
       )}
 
       {/* Phones: the bottom tab bar (and the Add button above it) need room under the page. */}
-      <main className={`flex-1 flex flex-col lg:flex-row lg:min-h-0 mt-3 lg:mt-0 lg:pb-0 ${kind ? 'pb-[calc(9rem+var(--inset-bottom))]' : 'pb-[calc(5rem+var(--inset-bottom))]'}`}>
+      <main ref={mainRef} className={`flex-1 flex flex-col lg:flex-row lg:min-h-0 mt-3 lg:mt-0 lg:pb-0 ${kind ? 'pb-[calc(9rem+var(--inset-bottom))]' : 'pb-[calc(5rem+var(--inset-bottom))]'}`}>
         {activeTab !== 'database' && (wide || !kind) && (
           <section className="w-full lg:w-[400px] bg-white border-r border-[var(--color-brand-concrete)] flex flex-col p-4 md:p-6 lg:overflow-y-auto">
             {kind ? (
@@ -549,8 +563,11 @@ export default function App() {
 
       {kind && !wide && listedItems.length > 0 && (
         <button
-          onClick={() => setAddOpen(true)}
-          className="fixed right-4 z-30 bottom-[calc(5rem+var(--inset-bottom))] h-14 pl-4 pr-5 rounded-full bg-[var(--color-brand-primary)] text-white font-bold shadow-lg shadow-orange-200 flex items-center gap-2"
+          onClick={() => {
+            haptic('tap');
+            setAddOpen(true);
+          }}
+          className="fixed right-4 z-30 transition-transform duration-100 active:scale-95 bottom-[calc(5rem+var(--inset-bottom))] h-14 pl-4 pr-5 rounded-full bg-[var(--color-brand-primary)] text-white font-bold shadow-lg shadow-orange-200 flex items-center gap-2"
         >
           <Plus size={22} /> Add
         </button>
@@ -563,7 +580,7 @@ export default function App() {
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
-            onClick={() => setActiveTab(id)}
+            onClick={() => pickTab(id)}
             aria-label={label}
             aria-current={activeTab === id ? 'page' : undefined}
             className={`h-16 min-w-0 flex flex-col items-center justify-center gap-1 text-xs font-semibold ${activeTab === id ? 'text-[var(--color-brand-primary)]' : 'text-gray-500'}`}

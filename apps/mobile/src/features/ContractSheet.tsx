@@ -162,7 +162,7 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
           )}
         </div>
 
-        {contract.notes && <p className="text-xs text-gray-600 whitespace-pre-wrap bg-gray-50 rounded-lg p-2">{contract.notes}</p>}
+        {contract.notes && <p className="select-text text-xs text-gray-600 whitespace-pre-wrap bg-gray-50 rounded-lg p-2">{contract.notes}</p>}
 
         <div className="grid grid-cols-2 gap-2 pt-1">
           <Button variant="secondary" onClick={() => setStatementOpen(true)}>

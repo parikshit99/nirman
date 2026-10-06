@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { AlertTriangle, Info } from 'lucide-react';
 import { Button } from './ui/Button.tsx';
 import { Sheet } from './ui/Sheet.tsx';
+import { haptic } from '../lib/haptics.ts';
 
 interface DialogRequest {
   kind: 'alert' | 'confirm' | 'prompt';
@@ -57,7 +58,10 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
     },
     confirm: async (title, opts = {}) => (await open({ kind: 'confirm', title, ...opts })) === true,
     prompt: async (title, defaultValue = '') => (await open({ kind: 'prompt', title, defaultValue })) as string | null,
-    toast: (message) => setToast({ id: Date.now(), message }),
+    toast: (message) => {
+      haptic('confirm');
+      setToast({ id: Date.now(), message });
+    },
   }).current;
 
   const close = (value: boolean | string | null) => {

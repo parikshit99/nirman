@@ -103,7 +103,7 @@ export function Sheet({
         aria-modal="true"
         aria-labelledby={labelledBy}
         aria-label={label}
-        className={`bg-white w-full ${WIDTH[size]} ${PANEL[kind]} ${height} shadow-2xl flex flex-col ${scroll ? 'overflow-y-auto' : 'overflow-hidden'} ${className}`}
+        className={`bg-white w-full ${WIDTH[size]} ${PANEL[kind]} ${height} shadow-2xl flex flex-col overscroll-contain ${scroll ? 'overflow-y-auto' : 'overflow-hidden'} ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {children}
