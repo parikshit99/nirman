@@ -28,6 +28,10 @@ android {
             keyPassword 'android'
         }
     }
+    lint {
+        // The release build would otherwise run a full lint pass first (over a minute in CI); the app's checks are tsc and the tests.
+        checkReleaseBuilds false
+    }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
