@@ -4,6 +4,7 @@ import type { ContractInput } from '../data/repo.ts';
 import { useDialogs } from './Dialogs.tsx';
 import { Button } from './ui/Button.tsx';
 import { Sheet, SheetHeader } from './ui/Sheet.tsx';
+import { SuggestInput } from './ui/SuggestInput.tsx';
 
 /** Common jobs, offered as suggestions; anything can be typed. */
 const WORK_SUGGESTIONS = [
@@ -78,8 +79,8 @@ export function ContractForm({
   const dialogs = useDialogs();
   const [f, setF] = useState(() => (contract ? asText(contract) : { ...blank(defaults.category), address: defaults.address }));
   const [saving, setSaving] = useState(false);
-  const set = (k: keyof ContractInput) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const value = e.target.value;
+  const set = (k: keyof ContractInput) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setValue(k, e.target.value);
+  const setValue = (k: keyof ContractInput, value: string) => {
     setF((p) => {
       const next = { ...p, [k]: value };
       // A known contractor brings their phone number.
@@ -136,12 +137,14 @@ export function ContractForm({
       <div className="grid grid-cols-2 gap-2">
         <label className="block min-w-0">
           <span className={label}>Contractor</span>
-          <input aria-label="Contractor" list="contract-contractors" value={f.contractor} onChange={set('contractor')} className={`${input} font-bold`} placeholder="Name" />
-          <datalist id="contract-contractors">
-            {contractors.map((c) => (
-              <option key={c.name} value={c.name} />
-            ))}
-          </datalist>
+          <SuggestInput
+            aria-label="Contractor"
+            value={f.contractor}
+            onChange={(v) => setValue('contractor', v)}
+            suggestions={contractors.map((c) => c.name)}
+            className={`${input} font-bold`}
+            placeholder="Name"
+          />
         </label>
         <label className="block min-w-0">
           <span className={label}>Phone</span>
@@ -151,23 +154,27 @@ export function ContractForm({
 
       <label className="block">
         <span className={label}>Work</span>
-        <input aria-label="Work" list="contract-work" value={f.work} onChange={set('work')} className={input} placeholder="e.g. Internal plaster, 2nd floor" />
-        <datalist id="contract-work">
-          {WORK_SUGGESTIONS.map((w) => (
-            <option key={w} value={w} />
-          ))}
-        </datalist>
+        <SuggestInput
+          aria-label="Work"
+          value={f.work}
+          onChange={(v) => setValue('work', v)}
+          suggestions={WORK_SUGGESTIONS}
+          className={input}
+          placeholder="e.g. Internal plaster, 2nd floor"
+        />
       </label>
 
       <div className="grid grid-cols-2 gap-2">
         <label className="block min-w-0">
           <span className={label}>Site address</span>
-          <input aria-label="Site address" list="contract-sites" value={f.address} onChange={set('address')} className={input} placeholder="e.g. Sector 44" />
-          <datalist id="contract-sites">
-            {addresses.map((a) => (
-              <option key={a} value={a} />
-            ))}
-          </datalist>
+          <SuggestInput
+            aria-label="Site address"
+            value={f.address}
+            onChange={(v) => setValue('address', v)}
+            suggestions={addresses}
+            className={input}
+            placeholder="e.g. Sector 44"
+          />
         </label>
         <label className="block min-w-0">
           <span className={label}>Work type</span>
@@ -199,12 +206,7 @@ export function ContractForm({
           </label>
           <label className="block min-w-0">
             <span className={label}>Per</span>
-            <input aria-label="Unit" list="contract-units" value={f.unit} onChange={set('unit')} className={input} />
-            <datalist id="contract-units">
-              {UNIT_SUGGESTIONS.map((u) => (
-                <option key={u} value={u} />
-              ))}
-            </datalist>
+            <SuggestInput aria-label="Unit" value={f.unit} onChange={(v) => setValue('unit', v)} suggestions={UNIT_SUGGESTIONS} className={input} />
           </label>
           <label className="block min-w-0">
             <span className={label}>Est. qty</span>

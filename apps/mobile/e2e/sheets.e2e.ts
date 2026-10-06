@@ -108,3 +108,19 @@ test('a material in Rates opens the line editor, and a saved BOQ can be ticked d
   await page.getByRole('button', { name: /^Mark delivered: BOQ/ }).click();
   await expectOnTop(page, page.getByRole('dialog', { name: 'Deliveries' }));
 });
+
+test('suggestions show under the field, which stays in view', async ({ page }) => {
+  await page.getByRole('button', { name: 'Labour', exact: true }).click();
+  await page.getByRole('button', { name: /new contract/i }).first().click();
+  const work = page.getByLabel('Work', { exact: true });
+  await work.fill('pla');
+  const option = page.getByRole('option', { name: 'Plaster' });
+  await expect(option).toBeVisible();
+  const field = (await work.boundingBox())!;
+  const list = (await page.getByRole('listbox', { name: 'Suggestions' }).boundingBox())!;
+  expect(list.y, 'the list starts below the field').toBeGreaterThanOrEqual(field.y + field.height - 1);
+  await option.click();
+  await expect(work).toHaveValue('Plaster');
+  await expect(work).toBeFocused();
+  await expect(page.getByRole('listbox', { name: 'Suggestions' })).toHaveCount(0);
+});

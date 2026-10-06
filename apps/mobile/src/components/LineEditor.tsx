@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { Check, Trash2 } from 'lucide-react';
 import { VARIANT_FIELDS, parseAmount, type Variant, type VariantField } from '@nirman/shared';
 import { useAppState } from '../state/AppState.tsx';
@@ -6,6 +6,7 @@ import { useDialogs } from './Dialogs.tsx';
 import { QuantityHelper } from './QuantityHelper.tsx';
 import { VariantFields } from './VariantFields.tsx';
 import { Button } from './ui/Button.tsx';
+import { SuggestInput } from './ui/SuggestInput.tsx';
 
 /** What the editor changes on a line or a recorded price. */
 export interface LineValues extends Variant {
@@ -43,7 +44,6 @@ const field = 'w-full px-3 py-2 bg-white border border-orange-200 rounded-lg tex
 export function LineEditor({ initial, showQuantity = true, showPrice = true, onSave, onCancel, onDelete, deleteLabel, alsoSave }: Props) {
   const { knownVendors } = useAppState();
   const dialogs = useDialogs();
-  const vendorList = useId();
   const [draft, setDraft] = useState<Record<string, string>>(() => ({
     ...Object.fromEntries(VARIANT_FIELDS.map((f) => [f, initial[f] ?? ''])),
     item_name: initial.item_name,
@@ -115,12 +115,7 @@ export function LineEditor({ initial, showQuantity = true, showPrice = true, onS
       {showPrice && (
         <label className="block">
           <span className="text-xs font-bold text-gray-500">Vendor</span>
-          <input aria-label="Vendor" list={vendorList} className={field} value={draft.vendor} onChange={set('vendor')} placeholder="Vendor" />
-          <datalist id={vendorList}>
-            {knownVendors.map((v) => (
-              <option key={v} value={v} />
-            ))}
-          </datalist>
+          <SuggestInput aria-label="Vendor" className={field} value={draft.vendor} onChange={(v) => setDraft((p) => ({ ...p, vendor: v }))} suggestions={knownVendors} placeholder="Vendor" />
         </label>
       )}
       {showPrice && showQuantity && (
