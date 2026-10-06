@@ -7,6 +7,7 @@ import { VariantFields } from '../components/VariantFields.tsx';
 import { DRAFT_IDS, type ListKind } from '../data/repo.ts';
 import { useAppState } from '../state/AppState.tsx';
 import { Button } from '../components/ui/Button.tsx';
+import { SuggestInput } from '../components/ui/SuggestInput.tsx';
 
 const EMPTY: Record<string, string> = { item_name: '', quantity: '', unit: '', unit_price: '', vendor: '', brand: '', model: '', spec: '', color: '', ordered_as: '' };
 
@@ -69,21 +70,14 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
       </div>
       <label className="block">
         <span className="text-xs font-bold text-gray-500">Item</span>
-        <input
+        <SuggestInput
           aria-label="Item name"
-          list="manual-materials"
           className={`${field} font-bold`}
           value={draft.item_name}
-          onChange={(e) => pickName(e.target.value)}
+          onChange={pickName}
+          suggestions={itemDatabase.map((e) => ({ value: e.name, hint: e.unit }))}
           placeholder="e.g. OPC Cement 53 grade"
         />
-        <datalist id="manual-materials">
-          {itemDatabase.map((e) => (
-            <option key={e.key} value={e.name}>
-              {e.unit}
-            </option>
-          ))}
-        </datalist>
       </label>
       {known && <LastPrice entry={known} />}
       <VariantFields value={draft} onChange={set} inputClassName={field} />
@@ -100,12 +94,7 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
         </label>
         <label className="block min-w-0">
           <span className="text-xs font-bold text-gray-500">Unit</span>
-          <input aria-label="Unit" list="manual-units" className={field} value={draft.unit} onChange={(e) => set('unit', e.target.value)} placeholder="Bag" />
-          <datalist id="manual-units">
-            {units.map((u) => (
-              <option key={u} value={u} />
-            ))}
-          </datalist>
+          <SuggestInput aria-label="Unit" className={field} value={draft.unit} onChange={(v) => set('unit', v)} suggestions={units} placeholder="Bag" />
         </label>
         {isAudit && (
           <label className="block min-w-0">
@@ -123,12 +112,7 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
       {isAudit && (
         <label className="block">
           <span className="text-xs font-bold text-gray-500">Vendor</span>
-          <input aria-label="Vendor" list="manual-vendors" className={field} value={draft.vendor} onChange={(e) => set('vendor', e.target.value)} />
-          <datalist id="manual-vendors">
-            {knownVendors.map((v) => (
-              <option key={v} value={v} />
-            ))}
-          </datalist>
+          <SuggestInput aria-label="Vendor" className={field} value={draft.vendor} onChange={(v) => set('vendor', v)} suggestions={knownVendors} />
         </label>
       )}
       <Button variant="primary" block onClick={add}>

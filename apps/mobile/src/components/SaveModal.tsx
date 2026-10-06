@@ -1,8 +1,9 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { ClipboardCheck, Copy, MapPin, Save, Trash2, Truck } from 'lucide-react';
 import type { ListMeta } from '../data/repo.ts';
 import { Button } from './ui/Button.tsx';
 import { Sheet, SheetHeader } from './ui/Sheet.tsx';
+import { SuggestInput } from './ui/SuggestInput.tsx';
 
 interface Props {
   initial: ListMeta;
@@ -29,7 +30,6 @@ interface Props {
 export function SaveModal({ initial, categories, recentAddresses, editing, allowSaveAsNew, titlePrefix, vendor, onDelete, onSave, onClose }: Props) {
   const [meta, setMeta] = useState(initial);
   const [vendorName, setVendorName] = useState(vendor?.initial ?? '');
-  const vendorList = useId();
   const set = (field: keyof ListMeta) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setMeta((p) => ({ ...p, [field]: e.target.value }));
 
@@ -99,19 +99,14 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
             </label>
             <div className="relative">
               <Truck size={14} className="absolute left-3 top-3.5 text-gray-500" />
-              <input
+              <SuggestInput
                 id="save-vendor"
-                list={vendorList}
                 value={vendorName}
-                onChange={(e) => setVendorName(e.target.value)}
+                onChange={setVendorName}
+                suggestions={vendor.known}
                 placeholder={vendor.mixed ? 'Several: each line keeps its own' : 'Who sold it'}
                 className="w-full pl-9 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm"
               />
-              <datalist id={vendorList}>
-                {vendor.known.map((v) => (
-                  <option key={v} value={v} />
-                ))}
-              </datalist>
             </div>
             <p className="text-xs text-gray-500 mt-1">{vendor.mixed ? 'Type or pick one to put it on every line.' : 'Applies to every line in the list.'}</p>
           </div>

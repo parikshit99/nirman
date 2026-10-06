@@ -9,7 +9,7 @@ An Android app for tracking construction materials on site. You photograph bills
 
 Everything is stored **only on your phone**. There is no server or account. The app keeps a small diagnostic log (errors, AI reading results, steps taken, slow screens; never bill contents, prices, addresses or keys), which leaves the phone only when you send it from *Settings → Report a problem* or *Share log*.
 
-**[⬇ Download the latest APK](https://github.com/parikshit99/nirman/releases/download/latest-debug/nirmaan-auditor-debug.apk)**: rebuilt automatically every time a change is merged into `main`. While this repository is private, you need to be signed in to GitHub for the link to work.
+**[⬇ Download the latest APK](https://github.com/parikshit99/nirman/releases/download/latest/nirman.apk)**: rebuilt automatically every time a change is merged into `main`. While this repository is private, you need to be signed in to GitHub for the link to work.
 
 ## How it works
 
@@ -28,8 +28,8 @@ Everything is stored **only on your phone**. There is no server or account. The 
 
 ## Using the app
 
-1. [Download the latest APK](https://github.com/parikshit99/nirman/releases/download/latest-debug/nirmaan-auditor-debug.apk) on the phone and open it. Android asks once to allow installs from your browser or Files app.
-   - Builds are signed with a fixed key, so each new APK installs as an update and keeps your data.
+1. [Download the latest APK](https://github.com/parikshit99/nirman/releases/download/latest/nirman.apk) on the phone and open it. Android asks once to allow installs from your browser or Files app.
+   - Builds are signed with a fixed release key, so each new APK installs as an update and keeps your data. Phones with an older build signed with the debug key also update in place: the release key carries a record that it replaces the debug key (needs Android 9 or later; on older phones the debug key still signs).
    - If an update fails with "App not installed", your phone has an older copy signed with a different key. Do this once: *Settings → Save backup*, uninstall the app, install the new APK, then *Settings → Restore*.
 2. On first launch, paste your Gemini API key. Get one free at [aistudio.google.com](https://aistudio.google.com) → *Get API key*. It is stored encrypted on the phone and can be changed later in Settings; *Test key* checks it works. You can skip this and type items in by hand.
 3. Back up from Settings now and then.
@@ -76,4 +76,4 @@ Versions are `MAJOR.MINOR.PATCH` (e.g. `2.2.3`):
 
 [CLAUDE.md](CLAUDE.md) has the rules for deciding which kind a change is. Android's internal version code is the CI build number, so every APK still installs over the previous one as an update. The version shows in *Settings → On this phone*, in Android's App info, in the release title, and as a `v2.2.3` tag on the commit it was built from. Local builds show `dev`.
 
-CI (`.github/workflows/ci.yml`) type-checks, runs the tests and builds a debug APK on every push. Builds of `main` are published to the [`latest-debug` release](https://github.com/parikshit99/nirman/releases/tag/latest-debug), which is where the download link above points; builds of a pull request are under that workflow run's *Artifacts*. For a Play Store release, add a signing config and run `./gradlew bundleRelease`.
+CI (`.github/workflows/ci.yml`) type-checks, runs the tests and builds a release APK on every push, signed with the key in the repo secrets `RELEASE_KEYSTORE_BASE64` (the PKCS12 keystore, base64) and `RELEASE_KEYSTORE_PASSWORD` (key alias `nirman`). Keep a copy of that keystore somewhere safe: without it, the next update needs an uninstall. Builds of `main` are published to the [`latest` release](https://github.com/parikshit99/nirman/releases/tag/latest), which is where the download link above points; builds of a pull request are under that workflow run's *Artifacts*. Local builds (`./gradlew assembleDebug`) use the debug key in `android/app/debug.keystore`.

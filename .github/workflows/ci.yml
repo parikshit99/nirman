@@ -28,7 +28,7 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     permissions:
-      contents: write # to publish the latest-debug release
+      contents: write # to publish the latest release
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,33 +59,54 @@ jobs:
         run: npm run build -w apps/mobile
       - run: npx cap sync android
         working-directory: apps/mobile
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon
+      - name: Build release APK
+        run: ./gradlew assembleRelease --no-daemon
         working-directory: apps/mobile/android
+      - name: Sign the APK
+        # Signed with the release key from the repo secrets, with a rotation record from the old debug key
+        # (APK signature v3), so phones that have a debug-signed build still accept this one as an update.
+        # Without the secrets (e.g. a pull request from a fork) it is signed with the debug key alone.
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+        run: |
+          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          echo "APKSIGNER=$BUILD_TOOLS/apksigner" >> "$GITHUB_ENV"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          UNSIGNED=apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          DEBUG_KEY=(--ks apps/mobile/android/app/debug.keystore --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android)
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
+            RELEASE_KEY=(--ks "$RUNNER_TEMP/release.p12" --ks-pass env:RELEASE_KEYSTORE_PASSWORD --ks-key-alias nirman)
+            "$APKSIGNER" rotate --out "$RUNNER_TEMP/lineage" --old-signer "${DEBUG_KEY[@]}" --new-signer "${RELEASE_KEY[@]}"
+            "$APKSIGNER" sign --lineage "$RUNNER_TEMP/lineage" --rotation-min-sdk-version 28 --out nirman.apk "${DEBUG_KEY[@]}" --next-signer "${RELEASE_KEY[@]}" "$UNSIGNED"
+            rm "$RUNNER_TEMP/release.p12"
+          else
+            echo "::warning::No release key in the repo secrets; signing with the debug key only"
+            "$APKSIGNER" sign --out nirman.apk "${DEBUG_KEY[@]}" "$UNSIGNED"
+          fi
+      - name: Show the APK signing certificates (the release key must be identical on every build)
+        run: |
+          "$APKSIGNER" verify --verbose --print-certs nirman.apk | grep -E 'Verified using|certificate DN|SHA-256'
+          "$APKSIGNER" lineage --in nirman.apk --print-certs 2>/dev/null | grep -E 'DN|SHA-256' || echo "No key rotation in this APK"
       - uses: actions/upload-artifact@v4
         with:
-          name: nirmaan-auditor-debug-apk
-          path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
-      - name: Show the APK signing certificate (must be identical on every build)
-        continue-on-error: true # informational only
-        run: |
-          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
-          "$APKSIGNER" verify --print-certs apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk | grep -E 'SHA-256'
+          name: nirman-apk
+          path: nirman.apk
       - name: Check no API key is bundled in the app
         run: |
-          if unzip -p apps/mobile/android/app/build/outputs/apk/debug/*.apk | grep -a -q -E "AIza[0-9A-Za-z_-]{35}"; then
+          if unzip -p nirman.apk | grep -a -q -E "AIza[0-9A-Za-z_-]{35}"; then
             echo "The APK contains something that looks like a Google API key"; exit 1
           fi
-      - name: Publish as the latest-debug release
+      - name: Publish as the latest release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk nirmaan-auditor-debug.apk
           # The fixed tag keeps the download link stable; the version tag records history.
-          git tag -f latest-debug
+          git tag -f latest
           git tag -f "v$APP_VERSION"
-          git push -f origin refs/tags/latest-debug "refs/tags/v$APP_VERSION"
+          git push -f origin refs/tags/latest "refs/tags/v$APP_VERSION"
           # Release notes: the newest CHANGELOG section, then this build's details (dates in IST).
           WHATS_NEW=$(awk '/^## /{n++} n==1' CHANGELOG.md)
           NOTES="$WHATS_NEW
@@ -94,6 +115,6 @@ jobs:
           Version $APP_VERSION, built from main at ${GITHUB_SHA::7} on $(TZ=Asia/Kolkata date +%Y-%m-%d).
 
           Latest change: $(git log -1 --format=%s)"
-          gh release view latest-debug >/dev/null 2>&1 || gh release create latest-debug --title "Nirman v$APP_VERSION" --notes "$NOTES"
-          gh release edit latest-debug --title "Nirman v$APP_VERSION" --notes "$NOTES" --prerelease=false --latest
-          gh release upload latest-debug nirmaan-auditor-debug.apk --clobber
+          gh release view latest >/dev/null 2>&1 || gh release create latest --title "Nirman v$APP_VERSION" --notes "$NOTES"
+          gh release edit latest --title "Nirman v$APP_VERSION" --notes "$NOTES" --prerelease=false --latest
+          gh release upload latest nirman.apk --clobber

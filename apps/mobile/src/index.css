@@ -24,6 +24,11 @@
 }
 
 @layer base {
+  /* No pull-to-stretch on the page: it moves the fixed header and bottom bar (MainActivity also turns it off). */
+  html,
+  body {
+    overscroll-behavior: none;
+  }
   body {
     @apply bg-[var(--color-brand-gray)] text-[var(--color-brand-dark)] font-sans antialiased;
   }

@@ -13,6 +13,7 @@ import { QuoteReview } from './QuoteReview.tsx';
 import { Sheet } from '../components/ui/Sheet.tsx';
 import { Tabs } from '../components/ui/Tabs.tsx';
 import { Button } from '../components/ui/Button.tsx';
+import { SuggestInput } from '../components/ui/SuggestInput.tsx';
 
 type Screen = { name: 'list' | 'add' | 'compare' } | { name: 'review'; quoteId: string };
 
@@ -248,18 +249,13 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
       <div className="grid grid-cols-[1fr_auto] gap-3">
         <label className="block">
           <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Vendor</span>
-          <input
+          <SuggestInput
             value={vendor}
-            onChange={(e) => setVendor(e.target.value)}
-            list="known-vendors"
+            onChange={setVendor}
+            suggestions={knownVendors}
             placeholder="e.g. Sharma Traders"
             className="mt-1 w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-500"
           />
-          <datalist id="known-vendors">
-            {knownVendors.map((v) => (
-              <option key={v} value={v} />
-            ))}
-          </datalist>
         </label>
         <label className="block">
           <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Quote date</span>

@@ -2,6 +2,14 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 4.3 — Sort and filter in Rates
+
+- **Sort materials in Rates** by the newest or oldest price, or by name (A–Z or Z–A). The phone remembers your choice.
+- **One Filter button in Rates.** Work type, site address, vendor, brand, size and colour are now in one sheet, instead of three rows of buttons and boxes above the list. The filters you have on show under the buttons; tap one to remove it.
+- **Suggestions under the box you are typing in.** Item names, units, vendors, site addresses and contractors are suggested in a list under the field, instead of a popup that covered it.
+- Pulling a list past its end no longer stretches the screen and pushes the bottom bar under Android's buttons.
+- Builds are now release builds signed with Nirman's own key, which Google Play Protect flags less often.
+
 ## 4.2 — Deliveries on BOQs, editing in Rates
 
 - **Tick BOQ lines as delivered**, like purchases: on the open BOQ, or with *Delivered* on a saved BOQ, so you can see what is still to come on an order.

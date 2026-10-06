@@ -1,7 +1,7 @@
 import { X } from 'lucide-react';
 import type { MaterialFilter } from '@nirman/shared';
 
-const FIELDS: { key: keyof MaterialFilter; label: string }[] = [
+export const MATERIAL_FILTER_FIELDS: { key: keyof MaterialFilter; label: string }[] = [
   { key: 'vendor', label: 'Vendor' },
   { key: 'brand', label: 'Brand' },
   { key: 'spec', label: 'Size / spec' },
@@ -13,14 +13,17 @@ export function MaterialFilters({
   value,
   options,
   onChange,
+  clearable = true,
 }: {
   value: MaterialFilter;
   options: Record<keyof MaterialFilter, string[]>;
   onChange(next: MaterialFilter): void;
+  /** Show the link that clears these four (off where a "Clear all" is next to them). */
+  clearable?: boolean;
 }) {
-  const shown = FIELDS.filter((f) => options[f.key].length > 0 || value[f.key]);
+  const shown = MATERIAL_FILTER_FIELDS.filter((f) => options[f.key].length > 0 || value[f.key]);
   if (shown.length === 0) return null;
-  const active = FIELDS.some((f) => value[f.key]);
+  const active = MATERIAL_FILTER_FIELDS.some((f) => value[f.key]);
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-2 gap-2">
@@ -44,7 +47,7 @@ export function MaterialFilters({
           </label>
         ))}
       </div>
-      {active && (
+      {active && clearable && (
         <button onClick={() => onChange({})} className="flex items-center gap-1 text-xs font-bold text-orange-700">
           <X size={12} /> Clear vendor / brand / size / color filters
         </button>

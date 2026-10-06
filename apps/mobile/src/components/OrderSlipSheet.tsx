@@ -10,6 +10,7 @@ import { useDialogs } from './Dialogs.tsx';
 import { DocumentPreview } from './DocumentPreview.tsx';
 import { Button } from './ui/Button.tsx';
 import { Sheet, SheetHeader, SheetLabel, SheetOption } from './ui/Sheet.tsx';
+import { SuggestInput } from './ui/SuggestInput.tsx';
 
 const LAST_KEY = 'nirmaan_order_slip';
 
@@ -92,12 +93,14 @@ export function OrderSlipSheet({
       </label>
       <label className="block">
         <span className={label}>Deliver to (site address)</span>
-        <input aria-label="Deliver to" list="order-slip-sites" value={details.address} onChange={set('address')} className={input} placeholder="e.g. Sector 44, Gurgaon" />
-        <datalist id="order-slip-sites">
-          {addresses.map((a) => (
-            <option key={a} value={a} />
-          ))}
-        </datalist>
+        <SuggestInput
+          aria-label="Deliver to"
+          value={details.address}
+          onChange={(v) => setDetails((p) => ({ ...p, address: v }))}
+          suggestions={addresses}
+          className={input}
+          placeholder="e.g. Sector 44, Gurgaon"
+        />
       </label>
       <label className="block">
         <span className={label}>Delivery date</span>
