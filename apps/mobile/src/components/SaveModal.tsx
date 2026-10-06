@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ClipboardCheck, Copy, MapPin, Save } from 'lucide-react';
+import { useId, useState } from 'react';
+import { ClipboardCheck, Copy, MapPin, Save, Trash2, Truck } from 'lucide-react';
 import type { ListMeta } from '../data/repo.ts';
 import { Button } from './ui/Button.tsx';
 import { Sheet, SheetHeader } from './ui/Sheet.tsx';
@@ -14,18 +14,30 @@ interface Props {
   allowSaveAsNew: boolean;
   /** Used for the automatic title when left blank, e.g. "BOQ 30/09/2026". */
   titlePrefix: string;
-  onSave(meta: ListMeta, asNew: boolean): void;
+  /**
+   * Purchase lists: one vendor for every line, prefilled when the lines agree. A bill
+   * read by the AI can carry the buyer's name as vendor; picking the vendor here fixes all lines.
+   */
+  vendor?: { initial: string; mixed: boolean; known: string[] };
+  /** Saved lists: Delete sits here rather than on the list card, so it isn't tapped by accident. */
+  onDelete?(): void;
+  /** `vendor` is undefined when left as it was. */
+  onSave(meta: ListMeta, asNew: boolean, vendor?: string): void;
   onClose(): void;
 }
 
-export function SaveModal({ initial, categories, recentAddresses, editing, allowSaveAsNew, titlePrefix, onSave, onClose }: Props) {
+export function SaveModal({ initial, categories, recentAddresses, editing, allowSaveAsNew, titlePrefix, vendor, onDelete, onSave, onClose }: Props) {
   const [meta, setMeta] = useState(initial);
+  const [vendorName, setVendorName] = useState(vendor?.initial ?? '');
+  const vendorList = useId();
   const set = (field: keyof ListMeta) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setMeta((p) => ({ ...p, [field]: e.target.value }));
 
   const submit = (asNew: boolean) => {
     const autoTitle = `${titlePrefix} ${meta.site_date.split('-').reverse().join('/')}`.trim();
-    onSave({ ...meta, title: meta.title.trim() || autoTitle, address: meta.address.trim() }, asNew);
+    const nextVendor = vendorName.trim();
+    const vendorChanged = !!vendor && !!nextVendor && (vendor.mixed || nextVendor !== vendor.initial);
+    onSave({ ...meta, title: meta.title.trim() || autoTitle, address: meta.address.trim() }, asNew, vendorChanged ? nextVendor : undefined);
   };
 
   const suggestions = meta.address
@@ -80,6 +92,31 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
           )}
         </div>
 
+        {vendor && (
+          <div>
+            <label htmlFor="save-vendor" className="text-xs text-gray-500 font-bold block mb-1">
+              Vendor
+            </label>
+            <div className="relative">
+              <Truck size={14} className="absolute left-3 top-3.5 text-gray-500" />
+              <input
+                id="save-vendor"
+                list={vendorList}
+                value={vendorName}
+                onChange={(e) => setVendorName(e.target.value)}
+                placeholder={vendor.mixed ? 'Several: each line keeps its own' : 'Who sold it'}
+                className="w-full pl-9 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm"
+              />
+              <datalist id={vendorList}>
+                {vendor.known.map((v) => (
+                  <option key={v} value={v} />
+                ))}
+              </datalist>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">{vendor.mixed ? 'Type or pick one to put it on every line.' : 'Applies to every line in the list.'}</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="save-category" className="text-xs text-gray-500 font-bold block mb-1">
@@ -125,6 +162,11 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
         {allowSaveAsNew && (
           <Button block onClick={() => submit(true)}>
             <Copy size={14} /> Save as a new list
+          </Button>
+        )}
+        {onDelete && (
+          <Button variant="dangerOutline" block onClick={onDelete}>
+            <Trash2 size={14} /> Delete this list
           </Button>
         )}
       </div>

@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { AlertTriangle, Calendar, Check, FileCode, HardHat, History, Pencil, Plus, Trash2, Truck, Zap } from 'lucide-react';
-import { VARIANT_FIELDS, materialKey, parseAmount, todayISO, variantLabel, variantMatches, type ItemRow, type MaterialEntry } from '@nirman/shared';
-import { useDialogs } from '../components/Dialogs.tsx';
+import { AlertTriangle, Calendar, Camera, Check, FileCode, HardHat, History, Pencil, Plus, Truck, Zap } from 'lucide-react';
+import { materialKey, todayISO, variantLabel, variantMatches, type ItemRow, type MaterialEntry } from '@nirman/shared';
+import { BillPhotosSheet } from '../components/BillPhotos.tsx';
 import { DeliveredToggle } from '../components/DeliveredToggle.tsx';
+import { LineEditor } from '../components/LineEditor.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
-import { QuantityHelper } from '../components/QuantityHelper.tsx';
-import { VariantFields } from '../components/VariantFields.tsx';
 import { Button } from '../components/ui/Button.tsx';
 import { EmptyState } from '../components/ui/EmptyState.tsx';
-import type { ItemPatch, ListKind } from '../data/repo.ts';
+import type { ListKind } from '../data/repo.ts';
 import { useBackHandler } from '../lib/backButton.ts';
 import { useAppState } from '../state/AppState.tsx';
 
@@ -28,57 +27,17 @@ const rupees = (n: number) => `₹${(n || 0).toLocaleString('en-IN', { maximumFr
 /** The current Audit or BOQ list: one card per item, sized for a phone screen. */
 export function ItemLog({ kind, items, searching, onIndex, onAdd }: Props) {
   const { actions, itemDatabase, itemsFor, pendingDeletes } = useAppState();
-  const dialogs = useDialogs();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [photosOf, setPhotosOf] = useState<ItemRow | null>(null);
   const isAudit = kind === 'audit';
   const byKey = new Map<string, MaterialEntry>(itemDatabase.map((e) => [e.key, e]));
-
-  const startEditing = (item: ItemRow) => {
-    setEditingId(item.id);
-    setDraft({
-      item_name: item.item_name,
-      quantity: String(item.quantity),
-      unit: item.unit,
-      unit_price: String(item.unit_price),
-      vendor: item.vendor,
-      brand: item.brand,
-      model: item.model,
-      spec: item.spec,
-      color: item.color,
-      ordered_as: item.ordered_as,
-    });
-  };
-
-  const saveEdit = async () => {
-    if (!editingId) return;
-    const quantity = draft.quantity.trim() ? parseAmount(draft.quantity) : 0;
-    const unitPrice = draft.unit_price.trim() ? parseAmount(draft.unit_price) : 0;
-    if (quantity === null || unitPrice === null) {
-      await dialogs.alert('Check the number', `“${quantity === null ? draft.quantity : draft.unit_price}” is not a number. Use digits, e.g. 1500 or 1,500.`);
-      return;
-    }
-    const patch: ItemPatch = {
-      item_name: draft.item_name.trim(),
-      quantity,
-      unit: draft.unit.trim(),
-      unit_price: unitPrice,
-      vendor: draft.vendor.trim(),
-      ordered_as: (draft.ordered_as ?? '').trim(),
-      ...Object.fromEntries(VARIANT_FIELDS.map((f) => [f, (draft[f] ?? '').trim()])),
-    };
-    await actions.updateItem(editingId, patch);
-    setEditingId(null);
-  };
 
   useBackHandler(() => setEditingId(null), editingId !== null);
   // Leaving the list carries out any delete still waiting for undo.
   useEffect(() => () => void actions.flushDeletes(), [actions]);
 
-  const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => setDraft((p) => ({ ...p, [field]: e.target.value }));
   const undelivered = isAudit ? items.filter((i) => !i.delivered_at && !pendingDeletes.has(i.id)) : [];
   const indexable = itemsFor('audit').filter((i) => i.item_name && i.unit_price && !pendingDeletes.has(i.id));
-  const field = 'w-full px-3 py-2 bg-white border border-orange-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-400';
 
   return (
     <>
@@ -110,78 +69,26 @@ export function ItemLog({ kind, items, searching, onIndex, onAdd }: Props) {
                   className={`px-4 md:px-6 py-3 ${editingId === item.id ? 'bg-orange-50/60' : ''} ${pendingDeletes.has(item.id) ? 'bg-red-50/40' : ''}`}
                 >
                   {editingId === item.id ? (
-                    <div className="space-y-2">
-                      <label className="block">
-                        <span className="text-xs font-bold text-gray-500">Item</span>
-                        <input autoFocus aria-label="Item name" className={`${field} font-bold`} value={draft.item_name} onChange={set('item_name')} />
-                      </label>
-                      <VariantFields value={draft} onChange={(f, v) => setDraft((p) => ({ ...p, [f]: v }))} inputClassName={field} />
-                      <QuantityHelper
-                        itemName={draft.item_name}
-                        spec={draft.spec ?? ''}
-                        fieldClassName={field}
-                        onApply={(r) => setDraft((p) => ({ ...p, quantity: String(r.quantity), unit: r.unit, spec: r.spec, ordered_as: r.ordered_as }))}
-                      />
-                      {draft.ordered_as && (
-                        <label className="block">
-                          <span className="text-xs font-bold text-gray-500">Ordered as</span>
-                          <input aria-label="Ordered as" className={field} value={draft.ordered_as} onChange={set('ordered_as')} />
-                        </label>
-                      )}
-                      <div className="grid grid-cols-3 gap-2">
-                        <label className="block">
-                          <span className="text-xs font-bold text-gray-500">Qty</span>
-                          <input aria-label="Quantity" inputMode="decimal" className={`${field} font-mono`} value={draft.quantity} onChange={set('quantity')} />
-                        </label>
-                        <label className="block">
-                          <span className="text-xs font-bold text-gray-500">Unit</span>
-                          <input aria-label="Unit" className={field} value={draft.unit} onChange={set('unit')} />
-                        </label>
-                        {isAudit && (
-                          <label className="block">
-                            <span className="text-xs font-bold text-gray-500">Rate ₹</span>
-                            <input aria-label="Rate" inputMode="decimal" className={`${field} font-mono`} value={draft.unit_price} onChange={set('unit_price')} placeholder="Rate" />
-                          </label>
-                        )}
-                      </div>
-                      {isAudit && (
-                        <label className="block">
-                          <span className="text-xs font-bold text-gray-500">Vendor</span>
-                          <input aria-label="Vendor" className={field} value={draft.vendor} onChange={set('vendor')} placeholder="Vendor" />
-                        </label>
-                      )}
-                      {isAudit && (
-                        <p className="text-sm font-mono font-bold text-orange-600 pt-1">
-                          Total {rupees((parseAmount(draft.quantity) ?? 0) * (parseAmount(draft.unit_price) ?? 0))}
-                        </p>
-                      )}
-                      {/* Delete lives here, not on every row, so it isn't tapped by accident (Undo still follows). */}
-                      <div className="flex items-center gap-2 pt-1">
-                        <Button
-                          variant="dangerOutline"
-                          size="sm"
-                          aria-label={`Delete ${item.item_name}`}
-                          onClick={() => {
-                            setEditingId(null);
-                            actions.deleteItemLater(item.id);
-                          }}
-                        >
-                          <Trash2 size={14} /> Delete
-                        </Button>
-                        <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setEditingId(null)} aria-label="Cancel">
-                          Cancel
-                        </Button>
-                        <Button variant="primary" size="sm" onClick={saveEdit} aria-label="Save changes">
-                          <Check size={14} /> Save
-                        </Button>
-                      </div>
-                    </div>
+                    <LineEditor
+                      initial={item}
+                      showPrice={isAudit}
+                      onSave={async (values) => {
+                        await actions.updateItem(item.id, values);
+                        setEditingId(null);
+                      }}
+                      onCancel={() => setEditingId(null)}
+                      onDelete={() => {
+                        setEditingId(null);
+                        actions.deleteItemLater(item.id);
+                      }}
+                    />
                   ) : (
                     <ItemCard
                       item={item}
                       isAudit={isAudit}
                       dbMatch={pricesFor(byKey.get(materialKey(item.item_name, item.unit)), item)}
-                      onEdit={() => startEditing(item)}
+                      onEdit={() => setEditingId(item.id)}
+                      onPhotos={() => setPhotosOf(item)}
                       onIndex={onIndex}
                       onDelivered={(date) => actions.setDelivered([item.id], date)}
                       pendingDelete={pendingDeletes.has(item.id)}
@@ -194,6 +101,9 @@ export function ItemLog({ kind, items, searching, onIndex, onAdd }: Props) {
           </AnimatePresence>
         </div>
       </div>
+      <AnimatePresence>
+        {photosOf && <BillPhotosSheet key="photos" photoIds={[photosOf.photo_id]} title={photosOf.item_name} onClose={() => setPhotosOf(null)} />}
+      </AnimatePresence>
 
       <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-[var(--color-brand-concrete)] rounded-full text-xs text-gray-500 shadow-sm order-2 sm:order-1 font-semibold">
@@ -234,13 +144,15 @@ interface CardProps {
   isAudit: boolean;
   dbMatch?: MatchingPrices;
   onEdit(): void;
+  /** Shows the bill photo the line was read from. */
+  onPhotos(): void;
   onIndex(): void;
   onDelivered(date: string): void;
   pendingDelete: boolean;
   onUndo(): void;
 }
 
-function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendingDelete, onUndo }: CardProps) {
+function ItemCard({ item, isAudit, dbMatch, onEdit, onPhotos, onIndex, onDelivered, pendingDelete, onUndo }: CardProps) {
   if (pendingDelete) {
     return (
       <div className="flex items-center gap-3 min-h-[44px]">
@@ -297,8 +209,14 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendin
         </button>
       </div>
 
+      {!isAudit && item.photo_id && (
+        <div className="mt-1.5">
+          <PhotoChip onClick={onPhotos} name={item.item_name} />
+        </div>
+      )}
       {isAudit && (
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          {item.photo_id && <PhotoChip onClick={onPhotos} name={item.item_name} />}
           <DeliveredToggle name={item.item_name} deliveredAt={item.delivered_at} onChange={onDelivered} />
           {isIndexed ? (
             <span className="flex items-center gap-1 text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100">
@@ -323,5 +241,17 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onIndex, onDelivered, pendin
         </div>
       )}
     </div>
+  );
+}
+
+function PhotoChip({ onClick, name }: { onClick(): void; name: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1 text-xs font-bold text-gray-600 px-2 py-0.5 rounded border border-gray-200 hover:border-orange-300"
+      aria-label={`Bill photo of ${name}`}
+    >
+      <Camera size={12} /> Bill
+    </button>
   );
 }

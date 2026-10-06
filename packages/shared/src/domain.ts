@@ -271,6 +271,43 @@ export function buildItemDatabase(
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/**
+ * Materials deleted from Rates whose deletion no longer hides anything: every
+ * saved line and rate recorded for them up to the deletion has itself been
+ * deleted (or renamed). Their hidden_materials rows can go.
+ */
+export function unusedHiddenMaterials(
+  hidden: { id: string; hidden_at: string }[],
+  lists: ListRow[],
+  items: ItemRow[],
+  rates: IndexedRateRow[],
+  learning: LearningMap,
+): string[] {
+  const earliest = new Map<string, string>();
+  const seen = (name: string, unit: string, recordedAt: string) => {
+    const key = materialKey(name, unit);
+    const prev = earliest.get(key);
+    if (!prev || recordedAt < prev) earliest.set(key, recordedAt);
+  };
+  const savedLists = new Map(lists.filter((l) => l.status === 'saved').map((l) => [l.id, l]));
+  for (const raw of items) {
+    const list = savedLists.get(raw.list_id);
+    if (!list || !raw.item_name) continue;
+    const { item_name, unit } = applyLearning(learning, raw);
+    seen(item_name, unit, list.created_at);
+  }
+  for (const rate of rates) {
+    const { item_name, unit } = applyLearning(learning, rate);
+    seen(item_name, unit, rate.indexed_at);
+  }
+  return hidden
+    .filter((h) => {
+      const first = earliest.get(h.id);
+      return !first || first > h.hidden_at;
+    })
+    .map((h) => h.id);
+}
+
 /** Narrow the price database to one vendor, brand, size/spec or colour; blank means any. */
 export interface MaterialFilter {
   vendor?: string;

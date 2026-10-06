@@ -57,8 +57,8 @@ interface SheetProps {
 }
 
 const ignore = () => {};
-const DIALOG_INSETS = { paddingTop: 'max(1rem, env(safe-area-inset-top))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' };
-const SCREEN_INSETS = { paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' };
+const DIALOG_INSETS = { paddingTop: 'max(1rem, var(--inset-top))', paddingBottom: 'max(1rem, var(--inset-bottom))' };
+const SCREEN_INSETS = { paddingTop: 'var(--inset-top)', paddingBottom: 'var(--inset-bottom)' };
 
 /**
  * The one way to show something over the app: dark backdrop, Back closes it,
@@ -108,7 +108,7 @@ export function Sheet({
       >
         {children}
         {/* Room for Android's gesture bar under a bottom sheet. */}
-        {kind === 'sheet' && <div aria-hidden className="shrink-0 h-[env(safe-area-inset-bottom)] md:hidden" />}
+        {kind === 'sheet' && <div aria-hidden className="shrink-0 h-[var(--inset-bottom)] md:hidden" />}
       </motion.div>
     </motion.div>,
     document.body,

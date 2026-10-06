@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileSpreadsheet, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Eye, FileSpreadsheet, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { todayISO, type ItemRow } from '@nirman/shared';
 import { orderSlipSheet, pdfFile, pdfToJpegs, sheetToXlsx, type ExportFormat } from '../lib/exports.ts';
 import { shareFiles } from '../lib/files.ts';
@@ -7,6 +7,7 @@ import { buildOrderSlipPdf, type OrderSlipDetails } from '../lib/pdf.ts';
 import { prefs } from '../lib/prefs.ts';
 import { logStep } from '../lib/diagnostics.ts';
 import { useDialogs } from './Dialogs.tsx';
+import { DocumentPreview } from './DocumentPreview.tsx';
 import { Button } from './ui/Button.tsx';
 import { Sheet, SheetHeader, SheetLabel, SheetOption } from './ui/Sheet.tsx';
 
@@ -50,6 +51,7 @@ export function OrderSlipSheet({
     notes,
   });
   const [busy, setBusy] = useState<ExportFormat | null>(null);
+  const [previewing, setPreviewing] = useState(false);
   const set = (k: keyof OrderSlipDetails) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setDetails((d) => ({ ...d, [k]: e.target.value }));
 
   const share = async (format: ExportFormat) => {
@@ -115,6 +117,9 @@ export function OrderSlipSheet({
         <span className={label}>Specifications / notes</span>
         <textarea aria-label="Order notes" value={details.notes} onChange={set('notes')} className={`${input} h-20 resize-none text-xs`} />
       </label>
+      <Button block onClick={() => setPreviewing(true)} disabled={!!busy}>
+        <Eye size={14} /> Preview
+      </Button>
       <div>
         <span className={label}>Share as</span>
         <div className="grid grid-cols-3 gap-2">
@@ -125,6 +130,17 @@ export function OrderSlipSheet({
           ))}
         </div>
       </div>
+      {previewing && (
+        <DocumentPreview
+          title={"Order slip"}
+          build={() => buildOrderSlipPdf(items, details)}
+          onShare={() => {
+            setPreviewing(false);
+            void share('pdf');
+          }}
+          onClose={() => setPreviewing(false)}
+        />
+      )}
     </Sheet>
   );
 }

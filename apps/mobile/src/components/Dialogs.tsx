@@ -110,7 +110,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
         )}
       </AnimatePresence>
       {/* Above the phone's bottom tab bar; polite, so a screen reader reads it without interrupting. */}
-      <div aria-live="polite" className="fixed inset-x-0 z-[110] flex justify-center px-4 pointer-events-none bottom-[calc(5.5rem+env(safe-area-inset-bottom))] lg:bottom-6">
+      <div aria-live="polite" className="fixed inset-x-0 z-[110] flex justify-center px-4 pointer-events-none bottom-[calc(5.5rem+var(--inset-bottom))] lg:bottom-6">
         <AnimatePresence>
           {toast && (
             <motion.div

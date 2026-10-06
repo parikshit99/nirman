@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { FileSpreadsheet, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Eye, FileSpreadsheet, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { contractStatement, todayISO, type ContractEntryRow, type ContractRow } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
+import { DocumentPreview } from '../components/DocumentPreview.tsx';
 import { Button } from '../components/ui/Button.tsx';
 import { Sheet, SheetHeader } from '../components/ui/Sheet.tsx';
 import { logStep } from '../lib/diagnostics.ts';
@@ -21,13 +22,15 @@ export function StatementSheet({ contract, entries, onClose }: { contract: Contr
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [busy, setBusy] = useState<ExportFormat | null>(null);
+  const [previewing, setPreviewing] = useState(false);
 
+  const periodLabel = () => (from || to ? `${from || 'start'} to ${to || todayISO()}` : '');
   const share = async (format: ExportFormat) => {
     setBusy(format);
     const statement = contractStatement(contract, entries, { from, to });
     logStep('share', { what: 'labour statement', format, lines: statement.rows.length, dated: !!(from || to) });
     const name = `Statement_${contract.contractor.replace(/[^\w-]+/g, '_').slice(0, 30)}_${todayISO()}`;
-    const period = from || to ? `${from || 'start'} to ${to || todayISO()}` : '';
+    const period = periodLabel();
     try {
       if (format === 'xlsx') {
         await shareFiles([await sheetToXlsx(contractStatementSheet(contract, statement, period), `${name}.xlsx`, 'Statement', [12, 44, 14, 14, 14, 14])]);
@@ -61,6 +64,9 @@ export function StatementSheet({ contract, entries, onClose }: { contract: Contr
           <input type="date" aria-label="Statement to" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className={input} />
         </div>
       </div>
+      <Button block onClick={() => setPreviewing(true)} disabled={!!busy}>
+        <Eye size={14} /> Preview
+      </Button>
       <div>
         <span className={label}>Share as</span>
         <div className="grid grid-cols-3 gap-2">
@@ -71,6 +77,17 @@ export function StatementSheet({ contract, entries, onClose }: { contract: Contr
           ))}
         </div>
       </div>
+      {previewing && (
+        <DocumentPreview
+          title={`Statement for ${contract.contractor}`}
+          build={() => buildContractStatementPdf(contract, contractStatement(contract, entries, { from, to }), periodLabel())}
+          onShare={() => {
+            setPreviewing(false);
+            void share('pdf');
+          }}
+          onClose={() => setPreviewing(false)}
+        />
+      )}
     </Sheet>
   );
 }

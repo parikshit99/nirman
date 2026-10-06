@@ -2,6 +2,17 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 4.1 — Bill photos and one line editor
+
+- **See the bill behind the lines.** Photos you read are now kept with the lines they became. Tap **Bill** on a line, or **Bills** on a saved list, to check the reading against the photo; tap a photo to zoom in. A photo goes when its last line is deleted; *Settings → On this phone → Bill photos* frees the space. Photos are not in backups.
+- **Pick the vendor when saving** a purchase list. When a bill was read with your own name or number as the vendor, type or pick the right one in *Save list* (or *Edit* on a saved list) and it goes on every line.
+- **One editor everywhere.** The editor for purchase and BOQ lines (name, brand, model, size, colour, unit calculator, rate, vendor) now opens in **Rates** too: open *Prices* and tap a price to correct it.
+- **Preview before sharing** the site report, quote comparison, order slip and labour statement, page by page as the PDF will look.
+- **No stray delete buttons.** A saved list is deleted from its *Edit* sheet, and Rates has no bin on every card or price. *Delete all saved lists* is a labelled button at the end of Saved instead of a bare bin at the top.
+- **Delivered** is a clearer button on each saved purchase list.
+- *Settings → Deleted from Rates* is folded away, explains what it does, and a material leaves it by itself once the prices it hid are gone.
+- Fixed: the status bar and navigation bar could be see-through, or the bottom bar could sit under Android's buttons.
+
 ## 4.0 — A new look for phones
 
 **Easier to use on a phone**
