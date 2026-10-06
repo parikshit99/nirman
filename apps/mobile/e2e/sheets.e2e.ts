@@ -163,3 +163,26 @@ test('Rates: one Filter sheet, and sorting by name or date', async ({ page }) =>
   await page.getByRole('button', { name: 'Remove filter Vendor: Sharma Traders' }).click();
   await expect(page.getByRole('button', { name: 'Edit Angle valve' })).toBeVisible();
 });
+
+test('behaves like an app: no tap flash, no text selection on a long press, no pinch zoom, a new tab opens at its top', async ({ page }) => {
+  const css = await page.evaluate(() => {
+    const html = getComputedStyle(document.documentElement);
+    return {
+      tapHighlight: html.getPropertyValue('-webkit-tap-highlight-color'),
+      bodySelect: getComputedStyle(document.body).userSelect,
+      viewport: document.querySelector('meta[name=viewport]')!.getAttribute('content'),
+    };
+  });
+  expect(css.tapHighlight).toBe('rgba(0, 0, 0, 0)');
+  expect(css.bodySelect).toBe('none');
+  expect(css.viewport).toContain('user-scalable=no');
+  // Fields can still be selected, to fix a typo.
+  expect(await page.getByRole('searchbox', { name: 'Search' }).evaluate((el) => getComputedStyle(el).userSelect)).toBe('text');
+
+  await page.setViewportSize({ width: 320, height: 360 });
+  await page.getByRole('button', { name: 'Labour', exact: true }).click();
+  await page.evaluate(() => window.scrollTo(0, 400));
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Saved', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+});

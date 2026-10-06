@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SharedFilesPlugin.class);
         registerPlugin(TextReaderPlugin.class);
+        registerPlugin(HapticsPlugin.class);
         super.onCreate(savedInstanceState);
         // On older WebViews Capacitor pads the window instead of the page; give that padding the
         // app's header and bottom bar colour rather than leaving the status and navigation bars see-through.
