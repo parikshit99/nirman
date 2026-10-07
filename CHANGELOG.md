@@ -2,6 +2,11 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 5.2 — Advances (kharcha) in labour contracts
+
+- **Record an advance (kharcha)** on a contract: cash given to the mistry before the work is measured, for wages or rations, apart from payments against measured work. Both count as paid; the contract shows how much of it was advances.
+- **See when a contractor is paid ahead of the work.** When payments and advances add up to more than the work measured is worth (after retention and deductions), the contract and its card show *Paid ahead* in red, instead of a quiet "advance", so you can stop before paying more for work not yet done.
+
 ## 5.1 — Bill photos in backups, prices checked per site
 
 - **Backups keep the bills.** *Save backup* now makes one .zip with everything and every bill photo, so a restored phone still has the proof behind each line. Save it to Google Drive every week; the app reminds you. Older .json backups still restore.

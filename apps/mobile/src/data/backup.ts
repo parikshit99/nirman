@@ -8,18 +8,19 @@ import { base64ToBytes, bytesToBase64 } from '../lib/base64.ts';
 const APP_ID = 'nirmaan-auditor';
 /**
  * 2 added vendor quotes, 3 hidden materials, 4 brand/model/spec/colour, 8 labour contracts, 9 items.photo_id,
- * 10 items.rates_excluded, 11 projects, 12 bill photos (a .zip: backup.json plus photos/*.jpg); older files still restore
+ * 10 items.rates_excluded, 11 projects, 12 bill photos (a .zip: backup.json plus photos/*.jpg), 13 advance (kharcha) entries;
+ * older files still restore
  * (their lists go into projects by site address; .json files have no photos).
  */
-const VERSION = 12;
-const READABLE_VERSIONS: unknown[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+const VERSION = 13;
+const READABLE_VERSIONS: unknown[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 
 /** A bill photo in the backup: its pages are files in the zip. */
 const billPhotoSchema = z.object({ id: z.string().min(1).max(200), created_at: z.string().max(40), files: z.array(z.string().max(300)).max(100) });
 
 const backupSchema = z.object({
   app: z.literal(APP_ID),
-  version: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7), z.literal(8), z.literal(9), z.literal(10), z.literal(11), z.literal(12)]),
+  version: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7), z.literal(8), z.literal(9), z.literal(10), z.literal(11), z.literal(12), z.literal(13)]),
   exported_at: z.string().datetime({ offset: true }),
   projects: z.array(rowSchemas.projects).default([]),
   lists: z.array(rowSchemas.lists),

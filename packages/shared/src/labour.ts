@@ -4,6 +4,9 @@ import type { ContractEntryRow, ContractRow } from './schemas.ts';
 // Labour contracts: what has been earned, held back, deducted and paid.
 // ---------------------------------------------------------------------------
 
+/** Money handed to the contractor: a payment, or an advance (kharcha) before the work is measured. */
+export const isPaidOut = (kind: ContractEntryRow['kind']) => kind === 'payment' || kind === 'advance';
+
 /** Value of one work entry: quantity × rate, or % of the lump sum. */
 export function workValue(c: Pick<ContractRow, 'kind' | 'rate' | 'amount'>, e: Pick<ContractEntryRow, 'quantity'>): number {
   return c.kind === 'rate' ? e.quantity * c.rate : (e.quantity / 100) * c.amount;
@@ -23,7 +26,10 @@ export interface ContractTotals {
   /** Held back from the work done; 0 once released. */
   retention: number;
   deductions: number;
+  /** Payments and advances together. */
   paid: number;
+  /** Of what was paid, the advances (kharcha). */
+  advances: number;
   /** What the contractor has earned so far: work done − retention − deductions. */
   payable: number;
   /** Payable − paid; negative means paid in advance of the work. */
@@ -40,14 +46,17 @@ export function contractTotals(c: ContractRow, entries: ContractEntryRow[], upTo
   let workDone = 0;
   let deductions = 0;
   let paid = 0;
+  let advances = 0;
   let lastDate = '';
   for (const e of entries) {
     if (e.contract_id !== c.id || (upTo && e.date > upTo)) continue;
     if (e.kind === 'work') {
       doneQty += e.quantity;
       workDone += workValue(c, e);
-    } else if (e.kind === 'payment') paid += e.amount;
-    else deductions += e.amount;
+    } else if (isPaidOut(e.kind)) {
+      paid += e.amount;
+      if (e.kind === 'advance') advances += e.amount;
+    } else deductions += e.amount;
     if (e.date > lastDate) lastDate = e.date;
   }
   const released = !!c.retention_released_at && (!upTo || c.retention_released_at <= upTo);
@@ -62,6 +71,7 @@ export function contractTotals(c: ContractRow, entries: ContractEntryRow[], upTo
     retention: round2(retention),
     deductions: round2(deductions),
     paid: round2(paid),
+    advances: round2(advances),
     payable: round2(payable),
     balance: round2(payable - paid),
     lastDate,
@@ -85,6 +95,7 @@ export function describeEntry(c: ContractRow, e: ContractEntryRow): string {
   const note = e.note.trim() ? ` - ${e.note.trim()}` : '';
   if (e.kind === 'work') return `Work: ${c.kind === 'rate' ? `${num(e.quantity)} ${c.unit || 'unit'} @ ${num(c.rate)}` : `${num(e.quantity)}% of the job`}${note}`;
   if (e.kind === 'payment') return `Payment${e.mode ? ` (${paymentModeLabel(e.mode)})` : ''}${note}`;
+  if (e.kind === 'advance') return `Advance (kharcha)${e.mode ? `, ${paymentModeLabel(e.mode)}` : ''}${note}`;
   return `Deduction${note}`;
 }
 
@@ -126,7 +137,7 @@ export function contractStatement(c: ContractRow, entries: ContractEntryRow[], o
   for (const e of own) {
     const work = e.kind === 'work' ? workValue(c, e) : 0;
     const deduction = e.kind === 'deduction' ? e.amount : 0;
-    const paid = e.kind === 'payment' ? e.amount : 0;
+    const paid = isPaidOut(e.kind) ? e.amount : 0;
     if (opts.from && e.date < opts.from) {
       balance += work - deduction - paid;
       continue;
@@ -174,7 +185,7 @@ export function buildLabourReport(
       if (e.contract_id !== c.id || (opts.from && e.date < opts.from) || (opts.to && e.date > opts.to)) continue;
       any = true;
       if (e.kind === 'work') workDone += workValue(c, e);
-      else if (e.kind === 'payment') paid += e.amount;
+      else if (isPaidOut(e.kind)) paid += e.amount;
     }
     if (!any && (opts.from || opts.to)) continue;
     rows.push({ contract: c, workDone: round2(workDone), paid: round2(paid), balance: contractTotals(c, entries).balance });
