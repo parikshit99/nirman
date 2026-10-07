@@ -77,6 +77,7 @@ export interface Services {
 }
 
 const PROJECT_PREF = 'nirmaan_project';
+const EDITING_PREF = 'nirmaan_editing_by_project';
 
 /** The project to open: the one last open, else the ongoing one used most recently. */
 function pickProject(snapshot: Snapshot, wanted: string | null): string {
@@ -98,6 +99,17 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
     prefs.set(PROJECT_PREF, id);
     setWantedProject(id);
   }, []);
+  /** Per project, the saved list each tab is editing in place (none: the open list for the next bill). */
+  const [editingByProject, setEditingByProject] = useState<Record<string, Partial<Record<ListKind, string | null>>>>(() => prefs.get(EDITING_PREF, {}));
+  const setEditing = useCallback(
+    (kind: ListKind, id: string | null) =>
+      setEditingByProject((prev) => {
+        const next = { ...prev, [projectId]: { ...prev[projectId], [kind]: id } };
+        prefs.set(EDITING_PREF, next);
+        return next;
+      }),
+    [projectId],
+  );
   const [status, setStatus] = useState<WorkerStatus>(worker.status);
   const [settings, setSettings] = useState<Settings>(settingsRef.current);
 
@@ -170,7 +182,6 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       renameList: write(repo.renameList),
       deleteList: write(repo.deleteList),
       deleteAllHistory: write(repo.deleteAllHistory),
-      restoreToDraft: write(repo.restoreToDraft),
       bulkEditMaterials: write(repo.bulkEditMaterials),
       renameMaterial: write(repo.renameMaterial),
       hideMaterial: write(repo.hideMaterial),
@@ -273,6 +284,10 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       .filter((l) => l.status === 'saved')
       .map((l) => ({ ...l, items: byList.get(l.id) ?? [] }));
     const history = allHistory.filter((l) => l.project_id === projectId);
+    // A tab shows the saved list being edited, if it still exists here, else the open list for the next bill.
+    const editingOf = (kind: ListKind) => history.find((h) => h.id === editingByProject[projectId]?.[kind] && h.kind === kind) ?? null;
+    const editing: Record<ListKind, HistoryRecord | null> = { audit: editingOf('audit'), boq: editingOf('boq') };
+    const openIds: Record<ListKind, string> = { audit: editing.audit?.id ?? draftIds.audit, boq: editing.boq?.id ?? draftIds.boq };
     const contracts = snapshot.contracts.filter((c) => c.project_id === projectId);
     /** Saved lists, contracts and the money spent, per project, for the project list. */
     const projectSummary = (id: string) => {
@@ -308,21 +323,25 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       project,
       projects: snapshot.projects,
       projectSummary,
-      /** The open project's Purchases list and BOQ draft. */
+      /** The open project's Purchases list and BOQ draft (for the next bill). */
       draftIds,
+      /** The list each tab shows and adds to: a saved list being edited in place, or the draft. */
+      openIds,
+      /** The saved list each tab is editing, if any. */
+      editing,
       allHistory,
       contracts,
       entriesFor: (contractId: string): ContractEntryRow[] => entriesByContract.get(contractId) ?? [],
       /** Sites from saved lists and contracts, for address suggestions. */
       allAddresses: [...new Set([project?.address ?? '', ...allHistory.map((h) => h.address), ...snapshot.contracts.map((c) => c.address), ...snapshot.projects.map((p) => p.address)].filter(Boolean))],
-      itemsFor: (kind: ListKind) => byList.get(draftIds[kind]) ?? [],
+      itemsFor: (kind: ListKind) => byList.get(openIds[kind]) ?? [],
       learning,
       savedBoqs: history.filter((h) => h.kind === 'boq'),
       quotesFor: (boqId: string): QuoteRow[] => snapshot.quotes.filter((q) => q.boq_id === boqId),
       linesFor: (quoteId: string): QuoteLineRow[] => linesByQuote.get(quoteId) ?? [],
       jobForQuote: (quoteId: string): Job | undefined => snapshot.jobs.find((j) => j.quote_id === quoteId),
       knownVendors: [...new Set([...snapshot.quotes.map((q) => q.vendor), ...itemDatabase.flatMap((e) => e.vendors)].filter(Boolean))].sort(),
-      boqNotes: draftList('boq')?.notes ?? '',
+      boqNotes: (editing.boq ?? draftList('boq'))?.notes ?? '',
       history,
       itemDatabase,
       learningCount: snapshot.learned.length,
@@ -330,9 +349,9 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       categoryNames: snapshot.categories.map((c) => c.name),
       /** Site addresses of saved lists in every project, for suggestions. */
       uniqueAddresses: [...new Set([project?.address ?? '', ...allHistory.map((h) => h.address)].filter(Boolean))],
-      jobsFor: (kind: ListKind) => snapshot.jobs.filter((j) => j.list_id === draftIds[kind]),
+      jobsFor: (kind: ListKind) => snapshot.jobs.filter((j) => j.list_id === openIds[kind]),
     };
-  }, [snapshot, projectId]);
+  }, [snapshot, projectId, editingByProject]);
 
   // A material deleted from Rates stays listed in Settings only while it still hides an old price.
   const unusedHidden = useMemo(
@@ -343,7 +362,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
     if (unusedHidden.length) void actions.unhideMaterials(unusedHidden);
   }, [unusedHidden, actions]);
 
-  return { snapshot, status, settings, actions, pendingDeletes, ...derived };
+  return { snapshot, status, settings, actions, pendingDeletes, setEditing, ...derived };
 }
 
 export type AppState = ReturnType<typeof useAppStateValue>;

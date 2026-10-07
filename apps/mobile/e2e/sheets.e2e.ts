@@ -289,3 +289,36 @@ test('an advance (kharcha) beyond the work measured shows as paid ahead', async 
   await contract.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(totals).toContainText('Balance due');
 });
+
+test('saving moves the list into Saved; opening a saved list edits it in place', async ({ page }) => {
+  await page.getByRole('button', { name: 'Add purchases' }).click();
+  await page.getByRole('button', { name: /add item manually/i }).click();
+  await page.getByLabel('Item name').fill('River sand');
+  await page.getByLabel('Quantity').fill('2');
+  await page.getByLabel('Rate', { exact: true }).fill('60');
+  await page.getByRole('button', { name: /^add to/i }).click();
+  await page.getByLabel('Close manual entry').click();
+  await page.getByRole('dialog', { name: /^Add/ }).getByRole('button', { name: 'Close' }).click();
+
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /^save$/i }).click();
+  await page.getByRole('button', { name: 'Next bill' }).click();
+  // The open list is empty for the next bill.
+  await expect(page.getByRole('button', { name: 'Edit River sand' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Saved', exact: true }).click();
+  await page.getByRole('button', { name: 'Open', exact: true }).first().click();
+  await expect(page.getByRole('status').filter({ hasText: 'Editing the saved list' })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit River sand' }).click();
+  await page.getByLabel('Rate', { exact: true }).fill('65');
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByText('₹130').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Clear' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Edit River sand' })).toHaveCount(0);
+  // The change is in the saved list itself.
+  await page.getByRole('button', { name: 'Saved', exact: true }).click();
+  await page.getByRole('button', { name: 'Open', exact: true }).first().click();
+  await expect(page.getByText('₹130').first()).toBeVisible();
+});

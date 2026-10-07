@@ -54,7 +54,7 @@ export function CapturePanel({
   incoming?: IncomingShare | null;
   onIncomingUsed?(): void;
 }) {
-  const { actions, status, settings, boqNotes, categoryNames, jobsFor, itemsFor, draftIds } = useAppState();
+  const { actions, status, settings, boqNotes, categoryNames, jobsFor, itemsFor, openIds } = useAppState();
   const dialogs = useDialogs();
   const [inputText, setInputText] = useState('');
   const [images, setImages] = useState<string[]>([]);
@@ -136,7 +136,7 @@ export function CapturePanel({
     if (!inputText.trim() && images.length === 0) return;
     stopDictation.current?.();
     await actions.enqueueJob({
-      listId: draftIds[kind],
+      listId: openIds[kind],
       text: inputText.trim(),
       images: images.map(dataUrlToBase64),
       category,
@@ -320,7 +320,7 @@ export function CapturePanel({
             </select>
           </div>
 
-          {kind === 'boq' && <BoqNotes notes={boqNotes} onChange={(n) => actions.setListNotes(draftIds.boq, n)} />}
+          {kind === 'boq' && <BoqNotes notes={boqNotes} onChange={(n) => actions.setListNotes(openIds.boq, n)} />}
 
           <button
             onClick={handleProcess}

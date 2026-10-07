@@ -13,7 +13,7 @@ const EMPTY: Record<string, string> = { item_name: '', quantity: '', unit: '', u
 
 /** Add one line by hand, without the AI: works with no internet or API key. */
 export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void }) {
-  const { actions, itemDatabase, knownVendors, draftIds } = useAppState();
+  const { actions, itemDatabase, knownVendors, openIds } = useAppState();
   const dialogs = useDialogs();
   const [draft, setDraft] = useState(EMPTY);
   const [added, setAdded] = useState<string[]>([]);
@@ -40,7 +40,7 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
       await dialogs.alert('Check the number', `“${quantity === null ? draft.quantity : draft.unit_price}” is not a number. Use digits, e.g. 1500 or 1,500.`);
       return;
     }
-    await actions.addItems(draftIds[kind], [
+    await actions.addItems(openIds[kind], [
       {
         item_name: name,
         quantity,
