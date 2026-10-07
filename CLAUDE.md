@@ -2,6 +2,8 @@
 
 Android app (Capacitor + React) for tracking construction purchases, BOQs and vendor quotes. See README.md for the layout and docs/data-format.md for the data. Run `npm run lint`, `npm test` and `npm run build` before every push; after a UI change also `npm run test:e2e -w apps/mobile` (checks 320–412 px). UI rules are under *UI and UX* below.
 
+**Moving to React Native:** the app is being rebuilt in React Native, in phases; follow [docs/react-native-plan.md](docs/react-native-plan.md). Until the switch, database changes must work for both apps (they share the schema), and the Capacitor app must stay buildable as the fallback.
+
 ## Versions: deciding the size of a change
 
 Versions are `MAJOR.MINOR.PATCH`. MAJOR.MINOR is set by hand in `apps/mobile/package.json`; CI counts PATCH automatically as the number of commits on `main` since that was last changed (2.2.0, 2.2.1, 2.2.2 … back to .0 at the next bump). Pick the size of every change before merging it:
