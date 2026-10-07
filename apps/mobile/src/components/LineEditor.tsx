@@ -16,6 +16,8 @@ export interface LineValues extends Variant {
   unit_price: number;
   vendor: string;
   ordered_as: string;
+  /** 1 to keep this price out of Rates (and price checks); only with `excludable`. */
+  rates_excluded?: number;
 }
 
 interface Props {
@@ -31,6 +33,8 @@ interface Props {
   deleteLabel?: string;
   /** A second way to save, e.g. "Save as today's price" in Rates. */
   alsoSave?: { label: string; onSave(values: LineValues): void | Promise<void> };
+  /** Show "Leave out of Rates", for a purchase line whose price isn't a fair rate. */
+  excludable?: boolean;
 }
 
 const rupees = (n: number) => `₹${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
@@ -41,7 +45,7 @@ const field = 'w-full px-3 py-2 bg-white border border-orange-200 rounded-lg tex
  * with the size helper, unit, rate and vendor. Used for purchase and BOQ lines and
  * for prices in Rates.
  */
-export function LineEditor({ initial, showQuantity = true, showPrice = true, onSave, onCancel, onDelete, deleteLabel, alsoSave }: Props) {
+export function LineEditor({ initial, showQuantity = true, showPrice = true, onSave, onCancel, onDelete, deleteLabel, alsoSave, excludable }: Props) {
   const { knownVendors } = useAppState();
   const dialogs = useDialogs();
   const [draft, setDraft] = useState<Record<string, string>>(() => ({
@@ -53,6 +57,7 @@ export function LineEditor({ initial, showQuantity = true, showPrice = true, onS
     vendor: initial.vendor,
     ordered_as: initial.ordered_as,
   }));
+  const [excluded, setExcluded] = useState(!!initial.rates_excluded);
   const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) => setDraft((p) => ({ ...p, [key]: e.target.value }));
 
   const save = async (to: Props['onSave'] = onSave) => {
@@ -70,6 +75,7 @@ export function LineEditor({ initial, showQuantity = true, showPrice = true, onS
       unit_price: unitPrice,
       vendor: draft.vendor.trim(),
       ordered_as: draft.ordered_as.trim(),
+      ...(excludable ? { rates_excluded: excluded ? 1 : 0 } : {}),
     });
   };
 
@@ -122,6 +128,15 @@ export function LineEditor({ initial, showQuantity = true, showPrice = true, onS
         <p className="text-sm font-mono font-bold text-orange-600 pt-1">
           Total {rupees((parseAmount(draft.quantity) ?? 0) * (parseAmount(draft.unit_price) ?? 0))}
         </p>
+      )}
+      {excludable && showPrice && (
+        <label className="flex items-start gap-3 min-h-10 py-1 cursor-pointer">
+          <input type="checkbox" checked={excluded} onChange={(e) => setExcluded(e.target.checked)} className="mt-0.5 w-5 h-5 shrink-0 accent-orange-500" />
+          <span className="text-sm text-gray-800">
+            Leave out of Rates
+            <span className="block text-xs text-gray-500">For a price that isn't the usual rate, e.g. with transport or an emergency charge included. The line stays in the list and its total.</span>
+          </span>
+        </label>
       )}
       <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
         {onDelete && (

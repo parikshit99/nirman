@@ -52,8 +52,34 @@ describe('materialKey', () => {
 });
 
 describe('buildItemDatabase', () => {
-  it('aggregates saved lists and indexed rates, ignoring drafts', () => {
-    const lists = [list('l1'), list('l2', { status: 'draft' }), list('l3', { created_at: ts('2026-02-01'), address: 'Site B' })];
+  it('counts a price on the open purchase list straight away, and leaves out lines marked to stay out of Rates', () => {
+    const lists = [list('l1'), list('draft', { status: 'draft', title: '', created_at: ts('2026-01-01') })];
+    const items = [
+      item('i1', 'l1'),
+      item('d1', 'draft', { unit_price: 430, date: '2026-05-01', created_at: ts('2026-05-01') }),
+      item('d2', 'draft', { unit_price: 900, date: '2026-05-02', rates_excluded: 1 }),
+      item('x1', 'l1', { unit_price: 2000, rates_excluded: 1 }),
+    ];
+    const [cement] = buildItemDatabase(lists, items, [], {});
+    expect(cement.priceHistory.map((p) => [p.price, p.itemId, p.draft ?? false, p.listTitle ?? null])).toEqual([
+      [400, 'i1', false, 't'],
+      [430, 'd1', true, null],
+    ]);
+    expect(cement.latestPrice).toBe(430);
+    // Once saved, the open list's line and its saved copy are one price.
+    const saved = list('s2', { title: 'May order', created_at: ts('2026-05-03') });
+    const copy = item('c1', 's2', { unit_price: 430, date: '2026-05-01' });
+    const after = buildItemDatabase([...lists, saved], [...items, copy], [], {})[0];
+    expect(after.priceHistory.map((p) => [p.price, p.itemId])).toEqual([
+      [400, 'i1'],
+      [430, 'c1'],
+    ]);
+    // Deleted from Rates after it was added: left out, like a saved line.
+    expect(buildItemDatabase(lists, items, [], {}, { [cement.key]: ts('2026-06-01') })).toEqual([]);
+  });
+
+  it('aggregates saved lists, the open purchase list and added rates, but not a BOQ draft', () => {
+    const lists = [list('l1'), list('l2', { status: 'draft', kind: 'boq' }), list('l3', { created_at: ts('2026-02-01'), address: 'Site B' })];
     const items = [
       item('i1', 'l1'),
       item('i2', 'l2', { unit_price: 999 }),
@@ -73,8 +99,8 @@ describe('buildItemDatabase', () => {
     expect(cement.vendors.sort()).toEqual(['Gupta', 'Manual', 'Sharma']);
     // Each price says where it came from; only single added rates carry an id to remove them by.
     expect(cement.priceHistory.map((p) => [p.listTitle ?? null, p.rateId ?? null])).toEqual([
-      [lists[0].title || 'Untitled session', null],
-      [lists[2].title || 'Untitled session', null],
+      [lists[0].title, null],
+      [lists[2].title, null],
       [null, 'r1'],
     ]);
   });
@@ -293,8 +319,10 @@ describe('unusedHiddenMaterials', () => {
     const hidden = [{ id: key, hidden_at: ts('2026-02-01') }];
     expect(unusedHiddenMaterials(hidden, [], [], [], {})).toEqual([key]);
     expect(unusedHiddenMaterials(hidden, [list('l1', { created_at: ts('2026-03-01') })], [item('i1', 'l1')], [], {})).toEqual([key]);
-    // A draft line is not a recorded price.
-    expect(unusedHiddenMaterials(hidden, [list('l1', { status: 'draft' })], [item('i1', 'l1')], [], {})).toEqual([key]);
+    // A BOQ draft line is not a recorded price; a line on the open purchase list is, from when it was added.
+    expect(unusedHiddenMaterials(hidden, [list('l1', { status: 'draft', kind: 'boq' })], [item('i1', 'l1')], [], {})).toEqual([key]);
+    expect(unusedHiddenMaterials(hidden, [list('l1', { status: 'draft' })], [item('i1', 'l1')], [], {})).toEqual([]);
+    expect(unusedHiddenMaterials(hidden, [list('l1', { status: 'draft' })], [item('i1', 'l1', { created_at: ts('2026-03-01') })], [], {})).toEqual([key]);
   });
 
   it('follows learned names', () => {

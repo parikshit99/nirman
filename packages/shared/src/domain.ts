@@ -107,8 +107,10 @@ export interface PricePoint {
   price: number;
   vendor: string;
   timestamp: string;
-  /** Title of the saved session the price came from; absent for a single added rate. */
+  /** Title of the saved list the price came from; absent for a single added rate or the open purchase list. */
   listTitle?: string;
+  /** From the purchase list still being written (not saved yet). */
+  draft?: boolean;
   /** Id of the saved-list line the price came from, so it can be edited or removed. */
   itemId?: string;
   /** Id of the single added rate (Index rate, or a confirmed vendor quote), so it can be removed. */
@@ -155,9 +157,13 @@ const priceStats = (priceHistory: PricePoint[]) => {
   };
 };
 
+/** Lists whose lines feed Rates: saved lists, and the purchase list still being written. */
+const countsInRates = (l: ListRow) => l.status === 'saved' || (l.status === 'draft' && l.kind === 'audit');
+
 /**
- * Build the material price database from saved sessions and manually indexed
- * rates. Draft lists are ignored. `deleted` maps a material key to when it was
+ * Build the material price database from saved lists, the open purchase list
+ * (its prices count as soon as they are entered) and single added rates. A line
+ * marked `rates_excluded` is left out. `deleted` maps a material key to when it was
  * deleted from the database: everything recorded up to then is left out (saved
  * lists themselves are untouched), and anything recorded later shows again.
  */
@@ -190,32 +196,42 @@ export function buildItemDatabase(
     return e;
   };
 
-  const savedLists = new Map(lists.filter((l) => l.status === 'saved').map((l) => [l.id, l]));
+  // Saved lists, and the purchase list still being written: a price counts as soon as it is entered.
+  const savedLists = new Map(lists.filter(countsInRates).map((l) => [l.id, l]));
   const savedPrices = new Set<string>();
   const pricePointKey = (key: string, variant: string, date: string, price: number, vendor: string) =>
     [key, variant, date, price, vendor.trim().toLowerCase()].join('\u0000');
 
-  for (const raw of items) {
-    if (!raw.item_name || raw.rates_excluded) continue;
+  // Saved lines first: saving copies the open list's lines, which then count once, as the saved copy.
+  const ordered = [...items].sort((a, b) => Number(savedLists.get(a.list_id)?.status === 'draft') - Number(savedLists.get(b.list_id)?.status === 'draft'));
+  for (const raw of ordered) {
+    if (!raw.item_name) continue;
     const list = savedLists.get(raw.list_id);
     if (!list) continue;
 
     const { item_name, unit } = applyLearning(learning, raw);
-    if (isDeleted(item_name, unit, list.created_at)) continue;
-    const e = entry(item_name, unit);
+    const draft = list.status === 'draft';
+    const recordedAt = draft ? raw.created_at || list.created_at : list.created_at;
     const variant = variantOf(raw);
+    const date = raw.date || recordedAt.slice(0, 10);
+    const point = raw.unit_price > 0 ? pricePointKey(materialKey(item_name, unit), variantKey(variant), date, raw.unit_price, raw.vendor || 'Unknown') : '';
+    // The open list's copy of a saved line is that line: counted once, or left out with it.
+    if (draft && point && savedPrices.has(point)) continue;
+    if (point) savedPrices.add(point);
+    if (raw.rates_excluded || isDeleted(item_name, unit, recordedAt)) continue;
+
+    const e = entry(item_name, unit);
     if (!e.variants.has(variantKey(variant))) e.variants.set(variantKey(variant), variant);
     if (raw.vendor) e.vendors.add(raw.vendor);
     if (list.category) e.categories.add(list.category);
     if (list.address) e.addresses.add(list.address);
-    if (raw.unit_price > 0) {
-      savedPrices.add(pricePointKey(e.key, variantKey(variant), raw.date || list.created_at.slice(0, 10), raw.unit_price, raw.vendor || 'Unknown'));
+    if (point) {
       e.priceHistory.push({
-        date: raw.date || list.created_at.slice(0, 10),
+        date,
         price: raw.unit_price,
         vendor: raw.vendor || 'Unknown',
-        timestamp: list.created_at,
-        listTitle: list.title || 'Untitled session',
+        timestamp: recordedAt,
+        ...(draft ? { draft: true } : { listTitle: list.title || 'Untitled list' }),
         itemId: raw.id,
         variant,
       });
@@ -289,12 +305,12 @@ export function unusedHiddenMaterials(
     const prev = earliest.get(key);
     if (!prev || recordedAt < prev) earliest.set(key, recordedAt);
   };
-  const savedLists = new Map(lists.filter((l) => l.status === 'saved').map((l) => [l.id, l]));
+  const savedLists = new Map(lists.filter(countsInRates).map((l) => [l.id, l]));
   for (const raw of items) {
     const list = savedLists.get(raw.list_id);
     if (!list || !raw.item_name || raw.rates_excluded) continue;
     const { item_name, unit } = applyLearning(learning, raw);
-    seen(item_name, unit, list.created_at);
+    seen(item_name, unit, list.status === 'draft' ? raw.created_at || list.created_at : list.created_at);
   }
   for (const rate of rates) {
     const { item_name, unit } = applyLearning(learning, rate);

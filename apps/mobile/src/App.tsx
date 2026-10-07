@@ -590,7 +590,7 @@ export default function App() {
             ) : (
               <>
                 {!wide && <QueuedReadings kind={kind!} />}
-                <ItemLog kind={kind!} items={filteredItems} searching={!!search} onIndex={openSave} onAdd={wide ? undefined : () => setAddOpen(true)} />
+                <ItemLog kind={kind!} items={filteredItems} searching={!!search} onAdd={wide ? undefined : () => setAddOpen(true)} />
               </>
             )}
           </div>

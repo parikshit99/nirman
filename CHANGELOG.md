@@ -12,7 +12,12 @@ Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major 
 - **Site report** is now for the open project: no need to pick the site.
 - Backups now include projects. Older backups still restore and are sorted into projects the same way.
 
-Also since 4.0: sort and filter in Rates, suggestions under the field you type in, deliveries on BOQs, editing materials in Rates, bill photos kept with their lines, one line editor everywhere, and a preview before every share.
+Also since 4.0: every purchase counts in Rates as soon as it is added (with *Leave out of Rates*), sort and filter in Rates, suggestions under the field you type in, deliveries on BOQs, editing materials in Rates, bill photos kept with their lines, one line editor everywhere, and a preview before every share.
+
+## 4.4 — Every purchase counts in Rates
+
+- **No more Save rate.** A purchase with a rate shows in Rates as soon as you add it, so price trends and *Last paid* checks are never missing an entry. Fixing a line's rate or vendor fixes Rates too, and deleting the line takes the price out.
+- **Leave out of Rates.** When a price isn't the usual rate (transport or an emergency charge included), tap the line and tick *Leave out of Rates*. The line keeps its total in the list and shows *Not in Rates*; untick it to count it again. The same box is there when you fix a price from Rates.
 
 ## 4.3 — Sort and filter in Rates
 
