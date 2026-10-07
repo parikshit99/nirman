@@ -131,7 +131,8 @@ describe('backup', () => {
     expect(project(snap.contracts[0].project_id)).toBe('Sector 44');
     // The open lists go to the project used last (the contract, in Sector 44); every project has its own pair.
     expect(project(snap.lists.find((l) => l.id === DRAFT_IDS.boq)!.project_id)).toBe('Sector 44');
-    expect(snap.lists.find((l) => l.id === DRAFT_IDS.boq)?.notes).toBe('Glossy');
+    // The BOQ's notes went with it when it was saved.
+    expect(snap.lists.find((l) => l.title === 'Tower A')?.notes).toBe('Glossy');
     expect(snap.lists.filter((l) => l.status === 'draft')).toHaveLength(4);
   });
 

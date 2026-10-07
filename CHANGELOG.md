@@ -2,6 +2,20 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 6.0 — One copy of every list
+
+**How saving works now**
+- **Save list moves the list into Saved.** The open purchase list or BOQ becomes the saved list, and an empty one is ready for the next bill. Nothing is copied, so there are never two versions of the same bill to keep in step.
+- **Open a saved list to change it.** Tap *Open* in Saved: the list shows on its tab with *Editing the saved list…* above it, and every change goes straight into that list. Tap *Done* to go back to the open list for the next bill, which is kept as you left it.
+- Every line was already saved on the phone the moment it was added or changed; that hasn't changed, and closing the app or a phone call never loses a line.
+
+**Also since 5.0**
+- Advances (kharcha) on labour contracts, and a red *Paid ahead* warning when a contractor is paid more than the work measured.
+- Vendor quotes read and matched to the BOQ on the phone, offline.
+- Backups as one .zip with every bill photo.
+- Price checks against this site's last price first, then other sites, with their address.
+- Rates worked out faster as your purchases grow.
+
 ## 5.3 — Vendor quotes without the internet
 
 - **Vendor quotes are read on the phone.** A printed or typed quote is read on the phone and each line matched to the BOQ there, so quotes can be compared in a basement or on a plot with no signal. Gemini is only asked when the phone is unsure and you are online. Lines the phone can't match are left for you to match when you review the quote, as before.

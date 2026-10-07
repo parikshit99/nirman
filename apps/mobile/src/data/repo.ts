@@ -401,26 +401,11 @@ export function listItems(tx: SqlExecutor, listId: string): Promise<ItemRow[]> {
   return tx.all<ItemRow>(`SELECT ${tableColumns.items.join(', ')} FROM items WHERE list_id = ? ORDER BY created_at DESC, id`, [listId]);
 }
 
-/** The open list of a kind in a project. */
-async function draftOf(tx: SqlExecutor, projectId: string, kind: ListKind): Promise<ListRow | undefined> {
-  const [row] = await tx.all<ListRow>(
-    `SELECT ${tableColumns.lists.join(', ')} FROM lists WHERE status = 'draft' AND kind = ? AND project_id = ? ORDER BY created_at LIMIT 1`,
-    [kind, projectId],
-  );
-  return row;
-}
-
-async function copyItems(tx: SqlExecutor, fromListId: string, toListId: string) {
-  const items = await listItems(tx, fromListId);
-  for (const item of items) {
-    const ts = nowISO();
-    await writeRow(tx, 'items', { ...item, id: newId(), list_id: toListId, updated_at: ts });
-  }
-}
-
 /**
- * Save a draft (a project's open Purchases list or BOQ) as a saved list in the same project. With
- * `targetId`, the existing record's metadata and items are replaced; otherwise a new record is created.
+ * Save a draft (a project's open Purchases list or BOQ) as a saved list in the same project. Its lines
+ * move to the saved list (they are not copied: each line exists once), entries still being read follow
+ * them, and the draft is left empty for the next bill. With `targetId` (an open list that was a copy of
+ * a saved list, from before 6.0), that list's lines are replaced; otherwise a new one is created.
  */
 export async function saveDraftToHistory(db: Db, draftId: string, meta: ListMeta, targetId?: string): Promise<string> {
   return db.transaction(async (tx) => {
@@ -447,8 +432,13 @@ export async function saveDraftToHistory(db: Db, draftId: string, meta: ListMeta
     });
     const oldItems = existing ? await listItems(tx, id) : [];
     if (existing) await tx.run('DELETE FROM items WHERE list_id = ?', [id]);
-    await copyItems(tx, draftId, id);
-    if (existing) await rematchQuoteLines(tx, id, oldItems);
+    await tx.run('UPDATE items SET list_id = ?, updated_at = ? WHERE list_id = ?', [id, ts, draftId]);
+    await tx.run('UPDATE jobs SET list_id = ? WHERE list_id = ? AND quote_id IS NULL', [id, draftId]);
+    if (kind === 'boq') await tx.run(`UPDATE lists SET notes = '', updated_at = ? WHERE id = ?`, [ts, draftId]);
+    if (existing) {
+      await rematchQuoteLines(tx, id, oldItems);
+      await pruneBillPhotos(tx);
+    }
     if ((existing?.kind ?? kind) === 'audit') await fillRateSites(tx, id, meta);
     return id;
   });
@@ -512,21 +502,6 @@ export async function deleteAllHistory(db: Db, projectId: string) {
     await tx.run(`DELETE FROM items WHERE list_id IN (${saved})`, [projectId]);
     await tx.run(`DELETE FROM lists WHERE status = 'saved' AND project_id = ?`, [projectId]);
     await pruneBillPhotos(tx);
-  });
-}
-
-/** Replace the matching draft (audit or BOQ) of the record's project with a copy of a saved list. */
-export async function restoreToDraft(db: Db, historyId: string): Promise<ListKind | undefined> {
-  return db.transaction(async (tx) => {
-    const record = await getRow(tx, 'lists', historyId);
-    if (!record) return undefined;
-    const draft = await draftOf(tx, record.project_id, record.kind);
-    if (!draft) return undefined;
-    const draftId = draft.id;
-    await tx.run('DELETE FROM items WHERE list_id = ?', [draftId]);
-    await copyItems(tx, historyId, draftId);
-    if (record.kind === 'boq') await touch(tx, 'lists', { ...draft, notes: record.notes });
-    return record.kind;
   });
 }
 

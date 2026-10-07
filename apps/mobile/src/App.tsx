@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, animate } from 'motion/react';
-import { ChevronDown, Database, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Plus, Save, Share2, ShoppingCart, Search, Trash2, Users, X } from 'lucide-react';
+import { ChevronDown, Database, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Pencil, Plus, Save, Share2, ShoppingCart, Search, Trash2, Users, X } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { filterMaterials, guessCategory, todayISO, type ContractRow, type MaterialFilter, type ProjectRow } from '@nirman/shared';
 import { useDialogs } from './components/Dialogs.tsx';
@@ -79,7 +79,7 @@ const kindOf = (tab: AppTab): ListKind | null => (tab === 'auditor' ? 'audit' : 
 export default function App() {
   const state = useAppState();
   const { actions, history, itemDatabase, itemsFor, boqNotes, categoryNames, uniqueAddresses, settings, pendingDeletes, savedBoqs, contracts, allAddresses, knownVendors, quotesFor } = state;
-  const { projectId, project, projects, draftIds } = state;
+  const { projectId, project, projects, draftIds, editing, setEditing } = state;
   const projectOptions = useMemo(() => projects.map((p) => ({ id: p.id, name: p.status === 'closed' ? `${p.name} (closed)` : p.name })), [projects]);
   const dialogs = useDialogs();
 
@@ -106,7 +106,10 @@ export default function App() {
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [addressFilter, setAddressFilter] = useState('All');
   const [materialFilter, setMaterialFilter] = useState<MaterialFilter>({});
-  /** The saved list each project's open Purchases list and BOQ were opened from (saving again updates it). */
+  /**
+   * Before 6.0, opening a saved list copied it into the open list, and saving again replaced the saved list's lines.
+   * An open list still holding such a copy saves over its saved list once more; after that, saved lists are edited in place.
+   */
   const [linkedByProject, setLinkedByProject] = useState<Record<string, Record<ListKind, string | null>>>(() => prefs.get('nirmaan_linked_by_project', {}));
   const linkedRecord = useMemo(
     // Before projects there was one pair; it still counts where that list is in the open project.
@@ -209,7 +212,7 @@ export default function App() {
 
   const openSave = () => {
     if (!kind || activeItems.length === 0) return;
-    const record = history.find((r) => r.id === linkedRecord[kind]);
+    const record = editing[kind] ?? history.find((r) => r.id === linkedRecord[kind]);
     setSaveState({
       kind,
       recordId: record?.id,
@@ -268,16 +271,24 @@ export default function App() {
       }
       return;
     }
+    // A saved list being edited is already saved line by line: only its details change.
+    const open = editing[k];
+    if (open) {
+      await actions.updateListMeta(open.id, meta);
+      if (vendor && k === 'audit') await actions.setListVendor(open.id, vendor);
+      dialogs.toast(`Saved “${meta.title || open.title}”`);
+      return;
+    }
     if (vendor && k === 'audit') await actions.setListVendor(draftIds.audit, vendor);
+    // Its lines move to the saved list; the open list is left empty for the next bill.
     const id = await actions.saveDraftToHistory(draftIds[k], meta, asNew ? undefined : recordId);
-    if (!asNew) linkRecord(k, id);
-    // The next bill shouldn't be added to this session by accident.
-    const fresh = await dialogs.confirm(`Saved “${meta.title || titlePrefix(k)}”`, {
-      message: 'Start a new list for the next bill, or keep editing this one (saving again updates it).',
-      confirmLabel: 'Start new list',
-      cancelLabel: 'Keep editing',
+    linkRecord(k, null);
+    const next = await dialogs.confirm(`Saved “${meta.title || titlePrefix(k)}”`, {
+      message: 'The list is empty for the next bill. Or keep working on the one you just saved: changes to it are saved as you make them.',
+      confirmLabel: 'Next bill',
+      cancelLabel: 'Keep editing it',
     });
-    if (fresh) await startNewList(k);
+    if (!next) setEditing(k, id);
   };
 
   const startNewList = async (k: ListKind) => {
@@ -286,23 +297,16 @@ export default function App() {
     linkRecord(k, null);
   };
 
+  /** Edit a saved list in place on its tab; the open list for the next bill is kept as it is. */
   const openRecord = async (record: HistoryRecord) => {
     await actions.flushDeletes();
-    if (itemsFor(record.kind).length > 0) {
-      const ok = await dialogs.confirm(`Replace the current ${titlePrefix(record.kind)} draft?`, {
-        message: `The draft will be replaced with the ${record.items.length} items from “${record.title}”.`,
-        confirmLabel: 'Replace',
-      });
-      if (!ok) return;
-    }
-    await actions.restoreToDraft(record.id);
-    linkRecord(record.kind, record.id);
+    setEditing(record.kind, record.id);
     setActiveTab(record.kind === 'audit' ? 'auditor' : 'boq');
   };
 
   /** Repeat order: the session's lines go into the purchase list, dated today and not yet delivered. */
   const buyAgain = async (record: HistoryRecord) => {
-    const current = itemsFor('audit').length;
+    const current = state.snapshot.items.filter((i) => i.list_id === draftIds.audit).length;
     if (current > 0) {
       const ok = await dialogs.confirm(`Add ${record.items.length} items to the current list?`, {
         message: `The purchase list already has ${current} items. Save or clear it first to keep the bills separate.`,
@@ -316,6 +320,7 @@ export default function App() {
       draftIds.audit,
       record.items.map((i) => ({ ...i, date: todayISO() })),
     );
+    setEditing('audit', null);
     setActiveTab('auditor');
   };
 
@@ -415,7 +420,8 @@ export default function App() {
   };
 
   // Saved has its own labelled "Delete all saved lists" at the end of the list, not a bare bin up here.
-  const canClear = !!kind && activeItems.length > 0;
+  // A saved list being edited isn't cleared from here: delete it from its Edit sheet in Saved.
+  const canClear = !!kind && activeItems.length > 0 && !editing[kind];
 
   return (
     <div className="min-h-screen lg:h-screen bg-[var(--color-brand-gray)] flex flex-col overflow-x-hidden lg:overflow-hidden">
@@ -589,6 +595,17 @@ export default function App() {
               />
             ) : (
               <>
+                {editing[kind!] && (
+                  <div role="status" className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-xl flex items-center gap-3">
+                    <Pencil size={16} className="text-orange-600 shrink-0" />
+                    <p className="flex-1 min-w-0 text-sm text-gray-800">
+                      Editing the saved list <b className="break-words">“{editing[kind!]!.title}”</b>. Changes are saved as you make them.
+                    </p>
+                    <Button size="sm" onClick={() => setEditing(kind!, null)}>
+                      Done
+                    </Button>
+                  </div>
+                )}
                 {!wide && <QueuedReadings kind={kind!} />}
                 <ItemLog kind={kind!} items={filteredItems} searching={!!search} onAdd={wide ? undefined : () => setAddOpen(true)} />
               </>
@@ -645,7 +662,7 @@ export default function App() {
             categories={categoryNames}
             recentAddresses={uniqueAddresses}
             editing={!!saveState.recordId}
-            allowSaveAsNew={!!saveState.recordId && !!saveState.kind}
+            allowSaveAsNew={!!saveState.recordId && !!saveState.kind && !editing[saveState.kind]}
             titlePrefix={saveState.titlePrefix}
             vendor={saveState.vendor && { ...saveState.vendor, known: knownVendors }}
             project={saveState.project}
@@ -680,7 +697,7 @@ export default function App() {
             key="order-slip"
             items={activeItems}
             notes={boqNotes}
-            address={history.find((r) => r.id === linkedRecord.boq)?.address || project?.address || ''}
+            address={editing.boq?.address || history.find((r) => r.id === linkedRecord.boq)?.address || project?.address || ''}
             addresses={uniqueAddresses}
             onClose={() => setOrderSlipOpen(false)}
           />

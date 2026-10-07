@@ -29,7 +29,6 @@ import {
   learningMap,
   loadSnapshot,
   renameMaterial,
-  restoreToDraft,
   saveDraftToHistory,
   setListNotes,
   setListVendor,
@@ -102,7 +101,7 @@ describe('local repository', () => {
     expect(learningMap(snap.learned)).toEqual({ bori: { item_name: 'OPC Cement 53 Grade', unit: 'Bag' } });
   });
 
-  it('marks purchase lines delivered and keeps the date through saving and reopening', async () => {
+  it('marks purchase lines delivered and keeps the date through saving', async () => {
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.audit, [cement, sand]);
     const draft = (await loadSnapshot(db)).items.filter((i) => i.list_id === DRAFT_IDS.audit);
@@ -110,13 +109,12 @@ describe('local repository', () => {
     expect(byName('Sand').delivered_at).toBe('');
     await setDelivered(db, [byName('Sand').id], '2026-10-03');
     const id = await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
-    // Ticked on the draft after saving: reopening the saved copy brings back what was saved.
+    // The same lines are now the saved list's: ticking one later changes the saved list itself.
     await setDelivered(db, [byName('Cement').id], '2026-10-04');
-    await restoreToDraft(db, id);
-    const reopened = (await loadSnapshot(db)).items.filter((i) => i.list_id === DRAFT_IDS.audit);
-    expect(reopened.map((i) => [i.item_name, i.delivered_at]).sort()).toEqual([['Cement', ''], ['Sand', '2026-10-03']].sort());
-    await setDelivered(db, reopened.map((i) => i.id), '');
-    expect((await loadSnapshot(db)).items.filter((i) => i.list_id === DRAFT_IDS.audit).every((i) => i.delivered_at === '')).toBe(true);
+    const saved = (await loadSnapshot(db)).items.filter((i) => i.list_id === id);
+    expect(saved.map((i) => [i.item_name, i.delivered_at]).sort()).toEqual([['Cement', '2026-10-04'], ['Sand', '2026-10-03']].sort());
+    await setDelivered(db, saved.map((i) => i.id), '');
+    expect((await loadSnapshot(db)).items.filter((i) => i.list_id === id).every((i) => i.delivered_at === '')).toBe(true);
   });
 
   it('edits and forgets single learned corrections', async () => {
@@ -131,32 +129,33 @@ describe('local repository', () => {
     expect(learningMap((await loadSnapshot(db)).learned)).toEqual({ bori: { item_name: 'PPC Cement', unit: 'Bag' } });
   });
 
-  it('saves drafts to history, updates records in place and restores them', async () => {
+  it('saves the open list by moving its lines, so each line exists once, and the open list starts empty', async () => {
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.boq, [cement, sand]);
     await setListNotes(db, DRAFT_IDS.boq, 'Glossy finish');
+    const lineIds = (await loadSnapshot(db)).items.map((i) => i.id).sort();
+    await enqueueJob(db, { listId: DRAFT_IDS.boq, text: 'still being read', images: [], category: '', captureDate: '2026-09-30' });
     const id = await saveDraftToHistory(db, DRAFT_IDS.boq, meta);
 
     let snap = await loadSnapshot(db);
-    const record = snap.lists.find((l) => l.id === id)!;
-    expect(record).toMatchObject({ status: 'saved', kind: 'boq', title: 'Morning audit', notes: 'Glossy finish' });
-    expect(snap.items.filter((i) => i.list_id === id).map((i) => i.item_name)).toEqual(['Cement', 'Sand']);
+    expect(snap.lists.find((l) => l.id === id)).toMatchObject({ status: 'saved', kind: 'boq', title: 'Morning audit', notes: 'Glossy finish' });
+    expect(snap.items.filter((i) => i.list_id === id).map((i) => i.id).sort()).toEqual(lineIds);
+    expect(snap.items.filter((i) => i.list_id === DRAFT_IDS.boq)).toHaveLength(0);
+    expect(snap.lists.find((l) => l.id === DRAFT_IDS.boq)?.notes).toBe('');
+    // An entry still being read lands in the saved list, where its bill went.
+    expect(snap.jobs.map((j) => j.list_id)).toEqual([id]);
 
-    // Update in place: record keeps its id, items are replaced.
-    const [first] = snap.items.filter((i) => i.list_id === DRAFT_IDS.boq);
-    await deleteItem(db, first.id);
+    // Editing the saved list changes it directly.
+    await deleteItem(db, lineIds[0]);
+    expect((await loadSnapshot(db)).items.filter((i) => i.list_id === id)).toHaveLength(1);
+
+    // An open list that was a copy of a saved one (before 6.0) replaces that list's lines when saved.
+    await addItems(db, DRAFT_IDS.boq, [cement, sand]);
     await saveDraftToHistory(db, DRAFT_IDS.boq, { ...meta, title: 'Updated' }, id);
     snap = await loadSnapshot(db);
-    expect(snap.lists.filter((l) => l.status === 'saved')).toHaveLength(1);
-    expect(snap.items.filter((i) => i.list_id === id)).toHaveLength(1);
-
-    // Restore into the draft.
-    await clearListItems(db, DRAFT_IDS.boq);
-    await setListNotes(db, DRAFT_IDS.boq, '');
-    await restoreToDraft(db, id);
-    snap = await loadSnapshot(db);
-    expect(snap.items.filter((i) => i.list_id === DRAFT_IDS.boq)).toHaveLength(1);
-    expect(snap.lists.find((l) => l.id === DRAFT_IDS.boq)?.notes).toBe('Glossy finish');
+    expect(snap.lists.filter((l) => l.status === 'saved').map((l) => l.title)).toEqual(['Updated']);
+    expect(snap.items.filter((i) => i.list_id === id)).toHaveLength(2);
+    expect(snap.items.filter((i) => i.list_id === DRAFT_IDS.boq)).toHaveLength(0);
 
     await deleteList(db, id);
     snap = await loadSnapshot(db);
@@ -266,7 +265,6 @@ describe('local repository', () => {
     await setPrice(db, { rateId: snap.rates[0].id }, 490);
     snap = await loadSnapshot(db);
     expect(snap.items.find((i) => i.id === saved.id)).toMatchObject({ unit_price: 480, total_amount: 480 * 15 });
-    expect(snap.items.find((i) => i.list_id === DRAFT_IDS.audit)?.unit_price).toBe(500);
     expect(snap.rates[0].price).toBe(490);
 
     const ref = { key: materialKey('Cement', 'Bag'), name: 'Cement', unit: 'Bag' };
@@ -344,8 +342,7 @@ describe('local repository', () => {
     const snap = await loadSnapshot(db);
     expect(snap.hidden).toEqual([]);
     expect(snap.rates).toEqual([]);
-    // On the saved list and on the open purchase list alike.
-    expect(snap.items.map((i) => [i.item_name, i.rates_excluded]).sort()).toEqual([['Cement', 1], ['Cement', 1], ['Sand', 0], ['Sand', 0]]);
+    expect(snap.items.map((i) => [i.item_name, i.rates_excluded]).sort()).toEqual([['Cement', 1], ['Sand', 0]]);
     expect(buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned)).map((e) => e.name)).toEqual(['Sand']);
 
     // A later purchase of it shows in Rates again.
@@ -460,7 +457,9 @@ describe('local repository', () => {
 
     it('re-saving the BOQ keeps matches; deleting it removes its quotes', async () => {
       const { db, boqId } = await quoted();
-      await restoreToDraft(db, boqId);
+      // An open BOQ holding a copy of the saved one (before 6.0), saved over it again.
+      const copy = (await loadSnapshot(db)).items.filter((i) => i.list_id === boqId);
+      await addItems(db, DRAFT_IDS.boq, copy);
       await saveDraftToHistory(db, DRAFT_IDS.boq, boqMeta, boqId);
       let snap = await loadSnapshot(db);
       const cementId = snap.items.find((i) => i.list_id === boqId && i.item_name === 'Cement')!.id;
@@ -532,12 +531,10 @@ describe('projects', () => {
     expect(snap.lists.find((l) => l.id === homeList)?.project_id).toBe(home);
     expect(snap.lists.find((l) => l.id === towerList)?.project_id).toBe(tower);
 
-    // Reopening a saved list fills its own project's draft, not the other one.
-    await clearListItems(db, towerDraft);
-    await restoreToDraft(db, towerList);
-    snap = await loadSnapshot(db);
-    expect(snap.items.filter((i) => i.list_id === towerDraft).map((i) => i.item_name)).toEqual(['Sand']);
-    expect(snap.items.filter((i) => i.list_id === DRAFT_IDS.audit).map((i) => i.item_name)).toEqual(['Cement']);
+    // Each saved list holds its own project's lines; both open lists are empty again.
+    expect(snap.items.filter((i) => i.list_id === towerList).map((i) => i.item_name)).toEqual(['Sand']);
+    expect(snap.items.filter((i) => i.list_id === homeList).map((i) => i.item_name)).toEqual(['Cement']);
+    expect(snap.items.filter((i) => i.list_id === towerDraft || i.list_id === DRAFT_IDS.audit)).toHaveLength(0);
 
     await deleteAllHistory(db, tower);
     snap = await loadSnapshot(db);
