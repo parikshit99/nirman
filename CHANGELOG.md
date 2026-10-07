@@ -2,6 +2,11 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 4.4 — Every purchase counts in Rates
+
+- **No more Save rate.** A purchase with a rate shows in Rates as soon as you add it, so price trends and *Last paid* checks are never missing an entry. Fixing a line's rate or vendor fixes Rates too, and deleting the line takes the price out.
+- **Leave out of Rates.** When a price isn't the usual rate (transport or an emergency charge included), tap the line and tick *Leave out of Rates*. The line keeps its total in the list and shows *Not in Rates*; untick it to count it again. The same box is there when you fix a price from Rates.
+
 ## 4.3 — Sort and filter in Rates
 
 - **Sort materials in Rates** by the newest or oldest price, or by name (A–Z or Z–A). The phone remembers your choice.

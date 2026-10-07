@@ -51,7 +51,7 @@ Users are on site, on a phone, often in sunlight, sometimes with gloves. Keep ev
 | Work type | Category, work category |
 | Site address | Address / location |
 | Save list | Site metadata, confirm save |
-| Save rate / Save all rates | Index rate, indexed |
+| Leave out of Rates | Exclude from benchmark, index rate, indexed |
 | Read items, being read | AI extraction, extraction queue |
 
 Plurals must agree ("1 item", "2 items").

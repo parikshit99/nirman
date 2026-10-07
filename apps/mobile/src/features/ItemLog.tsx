@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { AlertTriangle, Calendar, Camera, Check, FileCode, HardHat, History, Pencil, Plus, Truck, Zap } from 'lucide-react';
+import { AlertTriangle, Calendar, Camera, Check, EyeOff, FileCode, HardHat, History, Pencil, Plus, Truck } from 'lucide-react';
 import { materialKey, todayISO, variantLabel, variantMatches, type ItemRow, type MaterialEntry } from '@nirman/shared';
 import { BillPhotosSheet } from '../components/BillPhotos.tsx';
 import { DeliveredToggle } from '../components/DeliveredToggle.tsx';
@@ -16,8 +16,6 @@ interface Props {
   kind: ListKind;
   items: ItemRow[];
   searching: boolean;
-  /** Saving a rate saves the purchase list (asking its site and work type); Rates reads prices from there. */
-  onIndex(): void;
   /** Opens the entry form (phones), offered when the list is empty. */
   onAdd?(): void;
 }
@@ -25,8 +23,8 @@ interface Props {
 const rupees = (n: number) => `₹${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
 /** The current Audit or BOQ list: one card per item, sized for a phone screen. */
-export function ItemLog({ kind, items, searching, onIndex, onAdd }: Props) {
-  const { actions, itemDatabase, itemsFor, pendingDeletes } = useAppState();
+export function ItemLog({ kind, items, searching, onAdd }: Props) {
+  const { actions, itemDatabase, pendingDeletes } = useAppState();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [photosOf, setPhotosOf] = useState<ItemRow | null>(null);
   const isAudit = kind === 'audit';
@@ -37,7 +35,6 @@ export function ItemLog({ kind, items, searching, onIndex, onAdd }: Props) {
   useEffect(() => () => void actions.flushDeletes(), [actions]);
 
   const undelivered = items.filter((i) => !i.delivered_at && !pendingDeletes.has(i.id));
-  const indexable = itemsFor('audit').filter((i) => i.item_name && i.unit_price && !pendingDeletes.has(i.id));
 
   return (
     <>
@@ -72,6 +69,7 @@ export function ItemLog({ kind, items, searching, onIndex, onAdd }: Props) {
                     <LineEditor
                       initial={item}
                       showPrice={isAudit}
+                      excludable={isAudit}
                       onSave={async (values) => {
                         await actions.updateItem(item.id, values);
                         setEditingId(null);
@@ -89,7 +87,6 @@ export function ItemLog({ kind, items, searching, onIndex, onAdd }: Props) {
                       dbMatch={pricesFor(byKey.get(materialKey(item.item_name, item.unit)), item)}
                       onEdit={() => setEditingId(item.id)}
                       onPhotos={() => setPhotosOf(item)}
-                      onIndex={onIndex}
                       onDelivered={(date) => actions.setDelivered([item.id], date)}
                       pendingDelete={pendingDeletes.has(item.id)}
                       onUndo={() => actions.undoDelete(item.id)}
@@ -117,15 +114,6 @@ export function ItemLog({ kind, items, searching, onIndex, onAdd }: Props) {
             <Check size={14} /> Mark all delivered
           </button>
         )}
-        {isAudit && indexable.length > 0 && (
-          <button
-            onClick={onIndex}
-            className="w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-br from-orange-500 to-orange-600 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-lg shadow-orange-100 transition-all active:scale-95"
-            title="Save this purchase list; its rates go into Rates"
-          >
-            <Zap size={14} fill="currentColor" /> Save all rates
-          </button>
-        )}
       </div>
     </>
   );
@@ -133,9 +121,13 @@ export function ItemLog({ kind, items, searching, onIndex, onAdd }: Props) {
 
 /** Past prices for this exact item: a line naming a brand/model/colour only sees prices for that. */
 type MatchingPrices = Pick<MaterialEntry, 'latestPrice' | 'priceHistory'>;
+/** Prices recorded for this item before, not counting the line itself (which is in Rates as soon as it has a price). */
 function pricesFor(entry: MaterialEntry | undefined, item: ItemRow): MatchingPrices | undefined {
   if (!entry) return undefined;
-  const priceHistory = entry.priceHistory.filter((p) => variantMatches(item, p.variant));
+  // Its saved copy (same day, rate and vendor) is the same purchase too.
+  const same = (p: MaterialEntry['priceHistory'][number]) =>
+    p.itemId === item.id || (p.date === (item.date || todayISO()) && p.price === item.unit_price && p.vendor === (item.vendor || 'Unknown'));
+  const priceHistory = entry.priceHistory.filter((p) => !same(p) && variantMatches(item, p.variant));
   return priceHistory.length ? { priceHistory, latestPrice: priceHistory[priceHistory.length - 1].price } : undefined;
 }
 
@@ -146,13 +138,12 @@ interface CardProps {
   onEdit(): void;
   /** Shows the bill photo the line was read from. */
   onPhotos(): void;
-  onIndex(): void;
   onDelivered(date: string): void;
   pendingDelete: boolean;
   onUndo(): void;
 }
 
-function ItemCard({ item, isAudit, dbMatch, onEdit, onPhotos, onIndex, onDelivered, pendingDelete, onUndo }: CardProps) {
+function ItemCard({ item, isAudit, dbMatch, onEdit, onPhotos, onDelivered, pendingDelete, onUndo }: CardProps) {
   if (pendingDelete) {
     return (
       <div className="flex items-center gap-3 min-h-[44px]">
@@ -172,9 +163,6 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onPhotos, onIndex, onDeliver
   const diffPercent = dbMatch && item.unit_price && dbMatch.latestPrice > 0 ? ((item.unit_price - dbMatch.latestPrice) / dbMatch.latestPrice) * 100 : 0;
   const isHigher = diffPercent > 2;
   const isLower = diffPercent < -2;
-  const itemDate = item.date || todayISO();
-  const last = dbMatch?.priceHistory[dbMatch.priceHistory.length - 1];
-  const isIndexed = !!last && dbMatch!.latestPrice === item.unit_price && last.date === itemDate;
 
   return (
     <div>
@@ -220,20 +208,12 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onPhotos, onIndex, onDeliver
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
           {item.photo_id && <PhotoChip onClick={onPhotos} name={item.item_name} />}
           <DeliveredToggle name={item.item_name} deliveredAt={item.delivered_at} onChange={onDelivered} />
-          {isIndexed ? (
-            <span className="flex items-center gap-1 text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100">
-              <Check size={12} /> Rate saved
+          {!!item.rates_excluded && (
+            <span className="flex items-center gap-1 text-xs font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+              <EyeOff size={12} /> Not in Rates
             </span>
-          ) : (
-            <button
-              onClick={onIndex}
-              className="flex items-center gap-1 text-xs font-bold text-orange-700 hover:text-white hover:bg-orange-500 px-2 py-0.5 rounded border border-orange-200 transition-all"
-              title="Save this purchase list; its rates go into Rates"
-            >
-              <Zap size={12} /> Save rate
-            </button>
           )}
-          {dbMatch && dbMatch.latestPrice > 0 && !isIndexed && (
+          {dbMatch && dbMatch.latestPrice > 0 && item.unit_price > 0 && (
             <span className={`flex items-center gap-1 text-xs ${isHigher ? 'text-red-600' : isLower ? 'text-green-700' : 'text-gray-500'}`}>
               {(isHigher || isLower) && <AlertTriangle size={12} />}
               Last paid {rupees(dbMatch.latestPrice)}

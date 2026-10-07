@@ -205,7 +205,7 @@ export async function addItems(db: Db, listId: string, materials: MaterialInput[
   await db.transaction((tx) => insertMaterials(tx, listId, materials));
 }
 
-export type ItemPatch = Partial<Pick<ItemRow, 'item_name' | 'quantity' | 'unit' | 'unit_price' | 'vendor' | 'date' | 'delivered_at' | 'ordered_as' | VariantField>>;
+export type ItemPatch = Partial<Pick<ItemRow, 'item_name' | 'quantity' | 'unit' | 'unit_price' | 'vendor' | 'date' | 'delivered_at' | 'ordered_as' | 'rates_excluded' | VariantField>>;
 
 /**
  * Save an edited item. When the name or unit changed, remember the correction
@@ -499,7 +499,9 @@ export async function clearHiddenMaterials(db: Db) {
     for (const item of await tx.all<ItemRow>(selectAll('items', 'created_at'))) {
       const list = lists.get(item.list_id);
       const at = hiddenAt(item);
-      if (list?.status === 'saved' && at && list.created_at <= at) await tx.run('UPDATE items SET rates_excluded = 1 WHERE id = ?', [item.id]);
+      // Saved lines by their list's date; lines on the open purchase list (which count in Rates too) by their own.
+      const recordedAt = list?.status === 'saved' ? list.created_at : list?.kind === 'audit' ? item.created_at : '';
+      if (recordedAt && at && recordedAt <= at) await tx.run('UPDATE items SET rates_excluded = 1 WHERE id = ?', [item.id]);
     }
     for (const rate of await tx.all<IndexedRateRow>(selectAll('indexed_rates', 'indexed_at'))) {
       const at = hiddenAt(rate);

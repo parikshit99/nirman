@@ -330,11 +330,12 @@ describe('local repository', () => {
     const snap = await loadSnapshot(db);
     expect(snap.hidden).toEqual([]);
     expect(snap.rates).toEqual([]);
-    const saved = snap.items.filter((i) => i.list_id !== DRAFT_IDS.audit);
-    expect(saved.map((i) => [i.item_name, i.rates_excluded]).sort()).toEqual([['Cement', 1], ['Sand', 0]]);
+    // On the saved list and on the open purchase list alike.
+    expect(snap.items.map((i) => [i.item_name, i.rates_excluded]).sort()).toEqual([['Cement', 1], ['Cement', 1], ['Sand', 0], ['Sand', 0]]);
     expect(buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned)).map((e) => e.name)).toEqual(['Sand']);
 
     // A later purchase of it shows in Rates again.
+    await addItems(db, DRAFT_IDS.audit, [cement]);
     await saveDraftToHistory(db, 'audit', meta);
     const after = await loadSnapshot(db);
     expect(buildItemDatabase(after.lists, after.items, after.rates, learningMap(after.learned)).map((e) => e.name)).toEqual(['Cement', 'Sand']);

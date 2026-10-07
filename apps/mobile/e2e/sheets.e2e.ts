@@ -186,3 +186,26 @@ test('behaves like an app: no tap flash, no text selection on a long press, no p
   await page.getByRole('button', { name: 'Saved', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
 });
+
+test('a purchase counts in Rates straight away, unless left out', async ({ page }) => {
+  await page.getByRole('button', { name: 'Add purchases' }).click();
+  await page.getByRole('button', { name: /add item manually/i }).click();
+  await page.getByLabel('Item name').fill('OPC Cement 53 grade');
+  await page.getByLabel('Quantity').fill('10');
+  await page.getByLabel('Rate', { exact: true }).fill('385');
+  await page.getByRole('button', { name: /^add to/i }).click();
+  await page.getByLabel('Close manual entry').click();
+  await page.getByRole('dialog', { name: /^Add/ }).getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByRole('button', { name: /save rate/i })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Rates', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Edit OPC Cement 53 grade' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Purchases', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit OPC Cement 53 grade' }).click();
+  await page.getByLabel('Leave out of Rates').check();
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByText('Not in Rates')).toBeVisible();
+  await page.getByRole('button', { name: 'Rates', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Edit OPC Cement 53 grade' })).toHaveCount(0);
+});
