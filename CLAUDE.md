@@ -23,6 +23,7 @@ When unsure between two sizes, pick the smaller one. A test (`apps/mobile/test/w
 - Database changes: append a migration to `MIGRATIONS` in `packages/core/src/data/schema.ts` (never edit a shipped one), bump the backup `VERSION` in `backup.ts` keeping older versions readable, and update docs/data-format.md.
 - Keep internal ids unchanged (app id, `nirmaan` database names, backup `APP_ID`), so existing installs keep their data.
 - Times shown to the user are in IST.
+- Claude: give every time in IST (UTC+5:30) when talking to the owner too (CI runs, check-ins, schedules), never only UTC.
 - The app must work at 320–360 px wide without sideways scrolling (see *UI and UX*).
 
 ## UI and UX (since 4.0)
