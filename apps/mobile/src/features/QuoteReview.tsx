@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, Trash2 } from 'lucide-react';
 import { compareQuotes, normalizeTerm, parseAmount, variantDifferences, variantLabel, type QuoteLineRow, type QuoteRow, type VariantField } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { VsLastBadge, rupees } from '../components/PriceBadges.tsx';
-import type { QuoteLinePatch } from '../data/repo.ts';
+import type { QuoteLinePatch } from '@nirman/core';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
 import { VariantFields } from '../components/VariantFields.tsx';

@@ -1,16 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Download, Eye, EyeOff, KeyRound, Loader2, Settings as SettingsIcon, Trash2, Upload } from 'lucide-react';
-import { backupFilename, BackupError } from '../data/backup.ts';
+import {
+  backupFilename,
+  BackupError,
+  FALLBACK_MODELS,
+  listReadingModels,
+  testGeminiKey,
+  type ModelOption,
+  DEFAULT_MODEL,
+  type ReadingMode,
+  clearLog,
+  getLog,
+  issueUrl,
+  logAsText,
+  logStep,
+  loadConversions,
+  resetConversions,
+  saveConversions,
+  describeLastBackup,
+  recordBackup,
+} from '@nirman/core';
+import { latestNotes } from '../lib/changelog.ts';
 import { shareBytes, shareFile, textToBase64 } from '../lib/files.ts';
-import { FALLBACK_MODELS, listReadingModels, testGeminiKey, type ModelOption } from '../lib/gemini.ts';
-import { DEFAULT_MODEL, type ReadingMode } from '../lib/settings.ts';
 import { APP_VERSION } from '../lib/version.ts';
-import { latestNotes } from '../lib/whatsNew.ts';
-import { clearLog, getLog, issueUrl, logAsText, logStep } from '../lib/diagnostics.ts';
 import { isNative } from '../lib/platform.ts';
-import { loadConversions, resetConversions, saveConversions } from '../lib/conversionSettings.ts';
 import { parseSize, sizeLabel, type SheetSize } from '@nirman/shared';
-import { describeLastBackup, recordBackup } from '../lib/backupReminder.ts';
 import { useAppState } from '../state/AppState.tsx';
 import { useDialogs } from './Dialogs.tsx';
 import { Sheet, SheetHeader } from './ui/Sheet.tsx';

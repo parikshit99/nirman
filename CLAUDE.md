@@ -19,7 +19,8 @@ When unsure between two sizes, pick the smaller one. A test (`apps/mobile/test/w
 ## Conventions
 
 - Never put the Gemini API key in the app or the repo.
-- Database changes: append a migration to `MIGRATIONS` in `apps/mobile/src/data/schema.ts` (never edit a shipped one), bump the backup `VERSION` in `backup.ts` keeping older versions readable, and update docs/data-format.md.
+- `packages/core` has no browser or Capacitor code (its type check has no DOM); the app hands it storage and device details with `configureCore` (`apps/mobile/src/lib/coreSetup.ts`).
+- Database changes: append a migration to `MIGRATIONS` in `packages/core/src/data/schema.ts` (never edit a shipped one), bump the backup `VERSION` in `backup.ts` keeping older versions readable, and update docs/data-format.md.
 - Keep internal ids unchanged (app id, `nirmaan` database names, backup `APP_ID`), so existing installs keep their data.
 - Times shown to the user are in IST.
 - The app must work at 320–360 px wide without sideways scrolling (see *UI and UX*).
@@ -73,6 +74,6 @@ Plurals must agree ("1 item", "2 items").
 
 ## Diagnostics
 
-- `apps/mobile/src/lib/diagnostics.ts` keeps the on-phone log. Steps carry what they worked on (action arguments, AI input text and output lines, so item names, rates, vendors and addresses may appear) to help reproduce bugs; the owner allowed this, and the repo is private. Never log photos (`describe()` replaces encoded data with a size) or the API key (`scrub()` removes it).
+- `packages/core/src/lib/diagnostics.ts` keeps the on-phone log. Steps carry what they worked on (action arguments, AI input text and output lines, so item names, rates, vendors and addresses may appear) to help reproduce bugs; the owner allowed this, and the repo is private. Never log photos (`describe()` replaces encoded data with a size) or the API key (`scrub()` removes it).
 - Users send it with *Settings → Report a problem* (a pre-filled GitHub issue labelled `bug`) or *Share log*. Read those issues' logs when debugging.
 - There are no automatic crash reports: the log leaves the phone only when the user sends it.

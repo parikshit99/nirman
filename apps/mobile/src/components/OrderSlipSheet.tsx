@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { Eye, FileSpreadsheet, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { todayISO, type ItemRow } from '@nirman/shared';
-import { orderSlipSheet, pdfFile, pdfToJpegs, sheetToXlsx, type ExportFormat } from '../lib/exports.ts';
+import { orderSlipSheet, pdfFile, type ExportFormat, buildOrderSlipPdf, type OrderSlipDetails, prefs, logStep } from '@nirman/core';
+import { pdfToJpegs, sheetToXlsx } from '../lib/exportFiles.ts';
 import { shareFiles } from '../lib/files.ts';
-import { buildOrderSlipPdf, type OrderSlipDetails } from '../lib/pdf.ts';
-import { prefs } from '../lib/prefs.ts';
-import { logStep } from '../lib/diagnostics.ts';
 import { useDialogs } from './Dialogs.tsx';
 import { DocumentPreview } from './DocumentPreview.tsx';
 import { Button } from './ui/Button.tsx';

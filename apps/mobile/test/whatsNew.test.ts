@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { latestNotes, parseChangelog } from '../src/lib/whatsNew.ts';
+import { parseChangelog } from '@nirman/core';
+import { latestNotes } from '../src/lib/changelog.ts';
 
 describe("what's new", () => {
   it('reads the newest changelog section', () => {

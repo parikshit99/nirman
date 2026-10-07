@@ -21,16 +21,13 @@ import {
 } from 'lucide-react';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { PhotoSourceSheet } from '../components/PhotoSourceSheet.tsx';
-import type { Job, ListKind } from '../data/repo.ts';
+import { type Job, type ListKind, prefs, workTypeKey, type ReadingProgress } from '@nirman/core';
 import { chooseFromGallery, takePhoto } from '../lib/camera.ts';
 import { compressImage, dataUrlToBase64, readFileAsDataUrl } from '../lib/images.ts';
 import { isNative } from '../lib/platform.ts';
 import { startDictation, type SpeechLanguage } from '../lib/speech.ts';
 import { useAppState } from '../state/AppState.tsx';
-import { prefs } from '../lib/prefs.ts';
-import { workTypeKey } from '../lib/workType.ts';
 import type { IncomingShare } from '../lib/sharedFiles.ts';
-import type { ReadingProgress } from '../jobs/worker.ts';
 import { ManualEntry } from './ManualEntry.tsx';
 
 export function CapturePanel({

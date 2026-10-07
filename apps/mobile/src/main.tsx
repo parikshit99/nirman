@@ -1,3 +1,4 @@
+import { installErrorHandlers } from './lib/coreSetup.ts';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource/inter/400.css';
@@ -10,16 +11,13 @@ import '@fontsource/playfair-display/400-italic.css';
 import App from './App.tsx';
 import { DialogProvider } from './components/Dialogs.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
-import { installErrorHandlers, logError, logPerf } from './lib/diagnostics.ts';
-import { ensureProjects, loadSnapshot, resetStuckJobs } from './data/repo.ts';
-import { migrateLocal } from './data/schema.ts';
-import { openCapacitorSqlite, openSqlJs, type Db } from './data/sql.ts';
-import { JobWorker } from './jobs/worker.ts';
+import { logError, logPerf, ensureProjects, loadSnapshot, resetStuckJobs, migrateLocal, type Db, JobWorker, settingsStore } from '@nirman/core';
+import { openCapacitorSqlite, openSqlJs } from './data/drivers.ts';
 import { installBackButton } from './lib/backButton.ts';
+import { readPhotoText } from './lib/textReader.ts';
 import { connectivity } from './lib/connectivity.ts';
 import { isNative } from './lib/platform.ts';
 import { AppStateProvider, type Services } from './state/AppState.tsx';
-import { settingsStore } from './lib/settings.ts';
 import { installTheme } from './lib/theme.ts';
 import './index.css';
 
@@ -53,6 +51,7 @@ async function bootstrap() {
         settings.current = { ...settings.current, geminiModel };
         void settingsStore.save(settings.current);
       },
+      readPhotoText,
     );
     const services: Services = {
       db,

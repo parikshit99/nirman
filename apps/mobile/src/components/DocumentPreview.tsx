@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { jsPDF } from 'jspdf';
 import { Eye, Loader2, Share2 } from 'lucide-react';
-import { pdfToJpegs } from '../lib/exports.ts';
+import { pdfToJpegs } from '../lib/exportFiles.ts';
 import { Button } from './ui/Button.tsx';
 import { Sheet, SheetHeader } from './ui/Sheet.tsx';
 

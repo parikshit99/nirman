@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Building2, ClipboardCheck, Copy, MapPin, Save, Trash2, Truck } from 'lucide-react';
-import type { ListMeta } from '../data/repo.ts';
+import type { ListMeta } from '@nirman/core';
 import { Button } from './ui/Button.tsx';
 import { Sheet, SheetHeader } from './ui/Sheet.tsx';
 import { SuggestInput } from './ui/SuggestInput.tsx';

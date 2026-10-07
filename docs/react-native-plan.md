@@ -1,6 +1,6 @@
 # Moving Nirman to React Native
 
-Status: agreed October 2026. Phase 1 next.
+Status: agreed October 2026. Phase 2 next.
 
 The Capacitor app is replaced by a React Native (Expo) app using Android's own controls. There is no beta app beside the old one: the new app is built over the next few sessions, and the update that switches is a normal update to the same app. Phases are sized so that each one fits in **one Claude session and one PR**.
 
@@ -164,7 +164,7 @@ Still not planned: swipe-to-delete (CLAUDE.md: delete from the edit view only) a
 
 ## Progress
 
-- [ ] Phase 1: shared core
+- [x] Phase 1: shared core
 - [ ] Phase 2: skeleton
 - [ ] Phase 3: UI pieces and Purchases
 - [ ] Phase 4: BOQ, Saved, Projects

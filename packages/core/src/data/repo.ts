@@ -29,6 +29,7 @@ import {
   type HiddenMaterialRow,
   type RowTypes,
 } from '@nirman/shared';
+import { platform } from '../platform.ts';
 import { seedCategories } from './schema.ts';
 import type { Db, SqlExecutor, SqlValue } from './sql.ts';
 
@@ -83,7 +84,7 @@ export interface ListMeta {
   site_date: string;
 }
 
-export const newId = () => crypto.randomUUID();
+export const newId = () => platform.randomUUID();
 
 let lastNowMs = 0;
 /** Strictly increasing timestamps, so rows written back to back keep their order. */

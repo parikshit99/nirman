@@ -4,7 +4,6 @@ import type { Db } from '../data/sql.ts';
 import { classifyError, createGeminiExtractor, type Extractor } from '../lib/gemini.ts';
 import { log, scrub } from '../lib/diagnostics.ts';
 import { loadConversions } from '../lib/conversionSettings.ts';
-import { readPhotoText } from '../lib/textReader.ts';
 import type { Settings } from '../lib/settings.ts';
 
 export interface WorkerStatus {
@@ -71,7 +70,7 @@ export class JobWorker {
     /** Called when Gemini no longer knew the configured model and another was used. */
     private onModelReplaced?: (model: string) => void,
     /** Reads the text on a photo on the phone; null where that isn't available. */
-    private readPhoto: ((image: string) => Promise<TextBox[]>) | null = readPhotoText,
+    private readPhoto: ((image: string) => Promise<TextBox[]>) | null = null,
   ) {}
 
   subscribe(fn: () => void): () => void {

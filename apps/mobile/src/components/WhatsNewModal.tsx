@@ -2,7 +2,7 @@ import { Fragment, type ReactNode } from 'react';
 import { Sparkles, X } from 'lucide-react';
 import { Button } from './ui/Button.tsx';
 import { Sheet } from './ui/Sheet.tsx';
-import type { ReleaseNotes } from '../lib/whatsNew.ts';
+import type { ReleaseNotes } from '@nirman/core';
 
 /** **bold** and *italic* inside a line of the changelog. */
 function inline(text: string): ReactNode {

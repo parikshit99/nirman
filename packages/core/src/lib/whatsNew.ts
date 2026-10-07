@@ -1,4 +1,3 @@
-import changelog from '../../../../CHANGELOG.md?raw';
 import { prefs } from './prefs.ts';
 
 /** One "## <version> — <title>" section of CHANGELOG.md. */
@@ -19,11 +18,9 @@ export function parseChangelog(text: string): ReleaseNotes[] {
   return sections;
 }
 
-export const latestNotes: ReleaseNotes | undefined = parseChangelog(changelog)[0];
-
 const SEEN_KEY = 'nirmaan_whats_new_seen';
 
 /** Whether this phone has yet to see the newest notes. */
-export const hasUnseenNotes = () => !!latestNotes && prefs.get<string | null>(SEEN_KEY, null) !== latestNotes.version;
+export const hasUnseenNotes = (latestNotes: ReleaseNotes | undefined) => !!latestNotes && prefs.get<string | null>(SEEN_KEY, null) !== latestNotes.version;
 
-export const markNotesSeen = () => latestNotes && prefs.set(SEEN_KEY, latestNotes.version);
+export const markNotesSeen = (latestNotes: ReleaseNotes | undefined) => latestNotes && prefs.set(SEEN_KEY, latestNotes.version);

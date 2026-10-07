@@ -14,7 +14,7 @@ import {
   type ConversionKind,
   type SheetSize,
 } from '@nirman/shared';
-import { loadConversions } from '../lib/conversionSettings.ts';
+import { loadConversions } from '@nirman/core';
 
 export interface HelperResult {
   quantity: number;

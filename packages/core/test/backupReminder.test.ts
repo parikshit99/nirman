@@ -1,14 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { backupOverdue, describeLastBackup, recordBackup, snoozeBackupReminder } from '../src/lib/backupReminder.ts';
 import { backupFilename } from '../src/data/backup.ts';
+import { configureCore } from '../src/platform.ts';
 
 const store = new Map<string, string>();
-Object.assign(globalThis, {
-  localStorage: {
-    getItem: (k: string) => store.get(k) ?? null,
-    setItem: (k: string, v: string) => void store.set(k, v),
-  },
-});
+configureCore({ storage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => void store.set(k, v) } });
 const day = (d: string) => new Date(`${d}T10:00:00`);
 
 describe('backup reminder', () => {

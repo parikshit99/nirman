@@ -51,8 +51,10 @@ Code layout:
 
 ```
 apps/mobile      React + Vite UI, packaged as an Android app with Capacitor
+packages/core    shared by the apps, no browser or Capacitor code:
   src/data       SQLite schema, repository and backup
-  src/jobs       queue worker that sends offline entries to Gemini
+  src/jobs       queue worker that reads queued entries (on the phone or with Gemini)
+  src/lib        Gemini, settings, PDF and Excel, the problem log
 packages/shared  types/validation, Gemini prompt + parsing, price-database and labour-contract logic
 ```
 
