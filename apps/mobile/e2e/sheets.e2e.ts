@@ -240,3 +240,26 @@ test('a purchase counts in Rates straight away, unless left out', async ({ page 
   await page.getByRole('button', { name: 'Rates', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Edit OPC Cement 53 grade' })).toHaveCount(0);
 });
+
+test('a backup is one .zip that restores', async ({ page }) => {
+  await page.getByRole('button', { name: 'Add purchases' }).click();
+  await page.getByRole('button', { name: /add item manually/i }).click();
+  await page.getByLabel('Item name').fill('River sand');
+  await page.getByLabel('Quantity').fill('2');
+  await page.getByLabel('Rate', { exact: true }).fill('60');
+  await page.getByRole('button', { name: /^add to/i }).click();
+  await page.getByLabel('Close manual entry').click();
+  await page.getByRole('dialog', { name: /^Add/ }).getByRole('button', { name: 'Close' }).click();
+
+  await page.getByRole('button', { name: 'Settings' }).click();
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: /save backup/i }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(/^nirman-backup-\d{4}-\d{2}-\d{2}\.zip$/);
+  const path = await file.path();
+
+  await page.locator('input[type=file][accept*=".zip"]').setInputFiles(path);
+  await expect(page.getByText(/Restore the backup from .*1 items?/)).toBeVisible();
+  await page.getByRole('button', { name: 'Restore', exact: true }).last().click();
+  await expect(page.getByText('Backup restored')).toBeVisible();
+});

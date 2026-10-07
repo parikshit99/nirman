@@ -10,7 +10,7 @@ import {
   type QuoteLineRow,
   type QuoteRow,
 } from '@nirman/shared';
-import { exportBackup, parseBackup, restoreBackup } from '../data/backup.ts';
+import { exportBackupZip, parseBackupFile, restoreBackup, type BackupFile } from '../data/backup.ts';
 import * as repo from '../data/repo.ts';
 import { findDraft, type Job, type ListKind, type Snapshot } from '../data/repo.ts';
 import type { Db } from '../data/sql.ts';
@@ -243,13 +243,13 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
         setSettings(next);
         worker.schedule();
       },
-      exportBackup: () => exportBackup(db),
+      exportBackup: () => exportBackupZip(db),
       countTrainingSamples: () => repo.countTrainingSamples(db),
       exportTrainingData: () => repo.exportTrainingData(db),
       clearTrainingSamples: () => repo.clearTrainingSamples(db),
-      parseBackup,
-      async restoreBackup(backup: Parameters<typeof restoreBackup>[1]) {
-        await restoreBackup(db, backup);
+      parseBackup: parseBackupFile,
+      async restoreBackup({ backup, photos }: BackupFile) {
+        await restoreBackup(db, backup, photos);
         await refresh();
       },
     }, ['flushDeletes', 'processQueue', 'parseBackup', 'getBillPhotos']),
@@ -286,7 +286,11 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
     const learning = repo.learningMap(snapshot.learned);
     // Materials deleted from Data leave out everything recorded up to then, in the Data tab and in every price check.
     const deleted = Object.fromEntries(snapshot.hidden.map((h) => [h.id, h.hidden_at]));
+    const ratesStart = performance.now();
     const itemDatabase: MaterialEntry[] = buildItemDatabase(snapshot.lists, snapshot.items, snapshot.rates, learning, deleted);
+    // Worked out again after every change: note it in the log when it gets slow, with how much data there is.
+    const ratesMs = performance.now() - ratesStart;
+    if (ratesMs >= 300) logPerf('rates', ratesMs, { lines: snapshot.items.length, rates: snapshot.rates.length, materials: itemDatabase.length });
     const linesByQuote = new Map<string, QuoteLineRow[]>();
     for (const line of snapshot.quoteLines) {
       const list = linesByQuote.get(line.quote_id);

@@ -117,7 +117,7 @@ function QuoteList({ boq, quotes, onAdd, onOpen }: { boq: HistoryRecord; quotes:
       {quotes.map((q) => {
         const job = jobForQuote(q.id);
         const lines = linesFor(q.id);
-        const summary = compareQuotes(boq.items, [q], lines, itemDatabase, learning).vendors[0];
+        const summary = compareQuotes(boq.items, [q], lines, itemDatabase, learning, boq.project_id).vendors[0];
         let state: React.ReactNode;
         if (job?.status === 'failed') {
           state = (

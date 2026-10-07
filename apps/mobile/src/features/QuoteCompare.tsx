@@ -23,7 +23,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
   const [orderFrom, setOrderFrom] = useState<string | null>(null);
   const { uniqueAddresses } = useAppState();
   const lines = quotes.flatMap((q) => linesFor(q.id));
-  const comparison = compareQuotes(boq.items, quotes, lines, itemDatabase, learning);
+  const comparison = compareQuotes(boq.items, quotes, lines, itemDatabase, learning, boq.project_id);
 
   if (quotes.length === 0) {
     return (
@@ -127,7 +127,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
               {comparison.vendors.map((v) => (
                 <div key={v.quote.id} className="flex justify-between items-start gap-2 py-1.5">
                   <span className="text-xs text-gray-700 truncate">{v.quote.vendor}</span>
-                  <PriceCell cell={row.cells[v.quote.id]} />
+                  <PriceCell cell={row.cells[v.quote.id]} projectId={boq.project_id} />
                 </div>
               ))}
             </div>
@@ -179,7 +179,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
                 </td>
                 {comparison.vendors.map((v) => (
                   <td key={v.quote.id} className={`p-2 text-right ${row.cells[v.quote.id]?.cheapest ? 'bg-green-50' : ''}`}>
-                    <PriceCell cell={row.cells[v.quote.id]} />
+                    <PriceCell cell={row.cells[v.quote.id]} projectId={boq.project_id} />
                   </td>
                 ))}
               </tr>
@@ -229,7 +229,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
 }
 
 /** One vendor's rate for one item: lowest marker, change against the last price, unit/quantity notes. */
-function PriceCell({ cell }: { cell?: QuoteCell }) {
+function PriceCell({ cell, projectId }: { cell?: QuoteCell; projectId: string }) {
   if (!cell || cell.price <= 0) return <span className="text-xs text-red-500 italic">not quoted</span>;
   return (
     <div className="text-right">
@@ -239,7 +239,7 @@ function PriceCell({ cell }: { cell?: QuoteCell }) {
         {cell.cheapest && <span className="ml-1 text-xs font-bold">· Lowest</span>}
       </div>
       <div className="mt-0.5">
-        <VsLastBadge vsLast={cell.vsLast} last={cell.lastPoint} />
+        <VsLastBadge vsLast={cell.vsLast} last={cell.lastPoint} projectId={projectId} />
       </div>
       {cell.unitDiffers && <div className="text-xs text-orange-700">different unit, not compared</div>}
       {cell.variantDiffers.length > 0 && <div className="text-xs text-orange-700">{variantLabel(cell.line)}: not what the BOQ asks for, not ranked</div>}

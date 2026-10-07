@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { AlertTriangle, Calendar, Camera, Check, EyeOff, FileCode, HardHat, History, Pencil, Plus, Truck } from 'lucide-react';
-import { materialKey, todayISO, variantLabel, variantMatches, type ItemRow, type MaterialEntry } from '@nirman/shared';
+import { lastPaidFor, materialKey, todayISO, variantLabel, type ItemRow, type LastPaid, type MaterialEntry } from '@nirman/shared';
 import { BillPhotosSheet } from '../components/BillPhotos.tsx';
 import { DeliveredToggle } from '../components/DeliveredToggle.tsx';
 import { LineEditor } from '../components/LineEditor.tsx';
@@ -24,7 +24,8 @@ const rupees = (n: number) => `₹${(n || 0).toLocaleString('en-IN', { maximumFr
 
 /** The current Audit or BOQ list: one card per item, sized for a phone screen. */
 export function ItemLog({ kind, items, searching, onAdd }: Props) {
-  const { actions, itemDatabase, pendingDeletes } = useAppState();
+  const { actions, itemDatabase, pendingDeletes, projectId, projects } = useAppState();
+  const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? '';
   const [editingId, setEditingId] = useState<string | null>(null);
   const [photosOf, setPhotosOf] = useState<ItemRow | null>(null);
   const isAudit = kind === 'audit';
@@ -84,7 +85,8 @@ export function ItemLog({ kind, items, searching, onAdd }: Props) {
                     <ItemCard
                       item={item}
                       isAudit={isAudit}
-                      dbMatch={pricesFor(byKey.get(materialKey(item.item_name, item.unit)), item)}
+                      lastPaid={lastPaidFor(byKey.get(materialKey(item.item_name, item.unit)), item, projectId, todayISO())}
+                      projectName={projectName}
                       onEdit={() => setEditingId(item.id)}
                       onPhotos={() => setPhotosOf(item)}
                       onDelivered={(date) => actions.setDelivered([item.id], date)}
@@ -119,22 +121,11 @@ export function ItemLog({ kind, items, searching, onAdd }: Props) {
   );
 }
 
-/** Past prices for this exact item: a line naming a brand/model/colour only sees prices for that. */
-type MatchingPrices = Pick<MaterialEntry, 'latestPrice' | 'priceHistory'>;
-/** Prices recorded for this item before, not counting the line itself (which is in Rates as soon as it has a price). */
-function pricesFor(entry: MaterialEntry | undefined, item: ItemRow): MatchingPrices | undefined {
-  if (!entry) return undefined;
-  // Its saved copy (same day, rate and vendor) is the same purchase too.
-  const same = (p: MaterialEntry['priceHistory'][number]) =>
-    p.itemId === item.id || (p.date === (item.date || todayISO()) && p.price === item.unit_price && p.vendor === (item.vendor || 'Unknown'));
-  const priceHistory = entry.priceHistory.filter((p) => !same(p) && variantMatches(item, p.variant));
-  return priceHistory.length ? { priceHistory, latestPrice: priceHistory[priceHistory.length - 1].price } : undefined;
-}
-
 interface CardProps {
   item: ItemRow;
   isAudit: boolean;
-  dbMatch?: MatchingPrices;
+  lastPaid?: LastPaid;
+  projectName(id: string): string;
   onEdit(): void;
   /** Shows the bill photo the line was read from. */
   onPhotos(): void;
@@ -143,7 +134,7 @@ interface CardProps {
   onUndo(): void;
 }
 
-function ItemCard({ item, isAudit, dbMatch, onEdit, onPhotos, onDelivered, pendingDelete, onUndo }: CardProps) {
+function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onPhotos, onDelivered, pendingDelete, onUndo }: CardProps) {
   if (pendingDelete) {
     return (
       <div className="flex items-center gap-3 min-h-[44px]">
@@ -160,7 +151,9 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onPhotos, onDelivered, pendi
     );
   }
 
-  const diffPercent = dbMatch && item.unit_price && dbMatch.latestPrice > 0 ? ((item.unit_price - dbMatch.latestPrice) / dbMatch.latestPrice) * 100 : 0;
+  const diffPercent = lastPaid && item.unit_price && lastPaid.price > 0 ? ((item.unit_price - lastPaid.price) / lastPaid.price) * 100 : 0;
+  // Another site's price can differ for transport alone: say where it is from.
+  const where = lastPaid?.scope === 'elsewhere' ? ` at ${lastPaid.site || projectName(lastPaid.projectId) || 'another site'}` : '';
   const isHigher = diffPercent > 2;
   const isLower = diffPercent < -2;
 
@@ -213,10 +206,10 @@ function ItemCard({ item, isAudit, dbMatch, onEdit, onPhotos, onDelivered, pendi
               <EyeOff size={12} /> Not in Rates
             </span>
           )}
-          {dbMatch && dbMatch.latestPrice > 0 && item.unit_price > 0 && (
+          {lastPaid && lastPaid.price > 0 && item.unit_price > 0 && (
             <span className={`flex items-center gap-1 text-xs ${isHigher ? 'text-red-600' : isLower ? 'text-green-700' : 'text-gray-500'}`}>
               {(isHigher || isLower) && <AlertTriangle size={12} />}
-              Last paid {rupees(dbMatch.latestPrice)}
+              Last paid{where} {rupees(lastPaid.price)}
               {isHigher ? ' (this is higher)' : isLower ? ' (this is lower)' : ''}
             </span>
           )}

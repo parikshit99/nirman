@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Download, Eye, EyeOff, KeyRound, Loader2, Settings as SettingsIcon, Trash2, Upload } from 'lucide-react';
 import { backupFilename, BackupError } from '../data/backup.ts';
-import { shareFile, textToBase64 } from '../lib/files.ts';
+import { shareBytes, shareFile, textToBase64 } from '../lib/files.ts';
 import { FALLBACK_MODELS, listReadingModels, testGeminiKey, type ModelOption } from '../lib/gemini.ts';
 import { DEFAULT_MODEL, type ReadingMode } from '../lib/settings.ts';
 import { APP_VERSION } from '../lib/version.ts';
@@ -292,8 +292,8 @@ function BackupSection() {
   const doExport = async () => {
     setBusy(true);
     try {
-      const backup = await actions.exportBackup();
-      await shareFile(backupFilename(), textToBase64(JSON.stringify(backup)), 'application/json');
+      const { bytes } = await actions.exportBackup();
+      await shareBytes(backupFilename(), bytes, 'application/zip');
       recordBackup();
       setLastBackup(describeLastBackup());
     } catch (err) {
@@ -305,17 +305,18 @@ function BackupSection() {
 
   const doImport = async (file: File) => {
     try {
-      const backup = actions.parseBackup(await file.text());
+      const parsed = actions.parseBackup(new Uint8Array(await file.arrayBuffer()));
+      const { backup } = parsed;
       const when = new Date(backup.exported_at).toLocaleString('en-IN');
       const saved = backup.lists.filter((l) => l.status === 'saved').length;
       const ok = await dialogs.confirm('Replace all data on this phone?', {
-        message: `Restore the backup from ${when} (${saved} saved lists, ${backup.items.length} items).\nEverything currently on this phone, including queued entries, will be replaced.`,
+        message: `Restore the backup from ${when} (${saved} saved lists, ${backup.items.length} items, ${parsed.photos.size ? `${parsed.photos.size} bill ${parsed.photos.size === 1 ? 'photo' : 'photos'}` : 'no bill photos'}).\nEverything currently on this phone, including queued entries, will be replaced.`,
         confirmLabel: 'Restore',
         danger: true,
       });
       if (!ok) return;
       setBusy(true);
-      await actions.restoreBackup(backup);
+      await actions.restoreBackup(parsed);
       dialogs.toast('Backup restored');
     } catch (err) {
       await dialogs.alert('Could not restore', err instanceof BackupError ? err.message : (err as Error).message);
@@ -328,7 +329,7 @@ function BackupSection() {
     <section className="space-y-3">
       <SectionTitle>Backup</SectionTitle>
       <p className="text-xs text-gray-500 leading-relaxed">
-        Your data lives only on this phone. Save a backup file to Google Drive, WhatsApp or email now and then, so you can restore it on a new phone.
+        Your data lives only on this phone. Save a backup to Google Drive, WhatsApp or email every week, so you can restore it on a new phone. It is one .zip file with everything, bill photos included.
       </p>
       <p className={`text-xs font-bold ${lastBackup === 'never' ? 'text-red-600' : 'text-gray-700'}`}>Last backup: {lastBackup}</p>
       <div className="flex gap-3">
@@ -346,7 +347,7 @@ function BackupSection() {
       <input
         ref={fileRef}
         type="file"
-        accept="application/json,.json"
+        accept="application/zip,.zip,application/json,.json"
         className="hidden"
         aria-label="Backup file"
         onChange={(e) => {

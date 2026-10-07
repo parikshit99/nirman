@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BackupError, exportBackup, parseBackup, restoreBackup } from '../src/data/backup.ts';
+import { BackupError, exportBackup, exportBackupZip, parseBackup, parseBackupFile, restoreBackup } from '../src/data/backup.ts';
+import { getBillPhotos } from '../src/data/repo.ts';
 import {
   addCategory,
   addItems,
@@ -67,6 +68,28 @@ describe('backup', () => {
     expect([restored.contracts.length, restored.contractEntries.length]).toEqual([1, 1]);
     expect(restored.jobs).toHaveLength(0);
     expect(restored.items.some((i) => i.item_name === 'Old data')).toBe(false);
+  });
+
+  it('keeps bill photos in a .zip backup, and still reads an old .json one', async () => {
+    const source = await populated();
+    const [line] = (await loadSnapshot(source)).items;
+    const jpeg = btoa(String.fromCharCode(0xff, 0xd8, 0xff, 0xe0, 1, 2, 3));
+    await source.run("INSERT INTO bill_photos (id, created_at, images) VALUES ('ph1', '2026-09-30T10:00:00.000Z', ?)", [JSON.stringify([jpeg, jpeg])]);
+    await source.run("UPDATE items SET photo_id = 'ph1' WHERE id = ?", [line.id]);
+
+    const { bytes, photos } = await exportBackupZip(source);
+    expect(photos).toBe(1);
+    const file = parseBackupFile(bytes);
+    expect(file.backup.bill_photos).toEqual([{ id: 'ph1', created_at: '2026-09-30T10:00:00.000Z', files: ['photos/ph1-1.jpg', 'photos/ph1-2.jpg'] }]);
+
+    const target = await freshDb();
+    await restoreBackup(target, file.backup, file.photos);
+    expect(await getBillPhotos(target, 'ph1')).toEqual([jpeg, jpeg]);
+    expect((await loadSnapshot(target)).items.find((i) => i.id === line.id)?.photo_id).toBe('ph1');
+
+    const old = parseBackupFile(new TextEncoder().encode(JSON.stringify(await exportBackup(source))));
+    expect([old.backup.items.length, old.photos.size]).toEqual([file.backup.items.length, 0]);
+    expect(() => parseBackupFile(new Uint8Array([0x50, 0x4b, 1, 2]))).toThrow(/damaged/);
   });
 
   it('rejects other files without touching the data', async () => {
