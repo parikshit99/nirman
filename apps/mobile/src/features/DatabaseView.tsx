@@ -235,7 +235,7 @@ function Materials({ entries: filtered, materialFilter, onMaterialFilter, catego
             </EmptyState>
           ) : (
             <EmptyState icon={Database} title="No prices yet">
-              Prices appear here when you save a purchase list (Save button), tap <b>Save rate</b> on a purchase (which saves the list), or confirm a vendor quote.
+              A price appears here as soon as you add a purchase with a rate, and when you confirm a vendor quote.
               {unsavedPriced > 0 && ` Your purchase list has ${unsavedPriced} priced item${unsavedPriced === 1 ? '' : 's'} not added yet.`}
             </EmptyState>
           )
@@ -374,8 +374,8 @@ function Materials({ entries: filtered, materialFilter, onMaterialFilter, catego
         <div>
           <h4 className="text-xs font-bold text-gray-700">Where prices come from</h4>
           <p className="text-xs text-gray-500">
-            Saved purchase lists (Save or Save rate), rates saved on their own by earlier versions, and confirmed vendor quotes. Fixing or removing a price from a saved list
-            changes that list too.
+            Every purchase with a rate, as soon as it is added (the open purchase list and saved lists), confirmed vendor quotes, and rates added on their own. Fixing or
+            removing a price here changes its list too. To keep one price out (e.g. transport included), edit the purchase and tick <b>Leave out of Rates</b>.
           </p>
         </div>
       </div>
@@ -568,6 +568,13 @@ function PriceList({ points }: { points: MaterialEntry['priceHistory'] }) {
   );
 }
 
+/** Where a price came from, for its row in Prices or above its editor. */
+function priceSource(p: MaterialEntry['priceHistory'][number], where: 'row' | 'edit') {
+  if (p.draft) return where === 'row' ? 'Open purchase list' : 'Line in the open purchase list; the list changes too.';
+  if (p.listTitle) return where === 'row' ? `Saved list: ${p.listTitle}` : `Line in the saved list “${p.listTitle}”; the list changes too.`;
+  return 'Added rate';
+}
+
 function PriceRow({ point: p }: { point: MaterialEntry['priceHistory'][number] }) {
   const { actions, pendingDeletes, snapshot } = useAppState();
   const [editing, setEditing] = useState(false);
@@ -581,10 +588,11 @@ function PriceRow({ point: p }: { point: MaterialEntry['priceHistory'][number] }
   if (editing && (item || rate)) {
     return (
       <li className="px-2 py-3 bg-orange-50/60">
-        <p className="text-xs text-gray-500 mb-2">{p.listTitle ? `Line in the saved list “${p.listTitle}”; the list changes too.` : 'Added rate'}</p>
+        <p className="text-xs text-gray-500 mb-2">{priceSource(p, 'edit')}</p>
         <LineEditor
           initial={item ?? { ...rate!, quantity: 0, unit_price: rate!.price, ordered_as: '' }}
           showQuantity={!!item}
+          excludable={!!item}
           onSave={async (values) => {
             if (item) await actions.updateItem(item.id, values);
             else {
@@ -626,7 +634,7 @@ function PriceRow({ point: p }: { point: MaterialEntry['priceHistory'][number] }
             </span>
           </div>
           {variantLabel(p.variant) && <div className="text-xs font-bold text-gray-700 truncate">{variantLabel(p.variant)}</div>}
-          <div className="text-xs text-gray-500 truncate">{p.listTitle ? `Saved list: ${p.listTitle}` : 'Added rate'}</div>
+          <div className="text-xs text-gray-500 truncate">{priceSource(p, 'row')}</div>
         </button>
       )}
     </li>
