@@ -36,7 +36,7 @@ The `nirmaan` names are the original internal ids. They stay unchanged so existi
 | `contract_entries` | something recorded on a contract | `contract_id`, `date`; `kind`: `work` (`quantity` in the contract's unit, or % of a lump sum), `payment` (`amount`, `mode`: cash / upi / bank / cheque) or `deduction` (`amount`); `note` |
 | `jobs`, `job_images` | entry waiting to be read by Gemini (with its photos as base64) | temporary; deleted once read |
 | `training_samples` | opt-in (*Keep bill photos for training*): a photographed bill kept for training an on-phone model | `engine` (`phone` or `gemini`, what read it), `ocr_text` (text the phone read), `images` (JSON array of base64 JPEGs), `item_ids` (JSON array of the `items` it became), `category`. Not in backups; exported from Settings as JSON Lines with each bill's current lines |
-| `bill_photos` | photographed bill whose lines were read | `images` (JSON array of base64 JPEGs), `created_at`. Lines point to it with `items.photo_id` (a saved copy of a line keeps it); deleted once no line does. Not in backups |
+| `bill_photos` | photographed bill whose lines were read | `images` (JSON array of base64 JPEGs, each at most 1200 px, JPEG quality 0.8), `created_at`. Lines point to it with `items.photo_id` (a saved copy of a line keeps it); deleted once no line does. In backups as JPEG files in the zip |
 | `schema_version` | — | number of migrations applied |
 
 Every list and item row also has `created_at` and `updated_at`.
@@ -66,21 +66,24 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
 
 ## Backup file
 
-*Settings → Save backup* writes one JSON file, `nirman-backup-YYYY-MM-DD.json`:
+*Settings → Save backup* writes one zip file, `nirman-backup-YYYY-MM-DD.zip`, holding `backup.json` and every bill photo as `photos/<bill_photos id>-<page>.jpg` (stored uncompressed: they are JPEGs already). `backup.json`:
 
 ```json
 {
   "app": "nirmaan-auditor",
-  "version": 11,
+  "version": 12,
   "exported_at": "2026-10-03T19:13:38.586Z",
   "projects": [], "lists": [], "items": [], "indexed_rates": [], "learned_terms": [],
   "categories": [], "quotes": [], "quote_lines": [], "hidden_materials": [],
-  "contracts": [], "contract_entries": []
+  "contracts": [], "contract_entries": [],
+  "bill_photos": [{ "id": "…", "created_at": "…", "files": ["photos/…-1.jpg"] }]
 }
 ```
 
 - Each array holds that table's rows exactly as stored, with the same column names.
-- `jobs`, `job_images`, `bill_photos` and `training_samples` are left out, so are quotes still waiting to be read. Restoring on the same phone keeps the bill photos of restored lines.
+- `bill_photos` lists each photo's pages by their file in the zip, instead of the base64 `images` column.
+- `jobs`, `job_images` and `training_samples` are left out, so are quotes still waiting to be read.
+- Restore reads the zip, or a plain `.json` from version 11 and earlier (which has no photos; restoring one on the same phone keeps the bill photos of restored lines).
 - Older files still restore:
   - version 1 (before vendor quotes) has no `quotes` or `quote_lines`;
   - version 2 (before hidden materials) has no `hidden_materials`;
@@ -91,6 +94,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
   - version 7 (before labour contracts) has no `contracts` or `contract_entries`;
   - version 8 (before bill photos) has `items` rows without `photo_id`;
   - version 9 (before clearing deleted rates) has `items` rows without `rates_excluded`;
-  - version 10 (before projects) has no `projects`, and `lists`, `contracts` and `indexed_rates` rows without `project_id`; they are sorted into projects as described above.
+  - version 10 (before projects) has no `projects`, and `lists`, `contracts` and `indexed_rates` rows without `project_id`; they are sorted into projects as described above;
+  - version 11 (before bill photos in backups) is a plain `.json` file with no `bill_photos`.
 - Restoring replaces everything on the phone.
 - Any reimplementation should read this format, so old backups keep working.

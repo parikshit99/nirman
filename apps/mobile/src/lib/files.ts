@@ -1,3 +1,4 @@
+import { bytesToBase64 } from './base64.ts';
 import { isNative } from './platform.ts';
 
 /**
@@ -36,6 +37,24 @@ export async function shareFiles(files: SharedFile[]): Promise<void> {
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   }
+}
+
+/** A large binary file (a backup .zip): written in pieces, so the whole file never sits in memory as base64 text. */
+export async function shareBytes(filename: string, bytes: Uint8Array, mimeType: string): Promise<void> {
+  if (!isNative) {
+    await shareFiles([{ filename, base64: bytesToBase64(bytes), mimeType }]);
+    return;
+  }
+  const { Filesystem, Directory } = await import('@capacitor/filesystem');
+  const { Share } = await import('@capacitor/share');
+  const CHUNK = 3 * 1024 * 1024; // a multiple of 3, so the base64 pieces join up
+  let uri = '';
+  for (let at = 0; at === 0 || at < bytes.length; at += CHUNK) {
+    const data = bytesToBase64(bytes.subarray(at, at + CHUNK));
+    if (at === 0) uri = (await Filesystem.writeFile({ path: filename, data, directory: Directory.Cache })).uri;
+    else await Filesystem.appendFile({ path: filename, data, directory: Directory.Cache });
+  }
+  await Share.share({ title: filename, files: [uri], dialogTitle: 'Save or send' });
 }
 
 export function textToBase64(text: string): string {

@@ -35,6 +35,6 @@ describe('backup reminder', () => {
 
   it('names backup files by the local date', () => {
     // 1 AM local on 4 Oct must not become 3 Oct (the UTC date in India).
-    expect(backupFilename(new Date(2026, 9, 4, 1, 0))).toBe('nirman-backup-2026-10-04.json');
+    expect(backupFilename(new Date(2026, 9, 4, 1, 0))).toBe('nirman-backup-2026-10-04.zip');
   });
 });

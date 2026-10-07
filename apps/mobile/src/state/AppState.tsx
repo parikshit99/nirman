@@ -10,7 +10,7 @@ import {
   type QuoteLineRow,
   type QuoteRow,
 } from '@nirman/shared';
-import { exportBackup, parseBackup, restoreBackup } from '../data/backup.ts';
+import { exportBackupZip, parseBackupFile, restoreBackup, type BackupFile } from '../data/backup.ts';
 import * as repo from '../data/repo.ts';
 import { findDraft, type Job, type ListKind, type Snapshot } from '../data/repo.ts';
 import type { Db } from '../data/sql.ts';
@@ -243,13 +243,13 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
         setSettings(next);
         worker.schedule();
       },
-      exportBackup: () => exportBackup(db),
+      exportBackup: () => exportBackupZip(db),
       countTrainingSamples: () => repo.countTrainingSamples(db),
       exportTrainingData: () => repo.exportTrainingData(db),
       clearTrainingSamples: () => repo.clearTrainingSamples(db),
-      parseBackup,
-      async restoreBackup(backup: Parameters<typeof restoreBackup>[1]) {
-        await restoreBackup(db, backup);
+      parseBackup: parseBackupFile,
+      async restoreBackup({ backup, photos }: BackupFile) {
+        await restoreBackup(db, backup, photos);
         await refresh();
       },
     }, ['flushDeletes', 'processQueue', 'parseBackup', 'getBillPhotos']),

@@ -2,6 +2,11 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 5.1 — Bill photos in backups, prices checked per site
+
+- **Backups keep the bills.** *Save backup* now makes one .zip with everything and every bill photo, so a restored phone still has the proof behind each line. Save it to Google Drive every week; the app reminds you. Older .json backups still restore.
+- **Prices are checked against this site first.** *Last paid* on a purchase, and the comparison of vendor quotes, now use the last price paid on this project. Only when this site has none is another site's price shown, with its address ("Last paid at Dwarka").
+
 ## 5.0 — Projects
 
 - **Everything belongs to a project.** Tap the project name at the top to switch projects or start a new one (a name and its site address). Each project keeps its own open purchase list and BOQ, its saved lists and its labour contracts, so bills for one site never land in another's list.
