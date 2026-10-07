@@ -286,7 +286,11 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
     const learning = repo.learningMap(snapshot.learned);
     // Materials deleted from Data leave out everything recorded up to then, in the Data tab and in every price check.
     const deleted = Object.fromEntries(snapshot.hidden.map((h) => [h.id, h.hidden_at]));
+    const ratesStart = performance.now();
     const itemDatabase: MaterialEntry[] = buildItemDatabase(snapshot.lists, snapshot.items, snapshot.rates, learning, deleted);
+    // Worked out again after every change: note it in the log when it gets slow, with how much data there is.
+    const ratesMs = performance.now() - ratesStart;
+    if (ratesMs >= 300) logPerf('rates', ratesMs, { lines: snapshot.items.length, rates: snapshot.rates.length, materials: itemDatabase.length });
     const linesByQuote = new Map<string, QuoteLineRow[]>();
     for (const line of snapshot.quoteLines) {
       const list = linesByQuote.get(line.quote_id);

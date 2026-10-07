@@ -177,8 +177,10 @@ export function buildItemDatabase(
   learning: LearningMap,
   deleted: Record<string, string> = {},
 ): MaterialEntry[] {
-  const isDeleted = (name: string, unit: string, recordedAt: string) => {
-    const cutoff = deleted[materialKey(name, unit)];
+  const anyDeleted = Object.keys(deleted).length > 0;
+  const isDeleted = (key: string, recordedAt: string) => {
+    if (!anyDeleted) return false;
+    const cutoff = deleted[key];
     return !!cutoff && recordedAt <= cutoff;
   };
   type Acc = Omit<MaterialEntry, 'vendors' | 'categories' | 'addresses' | 'minPrice' | 'maxPrice' | 'avgPrice' | 'latestPrice' | 'variants'> & {
@@ -189,8 +191,9 @@ export function buildItemDatabase(
     variants: Map<string, Variant>;
   };
   const db = new Map<string, Acc>();
-  const entry = (name: string, unit: string): Acc => {
-    const key = materialKey(name, unit);
+  // Each point's variant key, worked out once while reading and reused when grouping by variant.
+  const pointVariant = new WeakMap<PricePoint, string>();
+  const entry = (key: string, name: string, unit: string): Acc => {
     let e = db.get(key);
     if (!e) {
       e = { key, name, unit, vendors: new Set(), categories: new Set(), addresses: new Set(), priceHistory: [], variants: new Map() };
@@ -206,30 +209,33 @@ export function buildItemDatabase(
     [key, variant, date, price, vendor.trim().toLowerCase()].join('\u0000');
 
   // Saved lines first: saving copies the open list's lines, which then count once, as the saved copy.
-  const ordered = [...items].sort((a, b) => Number(savedLists.get(a.list_id)?.status === 'draft') - Number(savedLists.get(b.list_id)?.status === 'draft'));
+  const onDraft = (i: ItemRow) => savedLists.get(i.list_id)?.status === 'draft';
+  const ordered = [...items.filter((i) => !onDraft(i)), ...items.filter(onDraft)];
   for (const raw of ordered) {
     if (!raw.item_name) continue;
     const list = savedLists.get(raw.list_id);
     if (!list) continue;
 
     const { item_name, unit } = applyLearning(learning, raw);
+    const key = materialKey(item_name, unit);
     const draft = list.status === 'draft';
     const recordedAt = draft ? raw.created_at || list.created_at : list.created_at;
     const variant = variantOf(raw);
+    const vKey = variantKey(variant);
     const date = raw.date || recordedAt.slice(0, 10);
-    const point = raw.unit_price > 0 ? pricePointKey(materialKey(item_name, unit), variantKey(variant), date, raw.unit_price, raw.vendor || 'Unknown') : '';
+    const point = raw.unit_price > 0 ? pricePointKey(key, vKey, date, raw.unit_price, raw.vendor || 'Unknown') : '';
     // The open list's copy of a saved line is that line: counted once, or left out with it.
     if (draft && point && savedPrices.has(point)) continue;
     if (point) savedPrices.add(point);
-    if (raw.rates_excluded || isDeleted(item_name, unit, recordedAt)) continue;
+    if (raw.rates_excluded || isDeleted(key, recordedAt)) continue;
 
-    const e = entry(item_name, unit);
-    if (!e.variants.has(variantKey(variant))) e.variants.set(variantKey(variant), variant);
+    const e = entry(key, item_name, unit);
+    if (!e.variants.has(vKey)) e.variants.set(vKey, variant);
     if (raw.vendor) e.vendors.add(raw.vendor);
     if (list.category) e.categories.add(list.category);
     if (list.address) e.addresses.add(list.address);
     if (point) {
-      e.priceHistory.push({
+      const p: PricePoint = {
         date,
         price: raw.unit_price,
         vendor: raw.vendor || 'Unknown',
@@ -239,19 +245,23 @@ export function buildItemDatabase(
         site: list.address || undefined,
         itemId: raw.id,
         variant,
-      });
+      };
+      pointVariant.set(p, vKey);
+      e.priceHistory.push(p);
     }
   }
 
   for (const rate of rates) {
     const { item_name, unit } = applyLearning(learning, rate);
-    if (isDeleted(item_name, unit, rate.indexed_at)) continue;
-    // "Index rate" on a line that was later saved: the saved line already counts this price.
-    if (savedPrices.has(pricePointKey(materialKey(item_name, unit), variantKey(rate), rate.date, rate.price, rate.vendor || 'Unknown'))) continue;
-    const e = entry(item_name, unit);
+    const key = materialKey(item_name, unit);
+    if (isDeleted(key, rate.indexed_at)) continue;
     const variant = variantOf(rate);
-    if (!e.variants.has(variantKey(variant))) e.variants.set(variantKey(variant), variant);
-    e.priceHistory.push({
+    const vKey = variantKey(variant);
+    // "Index rate" on a line that was later saved: the saved line already counts this price.
+    if (savedPrices.has(pricePointKey(key, vKey, rate.date, rate.price, rate.vendor || 'Unknown'))) continue;
+    const e = entry(key, item_name, unit);
+    if (!e.variants.has(vKey)) e.variants.set(vKey, variant);
+    const p: PricePoint = {
       date: rate.date,
       price: rate.price,
       vendor: rate.vendor || 'Manual Index',
@@ -260,7 +270,9 @@ export function buildItemDatabase(
       projectId: rate.project_id || undefined,
       site: rate.address || undefined,
       variant,
-    });
+    };
+    pointVariant.set(p, vKey);
+    e.priceHistory.push(p);
     if (rate.vendor) e.vendors.add(rate.vendor);
     if (rate.category) e.categories.add(rate.category);
     if (rate.address) e.addresses.add(rate.address);
@@ -268,14 +280,22 @@ export function buildItemDatabase(
 
   return [...db.values()]
     .map((e) => {
-      const priceHistory = [...e.priceHistory].sort((a, b) => {
-        const byDate = new Date(a.date).getTime() - new Date(b.date).getTime();
-        return byDate !== 0 ? byDate : new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-      });
+      // Oldest first, by date then by when it was recorded; each date parsed once, not on every comparison.
+      const priceHistory = e.priceHistory
+        .map((p) => ({ p, day: Date.parse(p.date) || 0, at: Date.parse(p.timestamp) || 0 }))
+        .sort((a, b) => a.day - b.day || a.at - b.at)
+        .map((x) => x.p);
       const prices = priceHistory.map((h) => h.price);
+      const byVariant = new Map<string, PricePoint[]>();
+      for (const p of priceHistory) {
+        const key = pointVariant.get(p) ?? variantKey(p.variant);
+        const points = byVariant.get(key);
+        if (points) points.push(p);
+        else byVariant.set(key, [p]);
+      }
       const variants: MaterialVariant[] = [...e.variants.entries()]
         .map(([key, variant]) => {
-          const points = priceHistory.filter((p) => variantKey(p.variant) === key);
+          const points = byVariant.get(key) ?? [];
           return { key, label: variantLabel(variant), variant, priceHistory: points, ...priceStats(points) };
         })
         .sort((a, b) => (a.label === '' ? -1 : b.label === '' ? 1 : a.label.localeCompare(b.label)));
