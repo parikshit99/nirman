@@ -28,8 +28,8 @@ export function SettingsModal({ onClose, firstRun, onWhatsNew }: { onClose(): vo
       <SheetHeader id="settings-title" icon={<SettingsIcon size={18} className="text-orange-500" />} title={firstRun ? 'Welcome' : 'Settings'} onClose={onClose} />
       {firstRun && (
         <p className="text-xs text-gray-500 leading-relaxed">
-            Everything you record is stored only on this phone and works offline. Printed bills and typed lists are read on the phone. For
-            handwritten bills and vendor quotes, add your own Google Gemini API key below. You can skip this and add it later from Settings.
+            Everything you record is stored only on this phone and works offline. Printed bills, typed lists and clear vendor quotes are read on the
+            phone. For handwritten bills and unclear quotes, add your own Google Gemini API key below. You can skip this and add it later from Settings.
         </p>
       )}
       <ApiKeySection onSaved={firstRun ? onClose : undefined} />

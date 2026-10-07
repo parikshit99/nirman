@@ -243,7 +243,7 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
       </div>
       <p className="text-xs text-gray-500 leading-relaxed">
         {mode === 'read'
-          ? "Photograph the vendor's reply as it is, even if they wrote their own list. The AI matches each line to this BOQ, and you check the matches before anything is saved."
+          ? "Photograph the vendor's reply as it is, even if they wrote their own list. The phone reads it and matches each line to this BOQ (Gemini helps when it is unsure and you are online), and you check the matches before anything is saved."
           : "Enter the vendor's rate against each BOQ line; leave blank what they didn't quote. Works without internet or an API key."}
       </p>
       <div className="grid grid-cols-[1fr_auto] gap-3">
