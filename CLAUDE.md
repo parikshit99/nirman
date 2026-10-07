@@ -2,6 +2,8 @@
 
 Android app (Capacitor + React) for tracking construction purchases, BOQs and vendor quotes. See README.md for the layout and docs/data-format.md for the data. Run `npm run lint`, `npm test` and `npm run build` before every push; after a UI change also `npm run test:e2e -w apps/mobile` (checks 320–412 px). UI rules are under *UI and UX* below.
 
+**Moving to React Native:** the app is being rebuilt in React Native, in phases; follow [docs/react-native-plan.md](docs/react-native-plan.md). Until the switch, database changes must work for both apps (they share the schema), and the Capacitor app must stay buildable as the fallback.
+
 ## Versions: deciding the size of a change
 
 Versions are `MAJOR.MINOR.PATCH`. MAJOR.MINOR is set by hand in `apps/mobile/package.json`; CI counts PATCH automatically as the number of commits on `main` since that was last changed (2.2.0, 2.2.1, 2.2.2 … back to .0 at the next bump). Pick the size of every change before merging it:
@@ -17,7 +19,8 @@ When unsure between two sizes, pick the smaller one. A test (`apps/mobile/test/w
 ## Conventions
 
 - Never put the Gemini API key in the app or the repo.
-- Database changes: append a migration to `MIGRATIONS` in `apps/mobile/src/data/schema.ts` (never edit a shipped one), bump the backup `VERSION` in `backup.ts` keeping older versions readable, and update docs/data-format.md.
+- `packages/core` has no browser or Capacitor code (its type check has no DOM); the app hands it storage and device details with `configureCore` (`apps/mobile/src/lib/coreSetup.ts`).
+- Database changes: append a migration to `MIGRATIONS` in `packages/core/src/data/schema.ts` (never edit a shipped one), bump the backup `VERSION` in `backup.ts` keeping older versions readable, and update docs/data-format.md.
 - Keep internal ids unchanged (app id, `nirmaan` database names, backup `APP_ID`), so existing installs keep their data.
 - Times shown to the user are in IST.
 - The app must work at 320–360 px wide without sideways scrolling (see *UI and UX*).
@@ -71,6 +74,6 @@ Plurals must agree ("1 item", "2 items").
 
 ## Diagnostics
 
-- `apps/mobile/src/lib/diagnostics.ts` keeps the on-phone log. Steps carry what they worked on (action arguments, AI input text and output lines, so item names, rates, vendors and addresses may appear) to help reproduce bugs; the owner allowed this, and the repo is private. Never log photos (`describe()` replaces encoded data with a size) or the API key (`scrub()` removes it).
+- `packages/core/src/lib/diagnostics.ts` keeps the on-phone log. Steps carry what they worked on (action arguments, AI input text and output lines, so item names, rates, vendors and addresses may appear) to help reproduce bugs; the owner allowed this, and the repo is private. Never log photos (`describe()` replaces encoded data with a size) or the API key (`scrub()` removes it).
 - Users send it with *Settings → Report a problem* (a pre-filled GitHub issue labelled `bug`) or *Share log*. Read those issues' logs when debugging.
 - There are no automatic crash reports: the log leaves the phone only when the user sends it.

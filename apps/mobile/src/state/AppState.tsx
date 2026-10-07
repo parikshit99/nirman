@@ -10,13 +10,28 @@ import {
   type QuoteLineRow,
   type QuoteRow,
 } from '@nirman/shared';
-import { exportBackupZip, parseBackupFile, restoreBackup, type BackupFile } from '../data/backup.ts';
-import * as repo from '../data/repo.ts';
-import { findDraft, type Job, type ListKind, type Snapshot } from '../data/repo.ts';
-import type { Db } from '../data/sql.ts';
-import type { JobWorker, WorkerStatus } from '../jobs/worker.ts';
-import { describe, logError, logPerf, logStep, timed } from '../lib/diagnostics.ts';
-import { prefs } from '../lib/prefs.ts';
+import {
+  exportBackupZip,
+  parseBackupFile,
+  restoreBackup,
+  type BackupFile,
+  findDraft,
+  type Job,
+  type ListKind,
+  type Snapshot,
+  type Db,
+  type JobWorker,
+  type WorkerStatus,
+  describe,
+  logError,
+  logPerf,
+  logStep,
+  timed,
+  prefs,
+  settingsStore,
+  type Settings,
+} from '@nirman/core';
+import * as repo from '@nirman/core';
 
 /**
  * Log each action for the diagnostic log: its name, time taken and what it
@@ -58,7 +73,6 @@ function instrument<T extends Record<string, unknown>>(actions: T, skip: string[
   }
   return out as T;
 }
-import { settingsStore, type Settings } from '../lib/settings.ts';
 
 /** How long a deleted row can be undone. */
 export const UNDO_MS = 10_000;

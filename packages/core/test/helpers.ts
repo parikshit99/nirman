@@ -1,6 +1,32 @@
-import { openSqlJs } from '../src/data/sql.ts';
+import initSqlJs from 'sql.js';
+import { wrapDriver, type Db } from '../src/data/sql.ts';
 import { migrateLocal } from '../src/data/schema.ts';
 import { ensureProjects } from '../src/data/repo.ts';
+
+/** An in-memory database on sql.js (the apps bring their own SQLite driver). */
+export async function openSqlJs(): Promise<Db> {
+  const SQL = await initSqlJs();
+  const db = new SQL.Database();
+  return wrapDriver({
+    async all(sql, params) {
+      const stmt = db.prepare(sql);
+      try {
+        stmt.bind(params);
+        const rows: Record<string, unknown>[] = [];
+        while (stmt.step()) rows.push(stmt.getAsObject());
+        return rows;
+      } finally {
+        stmt.free();
+      }
+    },
+    run: async (sql, params) => void db.run(sql, params),
+    exec: async (script) => void db.exec(script),
+    begin: async () => void db.run('BEGIN'),
+    commit: async () => void db.run('COMMIT'),
+    rollback: async () => void db.run('ROLLBACK'),
+    close: async () => db.close(),
+  });
+}
 
 /** The drafts of a phone that had them before projects; ensureProjects puts them in "My site". */
 export const DRAFT_IDS = { audit: 'draft-audit', boq: 'draft-boq' } as const;

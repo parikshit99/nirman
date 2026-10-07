@@ -24,7 +24,7 @@ import { EmptyState } from '../components/ui/EmptyState.tsx';
 import { Tabs } from '../components/ui/Tabs.tsx';
 import { Sheet, SheetHeader, SheetLabel, SheetOption } from '../components/ui/Sheet.tsx';
 import { Button } from '../components/ui/Button.tsx';
-import { MATERIAL_SORTS, saveMaterialSort, savedMaterialSort, sortMaterials, type MaterialSort } from '../lib/materialSort.ts';
+import { MATERIAL_SORTS, saveMaterialSort, savedMaterialSort, sortMaterials, type MaterialSort } from '@nirman/core';
 
 type SubTab = 'materials' | 'categories';
 

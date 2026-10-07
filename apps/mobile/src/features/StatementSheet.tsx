@@ -5,10 +5,9 @@ import { useDialogs } from '../components/Dialogs.tsx';
 import { DocumentPreview } from '../components/DocumentPreview.tsx';
 import { Button } from '../components/ui/Button.tsx';
 import { Sheet, SheetHeader } from '../components/ui/Sheet.tsx';
-import { logStep } from '../lib/diagnostics.ts';
-import { contractStatementSheet, pdfFile, pdfToJpegs, sheetToXlsx, type ExportFormat } from '../lib/exports.ts';
+import { logStep, contractStatementSheet, pdfFile, type ExportFormat, buildContractStatementPdf } from '@nirman/core';
+import { pdfToJpegs, sheetToXlsx } from '../lib/exportFiles.ts';
 import { shareFiles } from '../lib/files.ts';
-import { buildContractStatementPdf } from '../lib/pdf.ts';
 
 const FORMATS: { format: ExportFormat; label: string; icon: typeof FileText }[] = [
   { format: 'pdf', label: 'PDF', icon: FileText },

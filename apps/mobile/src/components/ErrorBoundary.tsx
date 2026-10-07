@@ -1,5 +1,5 @@
 import React from 'react';
-import { logError } from '../lib/diagnostics.ts';
+import { logError } from '@nirman/core';
 import { Button } from './ui/Button.tsx';
 
 /** If a screen crashes, log it and offer to reload instead of showing a blank page. */

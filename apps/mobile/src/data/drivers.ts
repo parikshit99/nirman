@@ -1,83 +1,11 @@
 /**
- * Minimal async SQL interface over SQLite. On Android it is backed by
- * @capacitor-community/sqlite; in the browser (dev server) and in tests by
- * sql.js, optionally persisted to IndexedDB.
+ * The SQLite drivers behind `Db`: @capacitor-community/sqlite on Android;
+ * sql.js in the browser (dev server), persisted to IndexedDB.
  */
-export type SqlValue = string | number | null;
-
-export interface SqlExecutor {
-  all<T = Record<string, unknown>>(sql: string, params?: SqlValue[]): Promise<T[]>;
-  run(sql: string, params?: SqlValue[]): Promise<void>;
-}
-
-export interface Db extends SqlExecutor {
-  /** Run `fn` atomically. Other callers wait until it finishes. */
-  transaction<T>(fn: (tx: SqlExecutor) => Promise<T>): Promise<T>;
-  /** Execute a script of several statements (used for migrations). */
-  exec(script: string): Promise<void>;
-  close(): Promise<void>;
-}
-
-/** Serialises access so a transaction never interleaves with other statements. */
-class Mutex {
-  private tail: Promise<unknown> = Promise.resolve();
-  lock<T>(fn: () => Promise<T>): Promise<T> {
-    const result = this.tail.then(fn, fn);
-    this.tail = result.catch(() => {});
-    return result;
-  }
-}
-
-interface RawDriver {
-  all(sql: string, params: SqlValue[]): Promise<Record<string, unknown>[]>;
-  run(sql: string, params: SqlValue[]): Promise<void>;
-  exec(script: string): Promise<void>;
-  begin(): Promise<void>;
-  commit(): Promise<void>;
-  rollback(): Promise<void>;
-  /** Called after each committed write outside a transaction, and after each commit. */
-  afterWrite?(): void;
-  close(): Promise<void>;
-}
-
-function wrap(driver: RawDriver): Db {
-  const mutex = new Mutex();
-  const raw: SqlExecutor = {
-    all: async <T,>(sql: string, params: SqlValue[] = []) => (await driver.all(sql, params)) as T[],
-    run: (sql, params = []) => driver.run(sql, params),
-  };
-  return {
-    all: (sql, params) => mutex.lock(() => raw.all(sql, params)),
-    run: (sql, params) =>
-      mutex.lock(async () => {
-        await raw.run(sql, params);
-        driver.afterWrite?.();
-      }),
-    exec: (script) =>
-      mutex.lock(async () => {
-        await driver.exec(script);
-        driver.afterWrite?.();
-      }),
-    transaction: (fn) =>
-      mutex.lock(async () => {
-        await driver.begin();
-        try {
-          const result = await fn(raw);
-          await driver.commit();
-          driver.afterWrite?.();
-          return result;
-        } catch (err) {
-          // Throw the original error even if the rollback fails too (SQLite may already have ended the transaction).
-          await driver.rollback().catch(() => {});
-          throw err;
-        }
-      }),
-    close: () => mutex.lock(() => driver.close()),
-  };
-}
+import { wrapDriver, type Db } from '@nirman/core';
 
 // ---------------------------------------------------------------------------
-// sql.js (browser + tests)
+// sql.js (browser)
 // ---------------------------------------------------------------------------
 
 export interface SqlJsOptions {
@@ -100,7 +28,7 @@ export async function openSqlJs({ locateFile, persistKey }: SqlJsOptions = {}): 
     saveTimer = setTimeout(() => void idbSet(persistKey, db.export()), 300);
   };
 
-  return wrap({
+  return wrapDriver({
     async all(sql, params) {
       const stmt = db.prepare(sql);
       try {
@@ -183,7 +111,7 @@ export async function openCapacitorSqlite(name: string): Promise<Db> {
     : await sqlite.createConnection(name, false, 'no-encryption', 1, false);
   await conn.open();
 
-  return wrap({
+  return wrapDriver({
     async all(sql, params) {
       return ((await conn.query(sql, params)).values ?? []) as Record<string, unknown>[];
     },

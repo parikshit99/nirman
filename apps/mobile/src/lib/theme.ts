@@ -1,5 +1,5 @@
 import { isNative } from './platform.ts';
-import { prefs } from './prefs.ts';
+import { prefs } from '@nirman/core';
 
 export type ThemeChoice = 'system' | 'light' | 'dark';
 

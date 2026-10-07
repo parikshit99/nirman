@@ -1,4 +1,4 @@
-import { NO_KEY_MESSAGE } from '../jobs/worker.ts';
+import { NO_KEY_MESSAGE } from '@nirman/core';
 import { AlertTriangle, CheckCircle2, CloudOff, KeyRound, Loader2, Settings } from 'lucide-react';
 import { useAppState } from '../state/AppState.tsx';
 

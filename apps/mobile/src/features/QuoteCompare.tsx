@@ -5,10 +5,9 @@ import { useDialogs } from '../components/Dialogs.tsx';
 import { Sparkline, VsLastBadge, pct, rupees, shortDate } from '../components/PriceBadges.tsx';
 import { ShareSheet } from '../components/ShareSheet.tsx';
 import { OrderSlipSheet } from '../components/OrderSlipSheet.tsx';
-import { comparisonSheet, pdfFile, pdfToJpegs, sheetToXlsx, type ExportFormat } from '../lib/exports.ts';
+import { comparisonSheet, pdfFile, type ExportFormat, logStep, buildQuoteComparisonPdf } from '@nirman/core';
+import { pdfToJpegs, sheetToXlsx } from '../lib/exportFiles.ts';
 import { shareFiles } from '../lib/files.ts';
-import { logStep } from '../lib/diagnostics.ts';
-import { buildQuoteComparisonPdf } from '../lib/pdf.ts';
 import { useAppState, type HistoryRecord } from '../state/AppState.tsx';
 
 /**

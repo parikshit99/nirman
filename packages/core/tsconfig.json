@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // No DOM and no Node: core runs in the WebView and in React Native alike (src/globals.d.ts lists the globals it may use).
+    "types": []
+  },
+  "include": ["src", "test"]
+}

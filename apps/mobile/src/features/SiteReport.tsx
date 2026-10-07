@@ -6,11 +6,10 @@ import { DocumentPreview } from '../components/DocumentPreview.tsx';
 import { ShareSheet } from '../components/ShareSheet.tsx';
 import { Button } from '../components/ui/Button.tsx';
 import { Sheet, SheetHeader } from '../components/ui/Sheet.tsx';
-import { pdfFile, pdfToJpegs, sheetToXlsx, siteReportSheet, type ExportFormat } from '../lib/exports.ts';
+import { pdfFile, siteReportSheet, type ExportFormat, buildSiteReportPdf, logStep } from '@nirman/core';
+import { pdfToJpegs, sheetToXlsx } from '../lib/exportFiles.ts';
 import { shareFiles } from '../lib/files.ts';
-import { buildSiteReportPdf } from '../lib/pdf.ts';
 import { useAppState } from '../state/AppState.tsx';
-import { logStep } from '../lib/diagnostics.ts';
 
 const rupees = (n: number) => `₹${Math.round(n || 0).toLocaleString('en-IN')}`;
 

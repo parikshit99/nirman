@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { jsPDF } from 'jspdf';
 import { Eye, FileSpreadsheet, FileText, Image as ImageIcon } from 'lucide-react';
 import { DocumentPreview } from './DocumentPreview.tsx';
-import type { ExportFormat } from '../lib/exports.ts';
+import type { ExportFormat } from '@nirman/core';
 import { Button } from './ui/Button.tsx';
 import { Sheet, SheetLabel, SheetOption } from './ui/Sheet.tsx';
 

@@ -7,19 +7,31 @@ import { useDialogs } from './components/Dialogs.tsx';
 import { Button } from './components/ui/Button.tsx';
 import { useBackHandler } from './lib/backButton.ts';
 import { haptic } from './lib/haptics.ts';
-import { prefs } from './lib/prefs.ts';
-import { workTypeKey } from './lib/workType.ts';
-import { logStep } from './lib/diagnostics.ts';
-import { hasUnseenNotes, latestNotes, markNotesSeen } from './lib/whatsNew.ts';
+import {
+  prefs,
+  workTypeKey,
+  logStep,
+  hasUnseenNotes,
+  markNotesSeen,
+  backupOverdue,
+  describeLastBackup,
+  snoozeBackupReminder,
+  type ListKind,
+  type ListMeta,
+  buildPdf,
+  listSheet,
+  pdfFile,
+  type ExportFormat,
+} from '@nirman/core';
+import { latestNotes } from './lib/changelog.ts';
+import { pdfToJpegs, sheetToXlsx } from './lib/exportFiles.ts';
 import { WhatsNewModal } from './components/WhatsNewModal.tsx';
-import { backupOverdue, describeLastBackup, snoozeBackupReminder } from './lib/backupReminder.ts';
 import { PdfPreviewModal } from './components/PdfPreviewModal.tsx';
 import { BoqPicker } from './features/BoqPicker.tsx';
 import { QuotesView } from './features/QuotesView.tsx';
 import { SaveModal } from './components/SaveModal.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
 import { StatusChip } from './components/StatusChip.tsx';
-import type { ListKind, ListMeta } from './data/repo.ts';
 import { ProjectForm, ProjectsSheet } from './features/ProjectsSheet.tsx';
 import { CapturePanel, QueuedReadings } from './features/CapturePanel.tsx';
 import { Sheet, SheetHeader } from './components/ui/Sheet.tsx';
@@ -32,8 +44,6 @@ import { ItemLog } from './features/ItemLog.tsx';
 import { LabourSidebar, LabourView, type StatusFilter } from './features/LabourView.tsx';
 import { ContractSheet } from './features/ContractSheet.tsx';
 import { ContractForm } from './components/ContractForm.tsx';
-import { buildPdf } from './lib/pdf.ts';
-import { listSheet, pdfFile, pdfToJpegs, sheetToXlsx, type ExportFormat } from './lib/exports.ts';
 import { shareFiles } from './lib/files.ts';
 import { ShareSheet } from './components/ShareSheet.tsx';
 import { BoqShareChoice, OrderSlipSheet } from './components/OrderSlipSheet.tsx';
@@ -125,13 +135,13 @@ export default function App() {
   // After an update, show what's new once; a new install has nothing to compare with.
   const [whatsNewOpen, setWhatsNewOpen] = useState(() => {
     if (settingsOpen) {
-      markNotesSeen();
+      markNotesSeen(latestNotes);
       return false;
     }
-    return hasUnseenNotes();
+    return hasUnseenNotes(latestNotes);
   });
   const closeWhatsNew = () => {
-    markNotesSeen();
+    markNotesSeen(latestNotes);
     setWhatsNewOpen(false);
   };
 

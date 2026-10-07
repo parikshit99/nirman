@@ -1,8 +1,7 @@
 import { FileCode, Share2, X } from 'lucide-react';
 import { variantLabel, type ItemRow } from '@nirman/shared';
-import type { ListKind } from '../data/repo.ts';
+import { appIcon, type ListKind } from '@nirman/core';
 import { Sheet } from './ui/Sheet.tsx';
-import appIcon from '../lib/pdf-icon.png?inline';
 
 interface Props {
   kind: ListKind;

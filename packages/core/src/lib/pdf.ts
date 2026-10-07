@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { describeTerms, variantLabel, type ContractRow, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
-import appIcon from './pdf-icon.png?inline';
+import { appIcon } from './pdfIcon.ts';
 
 const rupees = (n: number) => `Rs. ${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 /** Item name, with brand · model · size/spec · colour, and how it was ordered, on further lines when given. */

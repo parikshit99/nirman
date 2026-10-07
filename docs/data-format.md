@@ -1,6 +1,6 @@
 # Data format
 
-What Nirman stores and how, written so the data can be read by any future version of the app, whatever it is built with. The code is the source of truth: the tables are in `apps/mobile/src/data/schema.ts`, the row types in `packages/shared/src/schemas.ts` and the backup in `apps/mobile/src/data/backup.ts`. Update this note when they change.
+What Nirman stores and how, written so the data can be read by any future version of the app, whatever it is built with. The code is the source of truth: the tables are in `packages/core/src/data/schema.ts`, the row types in `packages/shared/src/schemas.ts` and the backup in `packages/core/src/data/backup.ts`. Update this note when they change.
 
 ## Where it lives
 

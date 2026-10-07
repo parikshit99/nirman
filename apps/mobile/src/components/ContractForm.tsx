@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { parseAmount, todayISO, type ContractRow } from '@nirman/shared';
-import type { ContractInput } from '../data/repo.ts';
+import type { ContractInput } from '@nirman/core';
 import { useDialogs } from './Dialogs.tsx';
 import { Button } from './ui/Button.tsx';
 import { Sheet, SheetHeader } from './ui/Sheet.tsx';

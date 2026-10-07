@@ -4,7 +4,7 @@ import { VARIANT_FIELDS, parseAmount, todayISO, type MaterialEntry } from '@nirm
 import { useDialogs } from '../components/Dialogs.tsx';
 import { QuantityHelper } from '../components/QuantityHelper.tsx';
 import { VariantFields } from '../components/VariantFields.tsx';
-import type { ListKind } from '../data/repo.ts';
+import type { ListKind } from '@nirman/core';
 import { useAppState } from '../state/AppState.tsx';
 import { Button } from '../components/ui/Button.tsx';
 import { SuggestInput } from '../components/ui/SuggestInput.tsx';

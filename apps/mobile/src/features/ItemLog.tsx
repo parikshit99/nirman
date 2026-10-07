@@ -8,7 +8,7 @@ import { LineEditor } from '../components/LineEditor.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
 import { Button } from '../components/ui/Button.tsx';
 import { EmptyState } from '../components/ui/EmptyState.tsx';
-import type { ListKind } from '../data/repo.ts';
+import type { ListKind } from '@nirman/core';
 import { useBackHandler } from '../lib/backButton.ts';
 import { useAppState } from '../state/AppState.tsx';
 

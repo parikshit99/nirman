@@ -1,4 +1,4 @@
-import { APP_VERSION } from './version.ts';
+import { platform } from '../platform.ts';
 
 /**
  * A diagnostic log kept on the phone: errors, AI readings, the steps people
@@ -31,7 +31,7 @@ let entries: LogEntry[] | null = null;
 function load(): LogEntry[] {
   if (entries) return entries;
   try {
-    entries = JSON.parse(localStorage.getItem(KEY) ?? '[]') as LogEntry[];
+    entries = JSON.parse(platform.storage.getItem(KEY) ?? '[]') as LogEntry[];
   } catch {
     entries = [];
   }
@@ -43,7 +43,7 @@ function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try {
-      localStorage.setItem(KEY, JSON.stringify(load()));
+      platform.storage.setItem(KEY, JSON.stringify(load()));
     } catch {
       // Storage full or unavailable: the log is best effort.
     }
@@ -104,25 +104,8 @@ export function clearLog() {
   save();
 }
 
-/** Catch errors nothing else handled. */
-export function installErrorHandlers() {
-  window.addEventListener('error', (e) => logError(e.error ?? e.message, 'window'));
-  window.addEventListener('unhandledrejection', (e) => logError(e.reason, 'promise'));
-}
-
-export function deviceSummary(): Record<string, string> {
-  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
-  const android = /Android ([\d.]+)/.exec(ua)?.[1];
-  const model = /Android [\d.]+; ([^;)]+)/.exec(ua)?.[1]?.replace(/ Build.*/, '');
-  const chrome = /Chrome\/([\d.]+)/.exec(ua)?.[1];
-  return {
-    app: APP_VERSION,
-    android: android ?? 'n/a',
-    phone: model ?? 'n/a',
-    webview: chrome ?? 'n/a',
-    screen: typeof window !== 'undefined' ? `${window.screen.width}×${window.screen.height}` : 'n/a',
-  };
-}
+/** App version, phone and screen, from the app (`configureCore`). */
+export const deviceSummary = (): Record<string, string> => platform.deviceInfo();
 
 const line = (e: LogEntry) =>
   `${e.t.slice(5, 19).replace('T', ' ')} ${e.kind.padEnd(5)} ${e.msg}${e.data ? ` ${Object.entries(e.data).map(([k, v]) => `${k}=${v}`).join(' ')}` : ''}${e.detail ? `\n    ${e.detail}` : ''}`;

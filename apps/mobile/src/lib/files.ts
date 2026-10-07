@@ -1,4 +1,4 @@
-import { bytesToBase64 } from './base64.ts';
+import { bytesToBase64, type SharedFile } from '@nirman/core';
 import { isNative } from './platform.ts';
 
 /**
@@ -7,12 +7,6 @@ import { isNative } from './platform.ts';
  */
 export async function shareFile(filename: string, base64: string, mimeType: string): Promise<void> {
   await shareFiles([{ filename, base64, mimeType }]);
-}
-
-export interface SharedFile {
-  filename: string;
-  base64: string;
-  mimeType: string;
 }
 
 /** Several files in one share (e.g. one picture per page); separate downloads in the browser. */
