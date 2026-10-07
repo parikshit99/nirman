@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildItemDatabase,
+  lastPaidFor,
   buildSiteReport,
   filterMaterials,
   financialYear,
@@ -329,5 +330,25 @@ describe('unusedHiddenMaterials', () => {
     const hidden = [{ id: key, hidden_at: ts('2026-02-01') }];
     const learning = { bori: { item_name: 'Cement', unit: 'Bag' } };
     expect(unusedHiddenMaterials(hidden, [list('l1')], [item('i1', 'l1', { item_name: 'Bori', unit: 'nos' })], [], learning)).toEqual([]);
+  });
+});
+
+describe('lastPaidFor (site first)', () => {
+  const lists = [
+    list('a', { project_id: 'p1', address: 'Sector 44', created_at: ts('2026-01-01') }),
+    list('b', { project_id: 'p2', address: 'Dwarka', created_at: ts('2026-03-01') }),
+  ];
+  const items = [item('i1', 'a', { unit_price: 400, date: '2026-01-01' }), item('i2', 'b', { unit_price: 460, date: '2026-03-01' })];
+  const [cement] = buildItemDatabase(lists, items, [], {});
+  const line = { id: 'new', date: '2026-04-01', unit_price: 420, vendor: 'Sharma' };
+
+  it("prefers this project's own last price, even when another site's is newer", () => {
+    expect(lastPaidFor(cement, line, 'p1', '2026-04-01')).toMatchObject({ price: 400, scope: 'here' });
+  });
+  it('falls back to the latest price anywhere, saying which site', () => {
+    expect(lastPaidFor(cement, line, 'p3', '2026-04-01')).toMatchObject({ price: 460, scope: 'elsewhere', site: 'Dwarka', projectId: 'p2' });
+  });
+  it('never compares a line with itself', () => {
+    expect(lastPaidFor(cement, { ...line, id: 'i1' }, 'p1', '2026-04-01')).toMatchObject({ price: 460, scope: 'elsewhere' });
   });
 });

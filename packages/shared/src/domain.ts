@@ -111,6 +111,9 @@ export interface PricePoint {
   listTitle?: string;
   /** From the purchase list still being written (not saved yet). */
   draft?: boolean;
+  /** Project and site address it was bought for (blank for a rate added on its own). */
+  projectId?: string;
+  site?: string;
   /** Id of the saved-list line the price came from, so it can be edited or removed. */
   itemId?: string;
   /** Id of the single added rate (Index rate, or a confirmed vendor quote), so it can be removed. */
@@ -232,6 +235,8 @@ export function buildItemDatabase(
         vendor: raw.vendor || 'Unknown',
         timestamp: recordedAt,
         ...(draft ? { draft: true } : { listTitle: list.title || 'Untitled list' }),
+        projectId: list.project_id || undefined,
+        site: list.address || undefined,
         itemId: raw.id,
         variant,
       });
@@ -252,6 +257,8 @@ export function buildItemDatabase(
       vendor: rate.vendor || 'Manual Index',
       timestamp: rate.indexed_at,
       rateId: rate.id,
+      projectId: rate.project_id || undefined,
+      site: rate.address || undefined,
       variant,
     });
     if (rate.vendor) e.vendors.add(rate.vendor);
@@ -604,6 +611,8 @@ export function compareQuotes(
   lines: QuoteLineRow[],
   database: MaterialEntry[],
   learning: LearningMap,
+  /** The BOQ's project: a past price paid on its site is preferred to one from another site. */
+  projectId = '',
 ): QuoteComparison {
   const byKey = new Map(database.map((e) => [e.key, e]));
   const linesByQuote = new Map<string, QuoteLineRow[]>();
@@ -625,7 +634,9 @@ export function compareQuotes(
       const unitDiffers = !sameUnit(line.unit, item.unit);
       const variantDiffers = variantDifferences(item, line);
       // Other vendors' quotes in this comparison are left out too, so the order of confirming doesn't matter.
-      const lastPoint = unitDiffers || variantDiffers.length ? null : history.points.filter((p) => p.date <= q.quote_date).at(-1) ?? null;
+      const before = unitDiffers || variantDiffers.length ? [] : history.points.filter((p) => p.date <= q.quote_date);
+      const here = projectId ? before.filter((p) => p.projectId === projectId) : [];
+      const lastPoint = (here.length ? here : before).at(-1) ?? null;
       cells[q.id] = {
         line,
         price: line.unit_price,
@@ -777,4 +788,36 @@ export function similarMaterials(material: MaterialEntry, all: MaterialEntry[], 
     .sort((x, y) => Number(sameUnit(y.e)) - Number(sameUnit(x.e)) || y.score - x.score)
     .slice(0, limit)
     .map((s) => s.e);
+}
+
+/** The price a new line is checked against: the last one paid on this project's site, else the last one anywhere. */
+export interface LastPaid {
+  price: number;
+  date: string;
+  vendor: string;
+  /** "here": this project; "elsewhere": no price for this project yet, so the latest from another site. */
+  scope: 'here' | 'elsewhere';
+  /** Site address (or blank) of the price, for "elsewhere". */
+  site: string;
+  projectId: string;
+}
+
+/**
+ * Last price paid for a line's material, site first: transport and local charges make the same
+ * material cost differently from site to site. The line itself, and its saved copy (same day, rate
+ * and vendor), don't count; a line naming a brand, model, size or colour only sees prices for that.
+ */
+export function lastPaidFor(
+  entry: Pick<MaterialEntry, 'priceHistory'> | undefined,
+  line: Pick<ItemRow, 'id' | 'date' | 'unit_price' | 'vendor'> & Partial<Variant>,
+  projectId: string,
+  today: string,
+): LastPaid | undefined {
+  if (!entry) return undefined;
+  const sameLine = (p: PricePoint) => p.itemId === line.id || (p.date === (line.date || today) && p.price === line.unit_price && p.vendor === (line.vendor || 'Unknown'));
+  const prices = entry.priceHistory.filter((p) => !sameLine(p) && variantMatches(line, p.variant));
+  const here = prices.filter((p) => p.projectId === projectId);
+  const last = (here.length ? here : prices).at(-1);
+  if (!last) return undefined;
+  return { price: last.price, date: last.date, vendor: last.vendor, scope: here.length ? 'here' : 'elsewhere', site: last.site ?? '', projectId: last.projectId ?? '' };
 }

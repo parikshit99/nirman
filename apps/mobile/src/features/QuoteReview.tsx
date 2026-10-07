@@ -22,7 +22,7 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
   const lines = allLines.filter((l) => !pendingDeletes.has(l.id));
   useEffect(() => () => void actions.flushDeletes(), [actions]);
   const readOnly = quote.status === 'confirmed';
-  const { rows, vendors } = compareQuotes(boq.items, [quote], lines, itemDatabase, learning);
+  const { rows, vendors } = compareQuotes(boq.items, [quote], lines, itemDatabase, learning, boq.project_id);
   const summary = vendors[0];
   const itemsById = new Map(boq.items.map((i, idx) => [i.id, { item: i, sr: idx + 1 }]));
   const cellByLine = new Map(rows.flatMap((r) => (r.cells[quote.id] ? [[r.cells[quote.id]!.line.id, r.cells[quote.id]!] as const] : [])));
@@ -262,7 +262,7 @@ function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDel
           </Flag>
         )}
         {line.note && <Flag tone="gray">{line.note}</Flag>}
-        {cell && <VsLastBadge vsLast={cell.vsLast} last={cell.lastPoint} />}
+        {cell && <VsLastBadge vsLast={cell.vsLast} last={cell.lastPoint} projectId={boq.project_id} />}
         {cell && !cell.lastPoint && !cell.unitDiffers && cell.price > 0 && <Flag tone="gray">First price recorded for this item</Flag>}
         {match && line.total_amount > 0 && <Flag tone="gray">Line total {rupees(line.total_amount)}</Flag>}
       </div>

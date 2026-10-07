@@ -5,12 +5,14 @@ export const pct = (x: number) => `${x > 0 ? '+' : ''}${Math.round(x * 100)}%`;
 export const shortDate = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' });
 
 /** "+8% vs last ₹360 (1 Sep, Sharma)": red when dearer, green when cheaper. */
-export function VsLastBadge({ vsLast, last }: { vsLast: number | null; last: PricePoint | null }) {
+/** `projectId`: the project being priced; a last price from another site says which. */
+export function VsLastBadge({ vsLast, last, projectId }: { vsLast: number | null; last: PricePoint | null; projectId?: string }) {
   if (vsLast === null || !last) return null;
+  const where = projectId && last.projectId && last.projectId !== projectId ? `, at ${last.site || 'another site'}` : '';
   const tone = Math.abs(vsLast) < 0.005 ? 'bg-gray-100 text-gray-600' : vsLast > 0 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700';
   return (
     <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-bold ${tone}`} title={`Last recorded ${rupees(last.price)} on ${shortDate(last.date)} from ${last.vendor}`}>
-      {pct(vsLast)} vs last {rupees(last.price)} ({shortDate(last.date)}, {last.vendor})
+      {pct(vsLast)} vs last {rupees(last.price)} ({shortDate(last.date)}, {last.vendor}{where})
     </span>
   );
 }
