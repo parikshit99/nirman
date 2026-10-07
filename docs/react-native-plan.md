@@ -71,7 +71,7 @@ Losing the preferences and asking for the key once saves a whole preparation rel
 
    | Piece | Built on |
    |---|---|
-   | `Sheet` | `react-native-true-sheet` (Android's own bottom sheet); `kind="screen"` uses the native stack |
+   | `Sheet` | `react-native-true-sheet` (Android's own bottom sheet); `kind="screen"` and `"dialog"` are native modals (props-driven like the old app, so no routes to pass data through) |
    | `Button`, `Tabs`, `EmptyState`, `SuggestInput` | React Native |
    | `useDialogs()` | `confirm`/`alert` use Android's own dialog (`Alert`); `prompt` is a small sheet; `toast` and Undo are a Snackbar |
 
@@ -90,13 +90,13 @@ Losing the preferences and asking for the key once saves a whole preparation rel
 ### Phase 5: vendor quotes and Rates
 
 - Quotes (read, review, compare, confirm).
-- Rates: search in the header, filters, the price chart with `victory-native`, bulk edit, Leave out of Rates, learned names.
+- Rates: search in the header, filters, the price chart with `react-native-svg` (no Skia or Reanimated), bulk edit, Leave out of Rates, learned names.
 - Read: `features/Quote*.tsx`, `features/QuotesView.tsx`, `features/DatabaseView.tsx`, `features/ItemLog.tsx`, `components/MaterialFilters.tsx`, `components/PriceBadges.tsx`.
 
 ### Phase 6: Labour, site report, sharing
 
 - Labour (contracts, entries, advances, retention, statement), the site report.
-- `DocumentPreview` with `react-native-pdf`, sharing PDF, Excel and JPG with `expo-sharing`.
+- `DocumentPreview` shows the PDF's pages drawn by Android's own `PdfRenderer` (the same pages as the JPG share), sharing PDF, Excel and JPG through Android's share sheet (`expo-sharing` for single files, the native module for several).
 - PDF and Excel are made by the same core code as today.
 - Read: `features/LabourView.tsx`, `features/ContractSheet.tsx`, `components/ContractForm.tsx`, `features/StatementSheet.tsx`, `features/SiteReport.tsx`, `components/ShareSheet.tsx`, `components/DocumentPreview.tsx`.
 
@@ -169,6 +169,6 @@ Still not planned: swipe-to-delete (CLAUDE.md: delete from the edit view only) a
 - [x] Phase 3: UI pieces and Purchases
 - [x] Phase 4: BOQ, Saved, Projects
 - [x] Phase 5: quotes and Rates
-- [ ] Phase 6: Labour, site report, sharing
+- [x] Phase 6: Labour, site report, sharing
 - [ ] Phase 7: Settings, first launch, 7.0
 - [ ] Phase 8: clean up

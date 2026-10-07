@@ -10,13 +10,14 @@ import { logError } from '@nirman/core';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DialogProvider } from './components/ui/Dialogs';
 import { startServices } from './data/services';
+import { LabourScreen } from './features/LabourScreen';
 import { ListScreen } from './features/ListScreen';
 import { ProjectsHost } from './features/ProjectsSheet';
 import { QuotesHost, useQuotes } from './features/QuotesHost';
 import { RatesScreen } from './features/RatesScreen';
 import { SavedScreen } from './features/SavedScreen';
-import { TabScreen } from './screens/TabScreen';
-import { AppStateProvider, type Services } from './state/AppState';
+import { SiteReportHost, useSiteReport } from './features/SiteReport';
+import { AppStateProvider, useAppState, type Services } from './state/AppState';
 import { dark, light, useColors } from './theme';
 
 const ICONS = {
@@ -30,17 +31,9 @@ const ICONS = {
 const ABOUT = {
   Purchases: 'Photograph bills or type what was bought; get a purchase list with the rate paid for each item.',
   BOQ: 'Photograph a drawing or list; get a blank BOQ (no rates) to send vendors, then compare their quotes.',
+  Labour: 'Labour contracts: record work measured, payments and deductions; see what each contractor is owed and share statements.',
   Saved: 'Saved purchase lists and BOQs of this project. Open one to edit it, export it, or add vendor quotes.',
 } as const;
-
-/** Tabs whose screens are ported in a later phase show an empty list for now. */
-const PLACEHOLDERS = [
-  {
-    name: 'Labour',
-    empty: 'No labour contracts yet.',
-    hint: 'Add one to this project with “New contract”: the contractor, the job, and the rate or lump sum.',
-  },
-] as const;
 
 const Tab = createNativeBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -52,7 +45,16 @@ function BoqScreen() {
 
 function SavedTab() {
   const quotes = useQuotes();
-  return <SavedScreen about={ABOUT.Saved} onQuotes={quotes.open} />;
+  const siteReport = useSiteReport();
+  const { history, contracts } = useAppState();
+  const hasPurchases = history.some((h) => h.kind === 'audit') || contracts.length > 0;
+  return (
+    <SavedScreen
+      about={ABOUT.Saved}
+      onQuotes={quotes.open}
+      extraMenu={hasPurchases ? [{ icon: 'assignment', label: 'Site report', about: 'Everything bought and paid for this project', onPress: siteReport.open }] : []}
+    />
+  );
 }
 
 function Tabs() {
@@ -65,11 +67,9 @@ function Tabs() {
       <Tab.Screen name="BOQ" options={{ tabBarIcon: () => ICONS.BOQ }}>
         {() => <BoqScreen />}
       </Tab.Screen>
-      {PLACEHOLDERS.map((t) => (
-        <Tab.Screen key={t.name} name={t.name} options={{ tabBarIcon: () => ICONS[t.name] }}>
-          {() => <TabScreen icon={ICONS[t.name]} title={t.empty} hint={t.hint} />}
-        </Tab.Screen>
-      ))}
+      <Tab.Screen name="Labour" options={{ tabBarIcon: () => ICONS.Labour }}>
+        {() => <LabourScreen about={ABOUT.Labour} />}
+      </Tab.Screen>
       <Tab.Screen name="Rates" options={{ tabBarIcon: () => ICONS.Rates }}>
         {() => <RatesScreen />}
       </Tab.Screen>
@@ -110,10 +110,12 @@ function Boot() {
     <AppStateProvider services={ready.services} initial={ready.initial}>
       <ProjectsHost>
         <QuotesHost>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            {/* Full screens (Sheet kind="screen") are native dialogs for now; pushed routes can go above the tabs here. */}
-            <Stack.Screen name="Home" component={Tabs} />
-          </Stack.Navigator>
+          <SiteReportHost>
+            <Stack.Navigator screenOptions={{ headerShown: false }}>
+              {/* Full screens (Sheet kind="screen") are native dialogs for now; pushed routes can go above the tabs here. */}
+              <Stack.Screen name="Home" component={Tabs} />
+            </Stack.Navigator>
+          </SiteReportHost>
         </QuotesHost>
       </ProjectsHost>
     </AppStateProvider>
