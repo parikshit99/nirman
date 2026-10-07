@@ -72,6 +72,16 @@ Plurals must agree ("1 item", "2 items").
 
 **Code style.** Format new code like the existing code (Prettier, `--print-width 180 --single-quote`), but don't reformat lines you didn't change.
 
+## React Native UI (apps/native, until the switch)
+
+The new app is Expo (prebuild: `android/` is generated, never committed), React Navigation's native stack with native bottom tabs, `expo-sqlite` behind core's `Db`. The *UI and UX* rules above still apply (words, plurals, colours by meaning, text sizes, one primary action, deleting, touch targets of at least 40 dp); the web-only parts don't (Tailwind classes, `index.css`, `--inset-*`, 320 px e2e checks).
+- Colours: `useColors()` from `src/theme.ts`, the palette of `index.css` as hex with the same dark values; no other literal colours. Add a shade there when a screen needs one.
+- Shared pieces live in `src/components/ui/` with the same names and props as apps/mobile's (Phase 3 adds `Sheet`, `Button`, `Tabs`, `useDialogs`). So far: `EmptyState` (`icon` is an image).
+- Android code is one local Expo module, `modules/nirman-native` (Kotlin): `readText` (ML Kit), `haptic`, `takeShared` + the `shared` event, `databasePath`. Change it there, not in `android/`.
+- Data: `src/data/db.ts` opens the Capacitor app's file in place (`databases/nirmaanSQLite.db`). Everything else comes from `@nirman/core`.
+- React is pinned to the version Expo asks for (it may differ from apps/mobile's); `metro.config.js` makes every package use that copy.
+- Check: `npm run lint` type-checks it; `npx expo export --platform android` (in `apps/native`) bundles it without the Android SDK; CI's `native` job builds the APK.
+
 ## Diagnostics
 
 - `packages/core/src/lib/diagnostics.ts` keeps the on-phone log. Steps carry what they worked on (action arguments, AI input text and output lines, so item names, rates, vendors and addresses may appear) to help reproduce bugs; the owner allowed this, and the repo is private. Never log photos (`describe()` replaces encoded data with a size) or the API key (`scrub()` removes it).

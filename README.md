@@ -51,6 +51,7 @@ Code layout:
 
 ```
 apps/mobile      React + Vite UI, packaged as an Android app with Capacitor
+apps/native      the React Native (Expo) app replacing it, being built (docs/react-native-plan.md)
 packages/core    shared by the apps, no browser or Capacitor code:
   src/data       SQLite schema, repository and backup
   src/jobs       queue worker that reads queued entries (on the phone or with Gemini)

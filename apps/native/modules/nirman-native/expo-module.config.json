@@ -1,0 +1,6 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": ["com.nirmaan.auditor.nativemodule.NirmanModule"]
+  }
+}

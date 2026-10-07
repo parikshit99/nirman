@@ -1,6 +1,6 @@
 # Moving Nirman to React Native
 
-Status: agreed October 2026. Phase 2 next.
+Status: agreed October 2026. Phase 3 next.
 
 The Capacitor app is replaced by a React Native (Expo) app using Android's own controls. There is no beta app beside the old one: the new app is built over the next few sessions, and the update that switches is a normal update to the same app. Phases are sized so that each one fits in **one Claude session and one PR**.
 
@@ -17,7 +17,7 @@ The Capacitor app is replaced by a React Native (Expo) app using Android's own c
 
 | What | Today | In 7.0 |
 |---|---|---|
-| All data, including queued readings and bill photos | SQLite `databases/nirmaanSQLite.db` (Phase 2 confirms the exact name) | Opened in place |
+| All data, including queued readings and bill photos | SQLite `/data/data/com.nirmaan.auditor/databases/nirmaanSQLite.db` (`@capacitor-community/sqlite` adds `SQLite.db` to the name and uses `getDatabasePath`; no encryption) | Opened in place |
 | Gemini key and reading settings | Capacitor secure storage | **Pasted again once.** A first-launch screen says "Paste your Gemini key again (needed once after this update)". Data works without it |
 | Small preferences (open project, sort, work types, What's new seen, backup snooze) and the problem log | WebView `localStorage`, which the new app can't read | **Not carried over.** Defaults: open the most recently changed project; skip onboarding if there is any data |
 
@@ -165,7 +165,7 @@ Still not planned: swipe-to-delete (CLAUDE.md: delete from the edit view only) a
 ## Progress
 
 - [x] Phase 1: shared core
-- [ ] Phase 2: skeleton
+- [x] Phase 2: skeleton
 - [ ] Phase 3: UI pieces and Purchases
 - [ ] Phase 4: BOQ, Saved, Projects
 - [ ] Phase 5: quotes and Rates
