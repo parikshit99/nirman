@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.nirmaan.auditor'
+version = '1.0.0'
+
+android {
+  namespace 'com.nirmaan.auditor.nativemodule'
+  // Expo's Gradle plugin needs these for every module; the app's own version is set in app.config.ts.
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+dependencies {
+  // Reads bill photos on the phone (Latin script, model bundled so it works offline).
+  implementation 'com.google.mlkit:text-recognition:16.0.1'
+}

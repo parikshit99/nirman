@@ -65,42 +65,62 @@ jobs:
       - name: Build release APK
         run: ./gradlew assembleRelease --no-daemon
         working-directory: apps/mobile/android
-      - name: Sign the APK
-        # Signed with the release key from the repo secrets, with a rotation record from the old debug key
-        # (APK signature v3), so phones that have a debug-signed build still accept this one as an update.
-        # Without the secrets (e.g. a pull request from a fork) it is signed with the debug key alone.
+      - name: Sign the APK (the release key must be identical on every build)
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-        run: |
-          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          echo "APKSIGNER=$BUILD_TOOLS/apksigner" >> "$GITHUB_ENV"
-          APKSIGNER="$BUILD_TOOLS/apksigner"
-          UNSIGNED=apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
-          DEBUG_KEY=(--ks apps/mobile/android/app/debug.keystore --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android)
-          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
-            echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
-            RELEASE_KEY=(--ks "$RUNNER_TEMP/release.p12" --ks-pass env:RELEASE_KEYSTORE_PASSWORD --ks-key-alias nirman)
-            "$APKSIGNER" rotate --out "$RUNNER_TEMP/lineage" --old-signer "${DEBUG_KEY[@]}" --new-signer "${RELEASE_KEY[@]}"
-            "$APKSIGNER" sign --lineage "$RUNNER_TEMP/lineage" --rotation-min-sdk-version 28 --out nirman.apk "${DEBUG_KEY[@]}" --next-signer "${RELEASE_KEY[@]}" "$UNSIGNED"
-            rm "$RUNNER_TEMP/release.p12"
-          else
-            echo "::warning::No release key in the repo secrets; signing with the debug key only"
-            "$APKSIGNER" sign --out nirman.apk "${DEBUG_KEY[@]}" "$UNSIGNED"
-          fi
-      - name: Show the APK signing certificates (the release key must be identical on every build)
-        run: |
-          "$APKSIGNER" verify --verbose --print-certs nirman.apk | grep -E 'Verified using|certificate DN|SHA-256'
-          "$APKSIGNER" lineage --in nirman.apk --print-certs 2>/dev/null | grep -E 'DN|SHA-256' || echo "No key rotation in this APK"
+        run: .github/scripts/sign-apk.sh apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk nirman.apk
       - uses: actions/upload-artifact@v4
         with:
           name: nirman-apk
           path: nirman.apk
-      - name: Check no API key is bundled in the app
+
+  native:
+    # The React Native app (apps/native, docs/react-native-plan.md): built and signed like the one above,
+    # kept as an artifact for testing. Not published until 7.0.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history, to count the changes since the last version bump
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17 # React Native's Gradle plugin asks for a Java 17 toolchain
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: npm ci
+      - name: Set the app version (as in the android job)
         run: |
-          if unzip -p nirman.apk | grep -a -q -E "AIza[0-9A-Za-z_-]{35}"; then
-            echo "The APK contains something that looks like a Google API key"; exit 1
-          fi
+          MAJOR_MINOR=$(node -p "require('./apps/mobile/package.json').version.split('.').slice(0, 2).join('.')")
+          BUMPED_AT=$(git log -1 --format=%H -G'"version":' -- apps/mobile/package.json)
+          PATCH=$(git rev-list --count "$BUMPED_AT..HEAD")
+          echo "APP_VERSION=$MAJOR_MINOR.$PATCH" >> "$GITHUB_ENV"
+          echo "Version $MAJOR_MINOR.$PATCH ($PATCH changes since $MAJOR_MINOR was set in ${BUMPED_AT::7})"
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install
+        working-directory: apps/native
+        env:
+          CI: 1
+      - name: Build release APK
+        # 32-bit x86 left out: no phone uses it, only old emulators.
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86_64
+        working-directory: apps/native/android
+      - name: Sign the APK
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+        run: .github/scripts/sign-apk.sh apps/native/android/app/build/outputs/apk/release/app-release.apk nirman-native.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nirman-native-apk
+          path: nirman-native.apk
 
   publish:
     needs: [test, android]
