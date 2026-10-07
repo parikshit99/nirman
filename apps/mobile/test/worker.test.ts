@@ -221,6 +221,26 @@ describe('JobWorker', () => {
     ]);
   });
 
+  it('reads a typed vendor quote on the phone and matches it to the BOQ without Gemini (offline, no key)', async () => {
+    const { db, worker, quoteCalls } = await setup(async () => [], { ...DEFAULT_SETTINGS, readingMode: 'auto' });
+    await addItems(db, DRAFT_IDS.boq, [{ ...cement, item_name: 'River sand', original_term: '', unit: 'MT', unit_price: 0 }, { ...cement, item_name: 'OPC Cement', original_term: '', unit_price: 0 }]);
+    const boqId = await saveDraftToHistory(db, DRAFT_IDS.boq, { title: 'Tower A', address: '', category: 'Civil', site_date: '' });
+    await enqueueQuote(db, { boqId, vendor: 'Sharma', quoteDate: '2026-10-03', text: 'OPC cement 15 bag 380 5700\nRiver sand 15 MT 1200 18000\nBinding wire 10 kg 90 900', images: [] });
+
+    await worker.run();
+    const snap = await loadSnapshot(db);
+    const boqItems = snap.items.filter((i) => i.list_id === boqId);
+    expect(quoteCalls).toHaveLength(0);
+    expect(snap.jobs).toHaveLength(0);
+    expect(snap.quotes).toMatchObject([{ status: 'review' }]);
+    const idOf = (name: string) => boqItems.find((i) => i.item_name === name)!.id;
+    expect(snap.quoteLines.map((l) => [l.unit_price, l.boq_item_id])).toEqual([
+      [380, idOf('OPC Cement')],
+      [1200, idOf('River sand')],
+      [90, null],
+    ]);
+  });
+
   it('marks a quote reading failed when nothing was read', async () => {
     const { db, worker } = await setup(async () => []);
     await addItems(db, DRAFT_IDS.boq, [cement]);

@@ -1,4 +1,4 @@
-import { boxesToRows, parseBill, todayISO, variantLabel, type BillReading, type LearnedTermRow, type MaterialInput, type TextBox } from '@nirman/shared';
+import { boxesToRows, matchQuoteLines, parseBill, todayISO, variantLabel, type BillReading, type LearnedTermRow, type MaterialInput, type TextBox } from '@nirman/shared';
 import { completeJob, completeQuoteJob, getJobImages, learningMap, listItems, saveTrainingSample, setJobStatus, type Job } from '../data/repo.ts';
 import type { Db } from '../data/sql.ts';
 import { classifyError, createGeminiExtractor, type Extractor } from '../lib/gemini.ts';
@@ -183,7 +183,34 @@ export class JobWorker {
         if (collectTraining && images.length) await saveTrainingSample(this.db, { engine, ocr_text: ocrText, images, item_ids: ids, category: job.category });
       };
 
-      // Vendor quotes are matched to the BOQ by Gemini; entries are read on the phone first.
+      // A vendor quote: read on the phone and matched to the BOQ there when it can be, so quotes work offline too.
+      if (job.quote_id && readingMode !== 'gemini') {
+        let read: Awaited<ReturnType<JobWorker['readOnPhone']>> = null;
+        try {
+          read = await this.readOnPhone(job, images, learning);
+        } catch (err) {
+          log('error', `phone reading: ${(err as Error).message}`, { where: 'textReader' });
+        }
+        if (read?.lines.length) {
+          const boq = await listItems(this.db, job.list_id);
+          const { lines, matched } = matchQuoteLines(
+            boq.map((b, i) => ({ sr: i + 1, item_name: b.item_name, original_term: b.original_term })),
+            read.lines.map((l) => l.item),
+            learning,
+          );
+          // Sure enough: the phone read the lines cleanly and most of them name a BOQ item.
+          const sure = read.confidence >= PHONE_CONFIDENCE && matched >= Math.ceil(lines.length * 0.6);
+          const geminiNow = !!extractor && this.status.online && readingMode !== 'phone';
+          if (sure || !geminiNow) {
+            // Unmatched lines are matched by hand when reviewing the quote.
+            await completeQuoteJob(this.db, job.id, lines, boq.map((b) => b.id));
+            logReading('ok', { engine: 'phone', lines: lines.length, matched, boqItems: boq.length, confidence: read.confidence });
+            return null;
+          }
+        }
+      }
+
+      // Entries are read on the phone first.
       let phone: Awaited<ReturnType<JobWorker['readOnPhone']>> = null;
       if (!job.quote_id && readingMode !== 'gemini') {
         try {
@@ -213,7 +240,7 @@ export class JobWorker {
         }
       }
       if (job.quote_id && readingMode === 'phone') {
-        await setJobStatus(this.db, job.id, 'failed', 'Vendor quotes are read by Gemini. Use “Type rates”, or allow Gemini in Settings → How bills are read.');
+        await setJobStatus(this.db, job.id, 'failed', 'Could not read this quote on the phone. Use “Type rates”, or allow Gemini in Settings → How bills are read.');
         return null;
       }
       if (!extractor) return NO_KEY_MESSAGE;

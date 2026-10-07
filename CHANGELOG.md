@@ -2,6 +2,10 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 5.3 — Vendor quotes without the internet
+
+- **Vendor quotes are read on the phone.** A printed or typed quote is read on the phone and each line matched to the BOQ there, so quotes can be compared in a basement or on a plot with no signal. Gemini is only asked when the phone is unsure and you are online. Lines the phone can't match are left for you to match when you review the quote, as before.
+
 ## 5.2 — Advances (kharcha) in labour contracts
 
 - **Record an advance (kharcha)** on a contract: cash given to the mistry before the work is measured, for wages or rations, apart from payments against measured work. Both count as paid; the contract shows how much of it was advances.
