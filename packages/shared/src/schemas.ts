@@ -49,6 +49,23 @@ export type MaterialInput = z.input<typeof extractedMaterialSchema>;
 const id = z.string().min(1).max(200);
 
 
+export const projectStatuses = ['active', 'closed'] as const;
+
+/**
+ * A project: one building job or site. Every purchase list, BOQ and labour contract belongs to one,
+ * from the moment it is started.
+ */
+export const projectRowSchema = z.object({
+  id,
+  name: z.string().min(1).max(200),
+  /** Site address, offered when saving its lists and adding its contracts. */
+  address: z.string().max(500),
+  status: z.enum(projectStatuses),
+  created_at: isoTimestamp,
+  updated_at: isoTimestamp,
+});
+export type ProjectRow = z.infer<typeof projectRowSchema>;
+
 export const listKinds = ['audit', 'boq'] as const;
 export const listStatuses = ['draft', 'saved'] as const;
 
@@ -56,6 +73,8 @@ export const listRowSchema = z.object({
   id,
   kind: z.enum(listKinds),
   status: z.enum(listStatuses),
+  /** The project it belongs to; blank only in backups made before projects (assigned on restore). */
+  project_id: z.string().max(200).default(''),
   title: z.string().max(500),
   address: z.string().max(500),
   category: z.string().max(100),
@@ -102,6 +121,8 @@ export const indexedRateRowSchema = z.object({
   /** Work category and site of the BOQ a confirmed quote was for; blank for a rate added on its own. */
   category: z.string().max(100).default(''),
   address: z.string().max(500).default(''),
+  /** Project of the BOQ a confirmed quote was for; blank for a rate added on its own. */
+  project_id: z.string().max(200).default(''),
   indexed_at: isoTimestamp,
 });
 export type IndexedRateRow = z.infer<typeof indexedRateRowSchema>;
@@ -172,6 +193,8 @@ export const contractStatuses = ['active', 'closed'] as const;
  */
 export const contractRowSchema = z.object({
   id,
+  /** The project it belongs to; blank only in backups made before projects (assigned on restore). */
+  project_id: z.string().max(200).default(''),
   contractor: z.string().max(200),
   phone: z.string().max(40),
   address: z.string().max(500),
@@ -223,10 +246,11 @@ export const contractEntryRowSchema = z.object({
 });
 export type ContractEntryRow = z.infer<typeof contractEntryRowSchema>;
 
-export const dataTables = ['lists', 'items', 'indexed_rates', 'learned_terms', 'categories', 'quotes', 'quote_lines', 'hidden_materials', 'contracts', 'contract_entries'] as const;
+export const dataTables = ['projects', 'lists', 'items', 'indexed_rates', 'learned_terms', 'categories', 'quotes', 'quote_lines', 'hidden_materials', 'contracts', 'contract_entries'] as const;
 export type DataTable = (typeof dataTables)[number];
 
 export const rowSchemas = {
+  projects: projectRowSchema,
   lists: listRowSchema,
   items: itemRowSchema,
   indexed_rates: indexedRateRowSchema,
@@ -245,6 +269,7 @@ export const tableColumns = Object.fromEntries(
 ) as Record<DataTable, string[]>;
 
 export interface RowTypes {
+  projects: ProjectRow;
   lists: ListRow;
   items: ItemRow;
   indexed_rates: IndexedRateRow;

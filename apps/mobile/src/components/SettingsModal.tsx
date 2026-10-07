@@ -360,7 +360,7 @@ function BackupSection() {
 }
 
 function StorageSection({ onWhatsNew }: { onWhatsNew?(): void }) {
-  const { history, snapshot, learningCount, hiddenMaterials, actions } = useAppState();
+  const { allHistory, snapshot, learningCount, hiddenMaterials, actions } = useAppState();
   const dialogs = useDialogs();
   const [showLearned, setShowLearned] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
@@ -399,8 +399,10 @@ function StorageSection({ onWhatsNew }: { onWhatsNew?(): void }) {
     <section className="space-y-2">
       <SectionTitle>On this phone</SectionTitle>
       <dl className="grid grid-cols-2 gap-2 text-xs">
+        <dt className="text-gray-500">Projects</dt>
+        <dd className="font-bold text-right">{snapshot.projects.length}</dd>
         <dt className="text-gray-500">Saved lists</dt>
-        <dd className="font-bold text-right">{history.length}</dd>
+        <dd className="font-bold text-right">{allHistory.length}</dd>
         <dt className="text-gray-500">Items</dt>
         <dd className="font-bold text-right">{snapshot.items.length}</dd>
         <dt className="text-gray-500">Added rates</dt>

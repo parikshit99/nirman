@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildItemDatabase, contractTotals, materialKey } from '@nirman/shared';
 import {
-  DRAFT_IDS,
   addCategory,
   addItems,
   bulkEditMaterials,
@@ -41,12 +40,26 @@ import {
   updateLearnedTerm,
   updateQuoteLine,
   updateRate,
+  deleteAllHistory,
+  deleteProject,
+  draftIdFor,
+  findDraft,
+  moveList,
+  saveProject,
+  setProjectStatus,
 } from '../src/data/repo.ts';
 import { migrateLocal } from '../src/data/schema.ts';
-import { freshDb } from './helpers.ts';
+import { DRAFT_IDS, freshDb, projectOf } from './helpers.ts';
 
 const cement = { item_name: 'Cement', original_term: 'bori', quantity: 15, unit: 'Bag', unit_price: 500, total_amount: 0, vendor: 'Sharma', date: '2026-09-30' };
 const sand = { item_name: 'Sand', original_term: 'reti', quantity: 2, unit: 'MT', unit_price: 1500, total_amount: 3000, vendor: '', date: '' };
+/** Undo migration 13's columns, so earlier migrations can be run again. */
+async function dropProjectColumns(db: Awaited<ReturnType<typeof freshDb>>) {
+  await db.run('DROP INDEX lists_project_idx');
+  await db.run('DROP INDEX contracts_project_idx');
+  for (const table of ['lists', 'contracts', 'indexed_rates']) await db.run(`ALTER TABLE ${table} DROP COLUMN project_id`);
+}
+
 const meta = { title: 'Morning audit', address: 'Sector 44', category: 'Civil', site_date: '2026-09-30' };
 
 describe('local repository', () => {
@@ -96,7 +109,7 @@ describe('local repository', () => {
     const byName = (n: string) => draft.find((i) => i.item_name === n)!;
     expect(byName('Sand').delivered_at).toBe('');
     await setDelivered(db, [byName('Sand').id], '2026-10-03');
-    const id = await saveDraftToHistory(db, 'audit', meta);
+    const id = await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
     // Ticked on the draft after saving: reopening the saved copy brings back what was saved.
     await setDelivered(db, [byName('Cement').id], '2026-10-04');
     await restoreToDraft(db, id);
@@ -122,7 +135,7 @@ describe('local repository', () => {
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.boq, [cement, sand]);
     await setListNotes(db, DRAFT_IDS.boq, 'Glossy finish');
-    const id = await saveDraftToHistory(db, 'boq', meta);
+    const id = await saveDraftToHistory(db, DRAFT_IDS.boq, meta);
 
     let snap = await loadSnapshot(db);
     const record = snap.lists.find((l) => l.id === id)!;
@@ -132,7 +145,7 @@ describe('local repository', () => {
     // Update in place: record keeps its id, items are replaced.
     const [first] = snap.items.filter((i) => i.list_id === DRAFT_IDS.boq);
     await deleteItem(db, first.id);
-    await saveDraftToHistory(db, 'boq', { ...meta, title: 'Updated' }, id);
+    await saveDraftToHistory(db, DRAFT_IDS.boq, { ...meta, title: 'Updated' }, id);
     snap = await loadSnapshot(db);
     expect(snap.lists.filter((l) => l.status === 'saved')).toHaveLength(1);
     expect(snap.items.filter((i) => i.list_id === id)).toHaveLength(1);
@@ -154,7 +167,7 @@ describe('local repository', () => {
   it('indexes rates, replacing identical ones, and bulk-edits materials without losing old prices', async () => {
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.audit, [cement]);
-    await saveDraftToHistory(db, 'audit', meta);
+    await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
     await indexRates(db, [cement]);
     await indexRates(db, [cement]);
     let snap = await loadSnapshot(db);
@@ -180,7 +193,7 @@ describe('local repository', () => {
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.audit, [cement, sand]);
     await indexRates(db, [cement, { ...cement, item_name: 'Steel', unit_price: 60 }]);
-    await saveDraftToHistory(db, 'audit', meta);
+    await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
     const sites = (await loadSnapshot(db)).rates.map((r) => [r.item_name, r.address, r.category]).sort();
     expect(sites).toEqual([
       ['Cement', 'Sector 44', 'Civil'],
@@ -189,7 +202,7 @@ describe('local repository', () => {
     // Rates indexed with a site keep it.
     await indexRates(db, [{ ...cement, unit_price: 510, address: 'DLF 3', category: 'Finishing' }]);
     await addItems(db, DRAFT_IDS.audit, [{ ...cement, unit_price: 510 }]);
-    await saveDraftToHistory(db, 'audit', meta);
+    await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
     expect((await loadSnapshot(db)).rates.find((r) => r.price === 510)?.address).toBe('DLF 3');
   });
 
@@ -197,11 +210,12 @@ describe('local repository', () => {
     const db = await freshDb();
     await indexRates(db, [cement]);
     await addItems(db, DRAFT_IDS.audit, [cement]);
-    await saveDraftToHistory(db, 'audit', meta);
+    await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
     await db.run(`UPDATE indexed_rates SET address = '', category = ''`);
-    // Migrations 11 and 12 added columns; drop them so the migrations after 7 can run again.
+    // Migrations 11 to 13 added columns; drop them so the migrations after 7 can run again.
     await db.run('ALTER TABLE items DROP COLUMN photo_id');
     await db.run('ALTER TABLE items DROP COLUMN rates_excluded');
+    await dropProjectColumns(db);
     await db.run('UPDATE schema_version SET version = 7');
     await migrateLocal(db);
     const [rate] = (await loadSnapshot(db)).rates;
@@ -211,7 +225,7 @@ describe('local repository', () => {
   it('renames a material everywhere, merging duplicates and remembering the old words', async () => {
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.audit, [cement, { ...cement, item_name: 'OPC Cement', original_term: 'cement bag', unit_price: 510 }]);
-    await saveDraftToHistory(db, 'audit', meta);
+    await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
     await indexRates(db, [{ ...cement, unit_price: 505 }]);
     let snap = await loadSnapshot(db);
     expect(buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned))).toHaveLength(2);
@@ -229,9 +243,9 @@ describe('local repository', () => {
     const db = await freshDb();
     const bagCement = { ...cement, original_term: 'cement' };
     await addItems(db, DRAFT_IDS.audit, [bagCement]);
-    await saveDraftToHistory(db, 'audit', meta);
+    await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
     await addItems(db, DRAFT_IDS.boq, [{ ...bagCement, unit: 'kg', unit_price: 9 }]);
-    await saveDraftToHistory(db, 'boq', { ...meta, title: 'Loose cement' });
+    await saveDraftToHistory(db, DRAFT_IDS.boq, { ...meta, title: 'Loose cement' });
 
     await renameMaterial(db, materialKey('Cement', 'Bag'), { item_name: 'OPC Cement', unit: 'ton' });
     const snap = await loadSnapshot(db);
@@ -244,7 +258,7 @@ describe('local repository', () => {
   it('corrects one price in a saved list or an added rate, and hides materials', async () => {
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.audit, [cement]);
-    const listId = await saveDraftToHistory(db, 'audit', meta);
+    const listId = await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
     await indexRates(db, [{ ...cement, unit_price: 505 }]);
     let snap = await loadSnapshot(db);
     const saved = snap.items.find((i) => i.list_id === listId)!;
@@ -266,7 +280,7 @@ describe('local repository', () => {
 
     // Renaming another material onto a hidden one shows it again instead of hiding these prices too.
     await addItems(db, DRAFT_IDS.audit, [{ ...cement, item_name: 'Cement 53', original_term: 'pp bag' }]);
-    await saveDraftToHistory(db, 'audit', meta);
+    await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
     await hideMaterial(db, ref);
     await renameMaterial(db, materialKey('Cement 53', 'Bag'), { item_name: 'Cement', unit: 'Bag' });
     expect((await loadSnapshot(db)).hidden).toHaveLength(0);
@@ -309,7 +323,7 @@ describe('local repository', () => {
     expect(await getBillPhotos(db, photoId)).toEqual(['AAA', 'BBB']);
 
     // Saving copies the lines; clearing the draft keeps the photos the saved list uses.
-    const listId = await saveDraftToHistory(db, 'audit', meta);
+    const listId = await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
     await clearListItems(db, DRAFT_IDS.audit);
     snap = await loadSnapshot(db);
     expect(snap.items.filter((i) => i.list_id === listId && i.photo_id === photoId)).toHaveLength(2);
@@ -322,7 +336,7 @@ describe('local repository', () => {
   it('clears deleted materials for good: rates deleted, saved lines kept but out of Rates', async () => {
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.audit, [cement, sand]);
-    await saveDraftToHistory(db, 'audit', meta);
+    await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
     await indexRates(db, [{ ...cement, unit_price: 505 }]);
     await hideMaterial(db, { key: materialKey('Cement', 'Bag'), name: 'Cement', unit: 'Bag' });
     await clearHiddenMaterials(db);
@@ -336,7 +350,7 @@ describe('local repository', () => {
 
     // A later purchase of it shows in Rates again.
     await addItems(db, DRAFT_IDS.audit, [cement]);
-    await saveDraftToHistory(db, 'audit', meta);
+    await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
     const after = await loadSnapshot(db);
     expect(buildItemDatabase(after.lists, after.items, after.rates, learningMap(after.learned)).map((e) => e.name)).toEqual(['Cement', 'Sand']);
   });
@@ -364,7 +378,7 @@ describe('local repository', () => {
     async function quoted() {
       const db = await freshDb();
       await addItems(db, DRAFT_IDS.boq, [{ ...sand, unit_price: 0 }, { ...cement, unit_price: 0 }]);
-      const boqId = await saveDraftToHistory(db, 'boq', boqMeta);
+      const boqId = await saveDraftToHistory(db, DRAFT_IDS.boq, boqMeta);
       const quoteId = await enqueueQuote(db, { boqId, vendor: 'Gupta', quoteDate: '2026-10-03', text: '', images: ['IMG'] });
       const snap = await loadSnapshot(db);
       const boqItems = snap.items.filter((i) => i.list_id === boqId);
@@ -400,7 +414,8 @@ describe('local repository', () => {
       await db.run('ALTER TABLE items DROP COLUMN delivered_at');
       await db.run('ALTER TABLE items DROP COLUMN ordered_as');
       await db.run('ALTER TABLE items DROP COLUMN photo_id');
-    await db.run('ALTER TABLE items DROP COLUMN rates_excluded');
+      await db.run('ALTER TABLE items DROP COLUMN rates_excluded');
+      await dropProjectColumns(db);
       await db.run('UPDATE schema_version SET version = 4');
       await migrateLocal(db);
       const rates = (await loadSnapshot(db)).rates.map((r) => [r.item_name, r.category, r.address]).sort();
@@ -416,7 +431,7 @@ describe('local repository', () => {
         { ...cement, unit_price: 0, brand: 'UltraTech', spec: '53 grade' },
         { ...sand, unit_price: 0, brand: 'Any' },
       ]);
-      const boqId = await saveDraftToHistory(db, 'boq', boqMeta);
+      const boqId = await saveDraftToHistory(db, DRAFT_IDS.boq, boqMeta);
       const quoteId = await enqueueQuote(db, { boqId, vendor: 'Gupta', quoteDate: '2026-10-03', text: '', images: ['IMG'] });
       let snap = await loadSnapshot(db);
       const boqItems = snap.items.filter((i) => i.list_id === boqId);
@@ -446,7 +461,7 @@ describe('local repository', () => {
     it('re-saving the BOQ keeps matches; deleting it removes its quotes', async () => {
       const { db, boqId } = await quoted();
       await restoreToDraft(db, boqId);
-      await saveDraftToHistory(db, 'boq', boqMeta, boqId);
+      await saveDraftToHistory(db, DRAFT_IDS.boq, boqMeta, boqId);
       let snap = await loadSnapshot(db);
       const cementId = snap.items.find((i) => i.list_id === boqId && i.item_name === 'Cement')!.id;
       expect(snap.quoteLines[0].boq_item_id).toBe(cementId);
@@ -460,7 +475,7 @@ describe('local repository', () => {
     it('removing a quote reading from the queue removes the empty quote', async () => {
       const db = await freshDb();
       await addItems(db, DRAFT_IDS.boq, [cement]);
-      const boqId = await saveDraftToHistory(db, 'boq', boqMeta);
+      const boqId = await saveDraftToHistory(db, DRAFT_IDS.boq, boqMeta);
       await enqueueQuote(db, { boqId, vendor: 'Gupta', quoteDate: '2026-10-03', text: 'x', images: ['IMG'] });
       const [job] = (await loadSnapshot(db)).jobs;
       expect(job.quote_id).toBeTruthy();
@@ -477,7 +492,7 @@ describe('typed vendor quotes', () => {
     const { createManualQuote } = await import('../src/data/repo.ts');
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.boq, [{ ...sand, unit_price: 0 }, { ...cement, unit_price: 0, brand: 'UltraTech' }]);
-    const boqId = await saveDraftToHistory(db, 'boq', { title: 'Tower A', address: 'Sector 44', category: 'Civil', site_date: '2026-10-01' });
+    const boqId = await saveDraftToHistory(db, DRAFT_IDS.boq, { title: 'Tower A', address: 'Sector 44', category: 'Civil', site_date: '2026-10-01' });
     const boqItems = (await loadSnapshot(db)).items.filter((i) => i.list_id === boqId);
     const id = await createManualQuote(db, {
       boqId, vendor: ' Gupta ', quoteDate: '2026-10-05',
@@ -491,6 +506,81 @@ describe('typed vendor quotes', () => {
   });
 });
 
+describe('projects', () => {
+  it('puts a new install in "My site", with its own purchase list and BOQ', async () => {
+    const db = await freshDb();
+    const snap = await loadSnapshot(db);
+    expect(snap.projects.map((p) => [p.name, p.status])).toEqual([['My site', 'active']]);
+    expect(snap.lists.every((l) => l.project_id === snap.projects[0].id)).toBe(true);
+  });
+
+  it('keeps each project’s lists apart: drafts, saving, reopening and deleting all', async () => {
+    const db = await freshDb();
+    const home = await projectOf(db);
+    const tower = await saveProject(db, { name: ' Tower B ', address: ' Sector 50 ' });
+    let snap = await loadSnapshot(db);
+    expect(snap.projects.find((p) => p.id === tower)).toMatchObject({ name: 'Tower B', address: 'Sector 50', status: 'active' });
+    const towerDraft = findDraft(snap.lists, tower, 'audit')!.id;
+    expect(towerDraft).toBe(draftIdFor(tower, 'audit'));
+    expect(findDraft(snap.lists, tower, 'boq')?.id).toBe(draftIdFor(tower, 'boq'));
+
+    await addItems(db, DRAFT_IDS.audit, [cement]);
+    await addItems(db, towerDraft, [sand]);
+    const homeList = await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
+    const towerList = await saveDraftToHistory(db, towerDraft, { ...meta, address: 'Sector 50' });
+    snap = await loadSnapshot(db);
+    expect(snap.lists.find((l) => l.id === homeList)?.project_id).toBe(home);
+    expect(snap.lists.find((l) => l.id === towerList)?.project_id).toBe(tower);
+
+    // Reopening a saved list fills its own project's draft, not the other one.
+    await clearListItems(db, towerDraft);
+    await restoreToDraft(db, towerList);
+    snap = await loadSnapshot(db);
+    expect(snap.items.filter((i) => i.list_id === towerDraft).map((i) => i.item_name)).toEqual(['Sand']);
+    expect(snap.items.filter((i) => i.list_id === DRAFT_IDS.audit).map((i) => i.item_name)).toEqual(['Cement']);
+
+    await deleteAllHistory(db, tower);
+    snap = await loadSnapshot(db);
+    expect(snap.lists.filter((l) => l.status === 'saved').map((l) => l.id)).toEqual([homeList]);
+  });
+
+  it('moves a saved list, closes and deletes a project with what is in it, keeping its rates', async () => {
+    const db = await freshDb();
+    const home = await projectOf(db);
+    const tower = await saveProject(db, { name: 'Tower B', address: '' });
+    await addItems(db, DRAFT_IDS.boq, [cement]);
+    const boq = await saveDraftToHistory(db, DRAFT_IDS.boq, meta);
+    const quote = await enqueueQuote(db, { boqId: boq, vendor: 'Gupta', quoteDate: '2026-10-03', text: '', images: ['IMG'] });
+    let snap = await loadSnapshot(db);
+    await completeQuoteJob(db, snap.jobs[0].id, [{ boq_sr: 1, original_term: '', item_name: 'Cement', quantity: 15, unit: 'Bag', unit_price: 380, total_amount: 0, note: '' }], [snap.items.find((i) => i.list_id === boq)!.id]);
+    await confirmQuote(db, quote);
+    await moveList(db, boq, tower);
+    await saveContract(db, {
+      project_id: tower, contractor: 'Ramesh', phone: '', address: '', category: 'Civil', work: 'Plaster', kind: 'lump_sum', rate: 0, unit: '', est_quantity: 0, amount: 1000, retention_pct: 0, start_date: '', notes: '',
+    });
+    snap = await loadSnapshot(db);
+    expect(snap.lists.find((l) => l.id === boq)?.project_id).toBe(tower);
+    expect(snap.rates[0].project_id).toBe(home);
+
+    await setProjectStatus(db, tower, 'closed');
+    expect((await loadSnapshot(db)).projects.find((p) => p.id === tower)?.status).toBe('closed');
+
+    await deleteProject(db, tower);
+    snap = await loadSnapshot(db);
+    expect(snap.projects.map((p) => p.id)).toEqual([home]);
+    expect(snap.lists.every((l) => l.project_id === home)).toBe(true);
+    expect([snap.contracts.length, snap.quotes.length, snap.quoteLines.length]).toEqual([0, 0, 0]);
+    expect(snap.rates).toHaveLength(1);
+
+    // Deleting the last project leaves a fresh, empty "My site".
+    await deleteProject(db, home);
+    snap = await loadSnapshot(db);
+    expect(snap.projects.map((p) => p.name)).toEqual(['My site']);
+    expect(snap.lists.map((l) => l.kind).sort()).toEqual(['audit', 'boq']);
+    expect(snap.items).toHaveLength(0);
+  });
+});
+
 describe('labour contracts', () => {
   const terms = {
     contractor: ' Ramesh ', phone: '98100', address: 'Sector 44', category: 'Civil', work: 'Plaster', kind: 'rate' as const,
@@ -499,7 +589,7 @@ describe('labour contracts', () => {
 
   it('adds contracts and entries, edits terms, closes with retention released, and deletes', async () => {
     const db = await freshDb();
-    const id = await saveContract(db, terms);
+    const id = await saveContract(db, { ...terms, project_id: await projectOf(db) });
     const work = await saveContractEntry(db, { contract_id: id, kind: 'work', date: '2026-09-10', quantity: 1000, amount: 0, mode: 'cash', note: '' });
     await saveContractEntry(db, { contract_id: id, kind: 'payment', date: '2026-09-11', quantity: 0, amount: 10000, mode: 'upi', note: ' advance ' });
     let snap = await loadSnapshot(db);
@@ -508,7 +598,7 @@ describe('labour contracts', () => {
     expect(contractTotals(snap.contracts[0], snap.contractEntries).balance).toBe(18000 - 900 - 10000);
 
     // A new rate applies to work already measured; editing an entry keeps it in place.
-    await saveContract(db, { ...terms, rate: 20 }, id);
+    await saveContract(db, { ...terms, project_id: await projectOf(db), rate: 20 }, id);
     await saveContractEntry(db, { contract_id: id, kind: 'work', date: '2026-09-10', quantity: 1200, amount: 0, mode: '', note: '' }, work);
     snap = await loadSnapshot(db);
     expect(snap.contracts).toHaveLength(1);

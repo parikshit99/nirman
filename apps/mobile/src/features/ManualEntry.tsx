@@ -4,7 +4,7 @@ import { VARIANT_FIELDS, parseAmount, todayISO, type MaterialEntry } from '@nirm
 import { useDialogs } from '../components/Dialogs.tsx';
 import { QuantityHelper } from '../components/QuantityHelper.tsx';
 import { VariantFields } from '../components/VariantFields.tsx';
-import { DRAFT_IDS, type ListKind } from '../data/repo.ts';
+import type { ListKind } from '../data/repo.ts';
 import { useAppState } from '../state/AppState.tsx';
 import { Button } from '../components/ui/Button.tsx';
 import { SuggestInput } from '../components/ui/SuggestInput.tsx';
@@ -13,7 +13,7 @@ const EMPTY: Record<string, string> = { item_name: '', quantity: '', unit: '', u
 
 /** Add one line by hand, without the AI: works with no internet or API key. */
 export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void }) {
-  const { actions, itemDatabase, knownVendors } = useAppState();
+  const { actions, itemDatabase, knownVendors, draftIds } = useAppState();
   const dialogs = useDialogs();
   const [draft, setDraft] = useState(EMPTY);
   const [added, setAdded] = useState<string[]>([]);
@@ -40,7 +40,7 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
       await dialogs.alert('Check the number', `“${quantity === null ? draft.quantity : draft.unit_price}” is not a number. Use digits, e.g. 1500 or 1,500.`);
       return;
     }
-    await actions.addItems(DRAFT_IDS[kind], [
+    await actions.addItems(draftIds[kind], [
       {
         item_name: name,
         quantity,

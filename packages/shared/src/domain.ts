@@ -387,7 +387,8 @@ export function filterMaterials(entries: MaterialEntry[], filter: MaterialFilter
 // ---------------------------------------------------------------------------
 
 export interface SiteReportOptions {
-  address: string;
+  /** Only lists saved with this site address; absent means every list given. */
+  address?: string;
   /** Inclusive YYYY-MM-DD bounds; blank or absent means no limit. */
   from?: string;
   to?: string;
@@ -435,8 +436,8 @@ const UNCATEGORISED = 'Uncategorised';
 export const siteReportDate = (item: ItemRow, list: ListRow) => item.delivered_at || item.date || list.site_date || list.created_at.slice(0, 10);
 
 /** Whether any saved purchase line for this address is ticked as delivered. */
-export function siteHasDeliveries(lists: ListRow[], items: ItemRow[], address: string): boolean {
-  const ids = new Set(lists.filter((l) => l.kind === 'audit' && l.status === 'saved' && l.address === address).map((l) => l.id));
+export function siteHasDeliveries(lists: ListRow[], items: ItemRow[], address?: string): boolean {
+  const ids = new Set(lists.filter((l) => l.kind === 'audit' && l.status === 'saved' && (address === undefined || l.address === address)).map((l) => l.id));
   return items.some((i) => ids.has(i.list_id) && !!i.delivered_at);
 }
 
@@ -448,7 +449,7 @@ export function buildSiteReport(lists: ListRow[], items: ItemRow[], learning: Le
   const wanted = new Set((opts.categories ?? []).map((c) => c.trim().toLowerCase()));
   const siteLists = new Map(
     lists
-      .filter((l) => l.kind === 'audit' && l.status === 'saved' && l.address === opts.address)
+      .filter((l) => l.kind === 'audit' && l.status === 'saved' && (opts.address === undefined || l.address === opts.address))
       .filter((l) => wanted.size === 0 || wanted.has((l.category || UNCATEGORISED).toLowerCase()))
       .map((l) => [l.id, l]),
   );

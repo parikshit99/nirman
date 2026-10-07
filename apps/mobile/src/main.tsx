@@ -11,7 +11,7 @@ import App from './App.tsx';
 import { DialogProvider } from './components/Dialogs.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { installErrorHandlers, logError, logPerf } from './lib/diagnostics.ts';
-import { ensureDrafts, loadSnapshot, resetStuckJobs } from './data/repo.ts';
+import { ensureProjects, loadSnapshot, resetStuckJobs } from './data/repo.ts';
 import { migrateLocal } from './data/schema.ts';
 import { openCapacitorSqlite, openSqlJs, type Db } from './data/sql.ts';
 import { JobWorker } from './jobs/worker.ts';
@@ -38,7 +38,7 @@ async function bootstrap() {
   try {
     const db = await openDatabase();
     await migrateLocal(db);
-    await ensureDrafts(db);
+    await ensureProjects(db);
     await resetStuckJobs(db);
 
     const settings = { current: await settingsStore.load() };

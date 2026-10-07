@@ -221,6 +221,22 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE items ADD COLUMN rates_excluded INTEGER NOT NULL DEFAULT 0;
   `,
+  // 13: projects. Every list and contract belongs to one; existing ones are sorted into projects by site address (ensureProjects).
+  `
+  CREATE TABLE IF NOT EXISTS projects (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    address TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  ALTER TABLE lists ADD COLUMN project_id TEXT NOT NULL DEFAULT '';
+  ALTER TABLE contracts ADD COLUMN project_id TEXT NOT NULL DEFAULT '';
+  ALTER TABLE indexed_rates ADD COLUMN project_id TEXT NOT NULL DEFAULT '';
+  CREATE INDEX IF NOT EXISTS lists_project_idx ON lists (project_id);
+  CREATE INDEX IF NOT EXISTS contracts_project_idx ON contracts (project_id);
+  `,
 ];
 
 /** Default categories sort before anything the user adds. */

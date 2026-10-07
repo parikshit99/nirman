@@ -14,48 +14,33 @@ import { logStep } from '../lib/diagnostics.ts';
 
 const rupees = (n: number) => `₹${Math.round(n || 0).toLocaleString('en-IN')}`;
 
-/** Everything bought (or delivered) for one site, for any period and work types, as PDF / Excel / JPG. */
+/** Everything bought (or delivered) for the open project, for any period and work types, as PDF / Excel / JPG. */
 export function SiteReport({ onClose }: { onClose(): void }) {
-  const { snapshot, learning, categoryNames } = useAppState();
+  const { snapshot, learning, categoryNames, project, projectId, contracts } = useAppState();
   const dialogs = useDialogs();
-  const sites = useMemo(
-    () =>
-      [
-        ...new Set([
-          ...snapshot.lists.filter((l) => l.kind === 'audit' && l.status === 'saved' && l.address).map((l) => l.address),
-          ...snapshot.contracts.map((c) => c.address).filter(Boolean),
-        ]),
-      ].sort(),
-    [snapshot.lists, snapshot.contracts],
-  );
-  const [address, setAddress] = useState(sites[0] ?? '');
+  const lists = useMemo(() => snapshot.lists.filter((l) => l.project_id === projectId && l.kind === 'audit' && l.status === 'saved'), [snapshot.lists, projectId]);
+  /** The report's heading: the project, and its site address when that says more. */
+  const address = [project?.name, project?.address].filter((v, i, all) => v && all.indexOf(v) === i).join(', ');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
-  const [deliveredOnly, setDeliveredOnly] = useState(() => siteHasDeliveries(snapshot.lists, snapshot.items, sites[0] ?? ''));
+  const [deliveredOnly, setDeliveredOnly] = useState(() => siteHasDeliveries(lists, snapshot.items));
   const [sharing, setSharing] = useState(false);
   const [previewing, setPreviewing] = useState(false);
 
-  const pickSite = (a: string) => {
-    setAddress(a);
-    setDeliveredOnly(siteHasDeliveries(snapshot.lists, snapshot.items, a));
-  };
   const toggleCategory = (c: string) => setCategories((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
   const siteCategories = useMemo(() => {
-    const used = new Set([
-      ...snapshot.lists.filter((l) => l.kind === 'audit' && l.status === 'saved' && l.address === address).map((l) => l.category || 'Uncategorised'),
-      ...snapshot.contracts.filter((c) => c.address === address).map((c) => c.category || 'Uncategorised'),
-    ]);
+    const used = new Set([...lists.map((l) => l.category || 'Uncategorised'), ...contracts.map((c) => c.category || 'Uncategorised')]);
     return [...categoryNames.filter((c) => used.has(c)), ...[...used].filter((c) => !categoryNames.includes(c))];
-  }, [snapshot.lists, snapshot.contracts, address, categoryNames]);
+  }, [lists, contracts, categoryNames]);
 
   const report = useMemo(
-    () => buildSiteReport(snapshot.lists, snapshot.items, learning, { address, from, to, categories, deliveredOnly }),
-    [snapshot.lists, snapshot.items, learning, address, from, to, categories, deliveredOnly],
+    () => buildSiteReport(lists, snapshot.items, learning, { from, to, categories, deliveredOnly }),
+    [lists, snapshot.items, learning, from, to, categories, deliveredOnly],
   );
   const labour = useMemo(
-    () => buildLabourReport(snapshot.contracts, snapshot.contractEntries, { address, from, to, categories }),
-    [snapshot.contracts, snapshot.contractEntries, address, from, to, categories],
+    () => buildLabourReport(contracts, snapshot.contractEntries, { from, to, categories }),
+    [contracts, snapshot.contractEntries, from, to, categories],
   );
   const empty = report.lineCount === 0 && labour.rows.length === 0;
   const materialCount = report.categories.reduce((n, c) => n + c.materials.length, 0);
@@ -90,22 +75,18 @@ export function SiteReport({ onClose }: { onClose(): void }) {
         <SheetHeader
           id="site-report-title"
           title="Site report"
-          subtitle="Everything bought for one site, grouped by work type and material, with every line listed, plus labour contracts."
+          subtitle="Everything bought for this project, grouped by work type and material, with every line listed, plus labour contracts."
           onClose={onClose}
         />
 
-        {sites.length === 0 ? (
-          <p className="text-sm text-gray-500">Save a purchase list or add a labour contract with a site address first.</p>
+        {lists.length === 0 && contracts.length === 0 ? (
+          <p className="text-sm text-gray-500">Save a purchase list or add a labour contract in this project first.</p>
         ) : (
           <div className="space-y-4">
-            <label className="block">
-              <span className={label}>Site</span>
-              <select aria-label="Site" value={address} onChange={(e) => pickSite(e.target.value)} className={`${input} font-bold`}>
-                {sites.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </label>
+            <div className="p-3 bg-gray-50 rounded-xl">
+              <span className={label}>Project</span>
+              <span className="block text-sm font-bold text-gray-900 break-words">{address}</span>
+            </div>
 
             <div>
               <span className={label}>Period</span>

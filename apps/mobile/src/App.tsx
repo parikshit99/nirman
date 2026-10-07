@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, animate } from 'motion/react';
-import { Database, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Plus, Save, Share2, ShoppingCart, Search, Trash2, Users, X } from 'lucide-react';
+import { ChevronDown, Database, Eye, FileCode, FileText, HardHat, History, LayoutDashboard, Plus, Save, Share2, ShoppingCart, Search, Trash2, Users, X } from 'lucide-react';
 import Fuse from 'fuse.js';
-import { filterMaterials, guessCategory, todayISO, type ContractRow, type MaterialFilter } from '@nirman/shared';
+import { filterMaterials, guessCategory, todayISO, type ContractRow, type MaterialFilter, type ProjectRow } from '@nirman/shared';
 import { useDialogs } from './components/Dialogs.tsx';
 import { Button } from './components/ui/Button.tsx';
 import { useBackHandler } from './lib/backButton.ts';
@@ -19,7 +19,8 @@ import { QuotesView } from './features/QuotesView.tsx';
 import { SaveModal } from './components/SaveModal.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
 import { StatusChip } from './components/StatusChip.tsx';
-import { DRAFT_IDS, type ListKind, type ListMeta } from './data/repo.ts';
+import type { ListKind, ListMeta } from './data/repo.ts';
+import { ProjectForm, ProjectsSheet } from './features/ProjectsSheet.tsx';
 import { CapturePanel, QueuedReadings } from './features/CapturePanel.tsx';
 import { Sheet, SheetHeader } from './components/ui/Sheet.tsx';
 import { useMediaQuery } from './lib/useMediaQuery.ts';
@@ -47,8 +48,8 @@ const TABS: { id: AppTab; label: string; icon: typeof LayoutDashboard; about: st
   { id: 'auditor', label: 'Purchases', icon: ShoppingCart, about: 'Photograph bills or type what was bought; get a purchase list with the rate paid for each item.' },
   { id: 'boq', label: 'BOQ', icon: FileCode, about: 'Photograph a drawing or list; get a blank BOQ (no rates) to send vendors, then compare their quotes.' },
   { id: 'labour', label: 'Labour', icon: Users, about: 'Labour contracts: record work measured, payments and deductions; see what each contractor is owed and share statements.' },
-  { id: 'database', label: 'Rates', icon: Database, about: 'Every price you have recorded, per material, to see how rates change over time.' },
-  { id: 'history', label: 'Saved', icon: History, about: 'Saved purchase lists and BOQs. Open one to edit it, export it, or add vendor quotes.' },
+  { id: 'database', label: 'Rates', icon: Database, about: 'Every price you have recorded in all projects, per material, to see how rates change over time.' },
+  { id: 'history', label: 'Saved', icon: History, about: 'Saved purchase lists and BOQs of this project. Open one to edit it, export it, or add vendor quotes.' },
 ];
 
 interface SaveState {
@@ -60,6 +61,8 @@ interface SaveState {
   titlePrefix: string;
   /** Purchase lists: the lines' vendor, to change on all of them at once. */
   vendor?: { initial: string; mixed: boolean };
+  /** Saved lists: the project, to move it to another. */
+  project?: { id: string; options: { id: string; name: string }[] };
 }
 
 /** One vendor on every line, or several. */
@@ -76,6 +79,8 @@ const kindOf = (tab: AppTab): ListKind | null => (tab === 'auditor' ? 'audit' : 
 export default function App() {
   const state = useAppState();
   const { actions, history, itemDatabase, itemsFor, boqNotes, categoryNames, uniqueAddresses, settings, pendingDeletes, savedBoqs, contracts, allAddresses, knownVendors, quotesFor } = state;
+  const { projectId, project, projects, draftIds } = state;
+  const projectOptions = useMemo(() => projects.map((p) => ({ id: p.id, name: p.status === 'closed' ? `${p.name} (closed)` : p.name })), [projects]);
   const dialogs = useDialogs();
 
   const [activeTab, setActiveTab] = useState<AppTab>('auditor');
@@ -101,9 +106,15 @@ export default function App() {
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [addressFilter, setAddressFilter] = useState('All');
   const [materialFilter, setMaterialFilter] = useState<MaterialFilter>({});
-  const [linkedRecord, setLinkedRecord] = useState<Record<ListKind, string | null>>(() =>
-    prefs.get('nirmaan_linked_records', { audit: null, boq: null }),
+  /** The saved list each project's open Purchases list and BOQ were opened from (saving again updates it). */
+  const [linkedByProject, setLinkedByProject] = useState<Record<string, Record<ListKind, string | null>>>(() => prefs.get('nirmaan_linked_by_project', {}));
+  const linkedRecord = useMemo(
+    // Before projects there was one pair; it still counts where that list is in the open project.
+    () => linkedByProject[projectId] ?? prefs.get<Record<ListKind, string | null>>('nirmaan_linked_records', { audit: null, boq: null }),
+    [linkedByProject, projectId],
   );
+  const [projectsOpen, setProjectsOpen] = useState(false);
+  const [projectForm, setProjectForm] = useState<{ project?: ProjectRow } | null>(null);
   const [saveState, setSaveState] = useState<SaveState | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(() => !settings.geminiApiKey && !prefs.get('nirmaan_onboarded', false));
@@ -131,15 +142,21 @@ export default function App() {
   const listedItems = kind ? itemsFor(kind) : [];
   /** The draft as it counts: totals, PDF and saving leave out deleted rows. */
   const activeItems = useMemo(() => listedItems.filter((i) => !pendingDeletes.has(i.id)), [listedItems, pendingDeletes]);
-  // Switching tabs carries out deletes still waiting for undo.
+  // Switching tabs or projects carries out deletes still waiting for undo.
   useEffect(() => {
     void actions.flushDeletes();
-  }, [activeTab, actions]);
+  }, [activeTab, projectId, actions]);
+  // Another project starts unfiltered: its sites and work types differ.
+  useEffect(() => {
+    setSearchQuery('');
+    setCategoryFilter('All');
+    setAddressFilter('All');
+  }, [projectId]);
 
   const linkRecord = (k: ListKind, id: string | null) => {
-    setLinkedRecord((prev) => {
-      const next = { ...prev, [k]: id };
-      prefs.set('nirmaan_linked_records', next);
+    setLinkedByProject((prev) => {
+      const next = { ...prev, [projectId]: { ...linkedRecord, [k]: id } };
+      prefs.set('nirmaan_linked_by_project', next);
       return next;
     });
   };
@@ -199,7 +216,7 @@ export default function App() {
       titlePrefix: titlePrefix(kind),
       initial: {
         title: record?.title ?? '',
-        address: record?.address ?? '',
+        address: record?.address || project?.address || '',
         category: record?.category || prefs.get(workTypeKey(kind), '') || guessCategory(activeItems),
         site_date: todayISO(),
       },
@@ -218,6 +235,7 @@ export default function App() {
         site_date: record.site_date || record.created_at.slice(0, 10),
       },
       vendor: record.kind === 'audit' && record.items.length ? vendorOf(record.items) : undefined,
+      project: { id: record.project_id, options: projectOptions },
     });
 
   const deleteRecord = async (recordId: string) => {
@@ -234,7 +252,7 @@ export default function App() {
     await actions.deleteList(record.id);
   };
 
-  const handleSave = async (meta: ListMeta, asNew: boolean, vendor?: string) => {
+  const handleSave = async (meta: ListMeta, asNew: boolean, vendor?: string, moveTo?: string) => {
     if (!saveState) return;
     await actions.flushDeletes();
     const { kind: k, recordId } = saveState;
@@ -243,11 +261,15 @@ export default function App() {
       if (recordId) {
         await actions.updateListMeta(recordId, meta);
         if (vendor) await actions.setListVendor(recordId, vendor);
+        if (moveTo) {
+          await actions.moveList(recordId, moveTo);
+          dialogs.toast(`Moved to ${projects.find((p) => p.id === moveTo)?.name ?? 'the other project'}`);
+        }
       }
       return;
     }
-    if (vendor && k === 'audit') await actions.setListVendor(DRAFT_IDS.audit, vendor);
-    const id = await actions.saveDraftToHistory(k, meta, asNew ? undefined : recordId);
+    if (vendor && k === 'audit') await actions.setListVendor(draftIds.audit, vendor);
+    const id = await actions.saveDraftToHistory(draftIds[k], meta, asNew ? undefined : recordId);
     if (!asNew) linkRecord(k, id);
     // The next bill shouldn't be added to this session by accident.
     const fresh = await dialogs.confirm(`Saved “${meta.title || titlePrefix(k)}”`, {
@@ -259,8 +281,8 @@ export default function App() {
   };
 
   const startNewList = async (k: ListKind) => {
-    await actions.clearListItems(k === 'audit' ? 'draft-audit' : 'draft-boq');
-    if (k === 'boq') await actions.setListNotes(DRAFT_IDS.boq, '');
+    await actions.clearListItems(draftIds[k]);
+    if (k === 'boq') await actions.setListNotes(draftIds.boq, '');
     linkRecord(k, null);
   };
 
@@ -291,7 +313,7 @@ export default function App() {
       linkRecord('audit', null);
     }
     await actions.addItems(
-      DRAFT_IDS.audit,
+      draftIds.audit,
       record.items.map((i) => ({ ...i, date: todayISO() })),
     );
     setActiveTab('auditor');
@@ -309,12 +331,12 @@ export default function App() {
   };
 
   const deleteAllSaved = async () => {
-    const ok = await dialogs.confirm('Delete all saved lists?', {
-      message: `${history.length} saved ${history.length === 1 ? 'list' : 'lists'} will be permanently deleted from this phone.`,
+    const ok = await dialogs.confirm(`Delete all saved lists of ${project?.name ?? 'this project'}?`, {
+      message: `${history.length} saved ${history.length === 1 ? 'list' : 'lists'} will be permanently deleted from this phone. Other projects are not affected.`,
       confirmLabel: 'Delete all',
       danger: true,
     });
-    if (ok) await actions.deleteAllHistory();
+    if (ok) await actions.deleteAllHistory(projectId);
   };
 
   const [shareOpen, setShareOpen] = useState(false);
@@ -352,7 +374,7 @@ export default function App() {
   }, [captureShare]);
   const capturePanel = kind && (
     <CapturePanel
-      key={kind}
+      key={`${projectId}-${kind}`}
       kind={kind}
       onVendorQuote={() => {
         setAddOpen(false);
@@ -402,10 +424,24 @@ export default function App() {
           <div className="w-8 h-8 bg-[var(--color-brand-primary)] rounded flex items-center justify-center text-white shrink-0">
             <HardHat size={18} />
           </div>
-          <h1 className="text-lg font-bold tracking-tight text-[var(--color-brand-dark)] whitespace-nowrap">
-            NIRMAN <span className="hidden min-[400px]:inline font-serif italic font-normal text-sm opacity-70">by Akohsa</span>
+          <h1 className="hidden md:block text-lg font-bold tracking-tight text-[var(--color-brand-dark)] whitespace-nowrap">
+            NIRMAN <span className="font-serif italic font-normal text-sm opacity-70">by Akohsa</span>
           </h1>
-          <nav className="hidden lg:flex bg-gray-100 p-1 rounded-lg border border-gray-200 ml-4" aria-label="Sections">
+          {/* Everything below the header belongs to this project. */}
+          <button
+            onClick={() => setProjectsOpen(true)}
+            aria-label={`Project: ${project?.name ?? ''}. Change project`}
+            className="min-w-0 flex-1 lg:flex-none lg:max-w-56 flex items-center gap-1 -my-1 py-1 px-2 -ml-2 md:ml-0 rounded-lg hover:bg-gray-100 active:bg-gray-200 text-left"
+          >
+            <span className="min-w-0 leading-tight">
+              <span className="block text-xs text-gray-500 font-semibold">Project</span>
+              <span className="block text-sm font-bold text-[var(--color-brand-dark)] truncate" data-testid="project-name">
+                {project?.name}
+              </span>
+            </span>
+            <ChevronDown size={16} className="text-gray-500 shrink-0" />
+          </button>
+          <nav className="hidden lg:flex bg-gray-100 p-1 rounded-lg border border-gray-200 ml-2" aria-label="Sections">
             {TABS.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -595,7 +631,7 @@ export default function App() {
 
       {/* Phones: the entry form opens over the list. It stays loaded when closed, so a half-typed entry isn't lost. */}
       {kind && !wide && (
-        <Sheet key={`add-${kind}`} open={addOpen} size="lg" labelledBy="add-title" onClose={() => setAddOpen(false)} className="p-4 gap-4">
+        <Sheet key={`add-${projectId}-${kind}`} open={addOpen} size="lg" labelledBy="add-title" onClose={() => setAddOpen(false)} className="p-4 gap-4">
           <SheetHeader id="add-title" title={kind === 'audit' ? 'Add purchases' : 'Add to BOQ'} onClose={() => setAddOpen(false)} />
           {capturePanel}
         </Sheet>
@@ -612,6 +648,7 @@ export default function App() {
             allowSaveAsNew={!!saveState.recordId && !!saveState.kind}
             titlePrefix={saveState.titlePrefix}
             vendor={saveState.vendor && { ...saveState.vendor, known: knownVendors }}
+            project={saveState.project}
             onDelete={saveState.recordId && !saveState.kind ? () => deleteRecord(saveState.recordId!) : undefined}
             onSave={handleSave}
             onClose={() => setSaveState(null)}
@@ -643,7 +680,7 @@ export default function App() {
             key="order-slip"
             items={activeItems}
             notes={boqNotes}
-            address={history.find((r) => r.id === linkedRecord.boq)?.address ?? ''}
+            address={history.find((r) => r.id === linkedRecord.boq)?.address || project?.address || ''}
             addresses={uniqueAddresses}
             onClose={() => setOrderSlipOpen(false)}
           />
@@ -680,9 +717,11 @@ export default function App() {
             key="contract-form"
             contract={contractForm.contract}
             defaults={{
-              address: addressFilter !== 'All' ? addressFilter : prefs.get('nirmaan_contract_site', ''),
+              address: addressFilter !== 'All' ? addressFilter : project?.address || prefs.get('nirmaan_contract_site', ''),
               category: categoryFilter !== 'All' ? categoryFilter : categoryNames[0] || 'Civil',
+              project_id: projectId,
             }}
+            projects={projectOptions}
             addresses={allAddresses}
             categories={categoryNames}
             contractors={contractors}
@@ -692,6 +731,25 @@ export default function App() {
         )}
         {siteReportOpen && <SiteReport key="site-report" onClose={() => setSiteReportOpen(false)} />}
         {deliveriesFor && <DeliveriesSheet key="deliveries" recordId={deliveriesFor} onClose={() => setDeliveriesFor(null)} />}
+        {projectsOpen && (
+          <ProjectsSheet
+            key="projects"
+            backEnabled={!projectForm}
+            onClose={() => setProjectsOpen(false)}
+            onNew={() => setProjectForm({})}
+            onEdit={(p) => setProjectForm({ project: p })}
+          />
+        )}
+        {projectForm && (
+          <ProjectForm
+            key="project-form"
+            project={projectForm.project}
+            onClose={() => {
+              setProjectForm(null);
+              setProjectsOpen(false);
+            }}
+          />
+        )}
         {incoming && <ShareTargetSheet key="share-target" share={incoming} hasSavedBoqs={savedBoqs.length > 0} onPick={routeShare} onClose={() => setIncoming(null)} />}
       </AnimatePresence>
     </div>

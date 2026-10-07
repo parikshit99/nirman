@@ -26,6 +26,7 @@ const WORK_SUGGESTIONS = [
 const UNIT_SUGGESTIONS = ['sqft', 'rft', 'cft', 'sqm', 'cum', 'point', 'nos', 'day'];
 
 const blank = (category: string): Record<keyof ContractInput, string> => ({
+  project_id: '',
   contractor: '',
   phone: '',
   address: '',
@@ -42,6 +43,7 @@ const blank = (category: string): Record<keyof ContractInput, string> => ({
 });
 
 const asText = (c: ContractRow): Record<keyof ContractInput, string> => ({
+  project_id: c.project_id,
   contractor: c.contractor,
   phone: c.phone,
   address: c.address,
@@ -64,11 +66,14 @@ export function ContractForm({
   addresses,
   categories,
   contractors,
+  projects,
   onSave,
   onClose,
 }: {
   contract?: ContractRow;
-  defaults: { address: string; category: string };
+  defaults: { address: string; category: string; project_id: string };
+  /** Projects it can be in (a choice is shown when there are several). */
+  projects: { id: string; name: string }[];
   addresses: string[];
   categories: string[];
   /** Contractors already on file, with their phone, to fill in. */
@@ -77,7 +82,7 @@ export function ContractForm({
   onClose(): void;
 }) {
   const dialogs = useDialogs();
-  const [f, setF] = useState(() => (contract ? asText(contract) : { ...blank(defaults.category), address: defaults.address }));
+  const [f, setF] = useState(() => (contract ? asText(contract) : { ...blank(defaults.category), address: defaults.address, project_id: defaults.project_id }));
   const [saving, setSaving] = useState(false);
   const set = (k: keyof ContractInput) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setValue(k, e.target.value);
   const setValue = (k: keyof ContractInput, value: string) => {
@@ -106,6 +111,7 @@ export function ContractForm({
     setSaving(true);
     try {
       await onSave({
+        project_id: f.project_id,
         contractor: f.contractor,
         phone: f.phone,
         address: f.address,
@@ -185,6 +191,19 @@ export function ContractForm({
           </select>
         </label>
       </div>
+
+      {projects.length > 1 && (
+        <label className="block">
+          <span className={label}>Project</span>
+          <select aria-label="Project" value={f.project_id} onChange={set('project_id')} className={input}>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <fieldset>
         <legend className={label}>Paid by</legend>

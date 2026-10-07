@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ClipboardCheck, Copy, MapPin, Save, Trash2, Truck } from 'lucide-react';
+import { Building2, ClipboardCheck, Copy, MapPin, Save, Trash2, Truck } from 'lucide-react';
 import type { ListMeta } from '../data/repo.ts';
 import { Button } from './ui/Button.tsx';
 import { Sheet, SheetHeader } from './ui/Sheet.tsx';
@@ -20,15 +20,18 @@ interface Props {
    * read by the AI can carry the buyer's name as vendor; picking the vendor here fixes all lines.
    */
   vendor?: { initial: string; mixed: boolean; known: string[] };
+  /** Saved lists: the project it is in, to move it to another (shown when there are several). */
+  project?: { id: string; options: { id: string; name: string }[] };
   /** Saved lists: Delete sits here rather than on the list card, so it isn't tapped by accident. */
   onDelete?(): void;
-  /** `vendor` is undefined when left as it was. */
-  onSave(meta: ListMeta, asNew: boolean, vendor?: string): void;
+  /** `vendor` is undefined when left as it was; `projectId` when the list was moved to another project. */
+  onSave(meta: ListMeta, asNew: boolean, vendor?: string, projectId?: string): void;
   onClose(): void;
 }
 
-export function SaveModal({ initial, categories, recentAddresses, editing, allowSaveAsNew, titlePrefix, vendor, onDelete, onSave, onClose }: Props) {
+export function SaveModal({ initial, categories, recentAddresses, editing, allowSaveAsNew, titlePrefix, vendor, project, onDelete, onSave, onClose }: Props) {
   const [meta, setMeta] = useState(initial);
+  const [projectId, setProjectId] = useState(project?.id ?? '');
   const [vendorName, setVendorName] = useState(vendor?.initial ?? '');
   const set = (field: keyof ListMeta) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setMeta((p) => ({ ...p, [field]: e.target.value }));
@@ -37,7 +40,12 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
     const autoTitle = `${titlePrefix} ${meta.site_date.split('-').reverse().join('/')}`.trim();
     const nextVendor = vendorName.trim();
     const vendorChanged = !!vendor && !!nextVendor && (vendor.mixed || nextVendor !== vendor.initial);
-    onSave({ ...meta, title: meta.title.trim() || autoTitle, address: meta.address.trim() }, asNew, vendorChanged ? nextVendor : undefined);
+    onSave(
+      { ...meta, title: meta.title.trim() || autoTitle, address: meta.address.trim() },
+      asNew,
+      vendorChanged ? nextVendor : undefined,
+      project && projectId !== project.id ? projectId : undefined,
+    );
   };
 
   const suggestions = meta.address
@@ -91,6 +99,24 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
             </div>
           )}
         </div>
+
+        {project && project.options.length > 1 && (
+          <div>
+            <label htmlFor="save-project" className="text-xs text-gray-500 font-bold block mb-1">
+              Project
+            </label>
+            <div className="relative">
+              <Building2 size={14} className="absolute left-3 top-3.5 text-gray-500 pointer-events-none" />
+              <select id="save-project" value={projectId} onChange={(e) => setProjectId(e.target.value)} className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold pl-9">
+                {project.options.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
 
         {vendor && (
           <div>
