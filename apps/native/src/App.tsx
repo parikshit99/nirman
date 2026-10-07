@@ -11,6 +11,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { DialogProvider } from './components/ui/Dialogs';
 import { startServices } from './data/services';
 import { ListScreen } from './features/ListScreen';
+import { ProjectsHost } from './features/ProjectsSheet';
+import { SavedScreen } from './features/SavedScreen';
 import { TabScreen } from './screens/TabScreen';
 import { AppStateProvider, type Services } from './state/AppState';
 import { dark, light, useColors } from './theme';
@@ -26,11 +28,11 @@ const ICONS = {
 const ABOUT = {
   Purchases: 'Photograph bills or type what was bought; get a purchase list with the rate paid for each item.',
   BOQ: 'Photograph a drawing or list; get a blank BOQ (no rates) to send vendors, then compare their quotes.',
+  Saved: 'Saved purchase lists and BOQs of this project. Open one to edit it, export it, or add vendor quotes.',
 } as const;
 
 /** Tabs whose screens are ported in a later phase show an empty list for now. */
 const PLACEHOLDERS = [
-  { name: 'BOQ', empty: 'No BOQ items yet.', hint: 'Photograph a drawing or list to get a BOQ to send vendors.' },
   {
     name: 'Labour',
     empty: 'No labour contracts yet.',
@@ -41,7 +43,6 @@ const PLACEHOLDERS = [
     empty: 'No prices yet',
     hint: 'A price appears here as soon as you add a purchase with a rate, and when you confirm a vendor quote.',
   },
-  { name: 'Saved', empty: 'Nothing saved yet.', hint: 'Lists you save in this project from Purchases or BOQ (the Save button) appear here.' },
 ] as const;
 
 const Tab = createNativeBottomTabNavigator();
@@ -54,11 +55,17 @@ function Tabs() {
       <Tab.Screen name="Purchases" options={{ tabBarIcon: () => ICONS.Purchases }}>
         {() => <ListScreen kind="audit" about={ABOUT.Purchases} />}
       </Tab.Screen>
+      <Tab.Screen name="BOQ" options={{ tabBarIcon: () => ICONS.BOQ }}>
+        {() => <ListScreen kind="boq" about={ABOUT.BOQ} />}
+      </Tab.Screen>
       {PLACEHOLDERS.map((t) => (
         <Tab.Screen key={t.name} name={t.name} options={{ tabBarIcon: () => ICONS[t.name] }}>
           {() => <TabScreen icon={ICONS[t.name]} title={t.empty} hint={t.hint} />}
         </Tab.Screen>
       ))}
+      <Tab.Screen name="Saved" options={{ tabBarIcon: () => ICONS.Saved }}>
+        {() => <SavedScreen about={ABOUT.Saved} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }
@@ -91,10 +98,12 @@ function Boot() {
   }
   return (
     <AppStateProvider services={ready.services} initial={ready.initial}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {/* Full screens (Sheet kind="screen") are native dialogs for now; pushed routes can go above the tabs here. */}
-        <Stack.Screen name="Home" component={Tabs} />
-      </Stack.Navigator>
+      <ProjectsHost>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {/* Full screens (Sheet kind="screen") are native dialogs for now; pushed routes can go above the tabs here. */}
+          <Stack.Screen name="Home" component={Tabs} />
+        </Stack.Navigator>
+      </ProjectsHost>
     </AppStateProvider>
   );
 }

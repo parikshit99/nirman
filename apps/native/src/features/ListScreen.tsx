@@ -2,20 +2,25 @@ import Fuse from 'fuse.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { guessCategory, todayISO } from '@nirman/shared';
-import { logStep, prefs, workTypeKey, type ListKind, type ListMeta } from '@nirman/core';
+import { buildPdf, listSheet, logStep, pdfFile, prefs, workTypeKey, type ExportFormat, type ListKind, type ListMeta } from '@nirman/core';
+import { DocumentPreview } from '../components/DocumentPreview';
 import { SaveModal } from '../components/SaveModal';
+import { ShareSheet } from '../components/ShareSheet';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { Icon } from '../components/ui/Icon';
 import type { MenuItem } from '../components/ui/OverflowMenu';
 import { Sheet, SheetHeader } from '../components/ui/Sheet';
+import { pdfToJpegs, sheetToXlsx } from '../lib/exportFiles';
+import { shareFiles } from '../lib/files';
 import { haptic } from '../lib/haptics';
 import { rupeesWhole } from '../lib/format';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 import { CapturePanel, QueuedReadings } from './CapturePanel';
 import { ItemLog } from './ItemLog';
+import { BoqShareChoice, OrderSlipSheet } from './OrderSlipSheet';
 
 /** One vendor on every line, or several. */
 function vendorOf(items: { vendor: string }[]): { initial: string; mixed: boolean } {
@@ -37,24 +42,26 @@ export function ListScreen({
   kind,
   about,
   extraMenu = [],
-  onProject,
   onVendorQuote,
 }: {
   kind: ListKind;
   /** The one line under the header saying what the tab does. */
   about: string;
   extraMenu?: MenuItem[];
-  onProject?(): void;
   /** BOQ: scan a vendor's reply. */
   onVendorQuote?(): void;
 }) {
   const c = useColors();
   const dialogs = useDialogs();
   const state = useAppState();
-  const { actions, itemsFor, categoryNames, uniqueAddresses, pendingDeletes, knownVendors, editing, setEditing, draftIds, project, projectId } = state;
+  const { actions, boqNotes, itemsFor, categoryNames, uniqueAddresses, pendingDeletes, knownVendors, editing, setEditing, draftIds, project, projectId } = state;
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [saveState, setSaveState] = useState<SaveState | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [boqChoiceOpen, setBoqChoiceOpen] = useState(false);
+  const [orderSlipOpen, setOrderSlipOpen] = useState(false);
   const isAudit = kind === 'audit';
 
   // The list as listed (rows waiting for undo still show, struck through) and as it counts (totals and saving leave them out).
@@ -123,7 +130,29 @@ export function ListScreen({
     if (kind === 'boq') await actions.setListNotes(draftIds.boq, '');
   };
 
-  const menu: MenuItem[] = [...extraMenu, ...(canClear ? [{ icon: 'delete-outline' as const, label: 'Clear the list', about: 'Remove every item in the open list', onPress: clearCurrent }] : [])];
+  const notes = kind === 'boq' ? boqNotes : '';
+  // A BOQ can go out for quotes or as an order slip; a purchase list goes straight to the formats.
+  const openShare = () => (kind === 'boq' ? setBoqChoiceOpen(true) : setShareOpen(true));
+  const shareList = async (format: ExportFormat) => {
+    logStep('share', { what: kind, format, lines: activeItems.length });
+    const name = `${titlePrefix(kind)}_${todayISO()}_${Date.now() % 100000}`;
+    try {
+      if (format === 'xlsx') {
+        await shareFiles([await sheetToXlsx(listSheet(kind, activeItems, notes), `${name}.xlsx`, isAudit ? 'Purchases' : 'BOQ', [5, 30, 14, 14, 14, 10, 8, 8, 26, 12, 14, 20, 12])]);
+      } else {
+        const doc = buildPdf(kind, activeItems, notes);
+        await shareFiles(format === 'pdf' ? [pdfFile(doc, name)] : await pdfToJpegs(doc, name));
+      }
+    } catch (err) {
+      await dialogs.alert('Could not create the file', (err as Error).message);
+    }
+  };
+  const has = activeItems.length > 0;
+  const menu: MenuItem[] = [
+    ...(has ? [{ icon: 'visibility' as const, label: 'Preview', about: 'See the PDF before sharing it', onPress: () => setPreviewOpen(true) }, { icon: 'share' as const, label: 'Share', about: isAudit ? 'PDF, Excel or pictures' : 'For quotes, or as an order slip', onPress: openShare }] : []),
+    ...extraMenu,
+    ...(canClear ? [{ icon: 'delete-outline' as const, label: 'Clear the list', about: 'Remove every item in the open list', onPress: clearCurrent }] : []),
+  ];
 
   const closeAdd = useCallback(() => setAddOpen(false), []);
   useEffect(() => logStep('tab', { to: kind }), [kind]);
@@ -148,7 +177,7 @@ export function ListScreen({
 
   return (
     <View style={{ flex: 1, backgroundColor: c.brandGray }}>
-      <ScreenHeader onProject={onProject} menu={menu}>
+      <ScreenHeader menu={menu}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <View style={{ flexShrink: 1 }}>
             <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>{isAudit ? 'Spent' : 'Items'}</Text>
@@ -212,6 +241,19 @@ export function ListScreen({
         />
       </Sheet>
 
+      {previewOpen && <DocumentPreview title={isAudit ? 'Purchase list' : 'BOQ'} build={() => buildPdf(kind, activeItems, notes)} onShare={() => { setPreviewOpen(false); openShare(); }} onClose={() => setPreviewOpen(false)} />}
+      {boqChoiceOpen && (
+        <BoqShareChoice
+          onClose={() => setBoqChoiceOpen(false)}
+          onPick={(choice) => {
+            setBoqChoiceOpen(false);
+            if (choice === 'order') setOrderSlipOpen(true);
+            else setShareOpen(true);
+          }}
+        />
+      )}
+      {orderSlipOpen && kind === 'boq' && <OrderSlipSheet items={activeItems} notes={notes} address={open?.address || project?.address || ''} addresses={uniqueAddresses} onClose={() => setOrderSlipOpen(false)} />}
+      {shareOpen && <ShareSheet title={isAudit ? 'purchase list' : 'BOQ'} onShare={shareList} onClose={() => setShareOpen(false)} />}
       {saveState && (
         <SaveModal
           initial={saveState.initial}
