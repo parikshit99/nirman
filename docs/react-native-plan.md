@@ -168,7 +168,7 @@ Still not planned: swipe-to-delete (CLAUDE.md: delete from the edit view only) a
 - [x] Phase 2: skeleton
 - [x] Phase 3: UI pieces and Purchases
 - [x] Phase 4: BOQ, Saved, Projects
-- [ ] Phase 5: quotes and Rates
+- [x] Phase 5: quotes and Rates
 - [ ] Phase 6: Labour, site report, sharing
 - [ ] Phase 7: Settings, first launch, 7.0
 - [ ] Phase 8: clean up
