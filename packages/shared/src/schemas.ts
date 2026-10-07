@@ -222,13 +222,14 @@ export const contractRowSchema = z.object({
 });
 export type ContractRow = z.infer<typeof contractRowSchema>;
 
-export const contractEntryKinds = ['work', 'payment', 'deduction'] as const;
+export const contractEntryKinds = ['work', 'payment', 'advance', 'deduction'] as const;
 export type ContractEntryKind = (typeof contractEntryKinds)[number];
 
 /**
  * Something that happened on a contract: work measured (quantity in the
- * contract's unit, or % of a lump sum), a payment or advance, or a deduction
- * (material supplied, penalty).
+ * contract's unit, or % of a lump sum), a payment against work measured, an
+ * advance (kharcha: cash given before the work is measured), or a deduction
+ * (material supplied, penalty). Payments and advances both count as paid.
  */
 export const contractEntryRowSchema = z.object({
   id,
@@ -239,7 +240,7 @@ export const contractEntryRowSchema = z.object({
   quantity: z.number(),
   /** Payments and deductions: the amount. */
   amount: z.number(),
-  /** Payments: cash, UPI, bank, cheque. */
+  /** Payments and advances: cash, UPI, bank, cheque. */
   mode: z.string().max(40),
   note: z.string().max(500),
   created_at: isoTimestamp,

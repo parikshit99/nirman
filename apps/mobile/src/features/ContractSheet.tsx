@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Banknote, Hammer, MinusCircle, Pencil, Phone, Share2, Trash2, X } from 'lucide-react';
+import { Banknote, Hammer, HandCoins, MinusCircle, Pencil, Phone, Share2, Trash2, X } from 'lucide-react';
 import {
   contractTotals,
   describeEntry,
@@ -12,6 +12,7 @@ import {
   type ContractEntryKind,
   type ContractEntryRow,
   type ContractRow,
+  isPaidOut,
 } from '@nirman/shared';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { UndoButton } from '../components/UndoButton.tsx';
@@ -22,7 +23,7 @@ import { rupees } from './LabourView.tsx';
 import { StatementSheet } from './StatementSheet.tsx';
 import { Button } from '../components/ui/Button.tsx';
 
-const KIND_LABEL: Record<ContractEntryKind, string> = { work: 'Work done', payment: 'Payment', deduction: 'Deduction' };
+const KIND_LABEL: Record<ContractEntryKind, string> = { work: 'Work done', payment: 'Payment', advance: 'Advance (kharcha)', deduction: 'Deduction' };
 
 /** One contract: its terms, what is owed, and every measurement, payment and deduction. */
 export function ContractSheet({ contractId, onEdit, onClose }: { contractId: string; onEdit(c: ContractRow): void; onClose(): void }) {
@@ -93,9 +94,10 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
           {stat('Work done', rupees(t.workDone), t.progress !== null ? `${Math.round(t.progress * 100)}% of ${rupees(t.value)}` : undefined)}
           {stat('Paid', rupees(t.paid))}
           {stat(
-            t.balance < 0 ? 'Advance' : t.balance > 0 ? 'Balance due' : 'Balance',
-            <span className={t.balance < 0 ? 'text-blue-700' : t.balance > 0 ? 'text-red-600' : 'text-green-700'}>{t.balance ? rupees(Math.abs(t.balance)) : 'Settled'}</span>,
+            t.balance < 0 ? 'Paid ahead of work' : t.balance > 0 ? 'Balance due' : 'Balance',
+            <span className={t.balance < 0 ? 'text-red-600' : t.balance > 0 ? 'text-gray-900' : 'text-green-700'}>{t.balance ? rupees(Math.abs(t.balance)) : 'Settled'}</span>,
           )}
+          {t.advances > 0 && stat('Advances (kharcha)', rupees(t.advances), 'in Paid')}
           {contract.retention_pct > 0 &&
             stat(
               'Retention',
@@ -116,14 +118,17 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
         {entryForm ? (
           <EntryForm contract={contract} kind={entryForm.kind} entry={entryForm.entry} onDone={() => setEntryForm(null)} />
         ) : (
-          <div className="flex gap-2">
-            <Button variant="primary" className="flex-1" onClick={() => setEntryForm({ kind: 'work' })}>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="primary" onClick={() => setEntryForm({ kind: 'work' })}>
               <Hammer size={14} /> Work
             </Button>
-            <Button variant="secondary" className="flex-1" onClick={() => setEntryForm({ kind: 'payment' })}>
+            <Button variant="secondary" onClick={() => setEntryForm({ kind: 'advance' })}>
+              <HandCoins size={14} /> Advance
+            </Button>
+            <Button variant="secondary" onClick={() => setEntryForm({ kind: 'payment' })}>
               <Banknote size={14} /> Payment
             </Button>
-            <Button variant="secondary" className="flex-1" onClick={() => setEntryForm({ kind: 'deduction' })}>
+            <Button variant="secondary" onClick={() => setEntryForm({ kind: 'deduction' })}>
               <MinusCircle size={14} /> Deduct
             </Button>
           </div>
@@ -132,7 +137,7 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
         <div>
           <h4 className="text-xs text-gray-500 font-bold mb-1">Entries ({entries.length})</h4>
           {listed.length === 0 ? (
-            <p className="text-xs text-gray-500 py-3">Nothing recorded yet. Add work as it is measured and every payment or advance.</p>
+            <p className="text-xs text-gray-500 py-3">Nothing recorded yet. Add work as it is measured, each advance (kharcha) given before measuring, and each payment.</p>
           ) : (
             <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl">
               {listed.map((e) => {
@@ -144,7 +149,7 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
                       <div className={`text-xs truncate ${pending ? 'line-through' : ''}`}>{describeEntry(contract, e)}</div>
                       <div className="text-xs text-gray-500 font-mono">{e.date}</div>
                     </button>
-                    <span className={`text-xs font-mono font-bold shrink-0 ${e.kind === 'work' ? 'text-gray-800' : e.kind === 'payment' ? 'text-green-700' : 'text-red-600'}`}>
+                    <span className={`text-xs font-mono font-bold shrink-0 ${e.kind === 'work' ? 'text-gray-800' : isPaidOut(e.kind) ? 'text-green-700' : 'text-red-600'}`}>
                       {e.kind === 'work' ? '+' : '−'}
                       {rupees(value)}
                     </span>
@@ -201,7 +206,7 @@ function EntryForm({ contract, kind, entry, onDone }: { contract: ContractRow; k
     if (n === null || n <= 0) return dialogs.alert(isWork ? 'Enter the quantity done' : 'Enter the amount', value.trim() ? `“${value}” is not a number.` : undefined);
     if (!date) return dialogs.alert('Pick the date');
     await actions.saveContractEntry(
-      { contract_id: contract.id, kind, date, quantity: isWork ? n : 0, amount: isWork ? 0 : n, mode: kind === 'payment' ? mode : '', note },
+      { contract_id: contract.id, kind, date, quantity: isWork ? n : 0, amount: isWork ? 0 : n, mode: isPaidOut(kind) ? mode : '', note },
       entry?.id,
     );
     onDone();
@@ -230,7 +235,7 @@ function EntryForm({ contract, kind, entry, onDone }: { contract: ContractRow; k
         </label>
       </div>
       {isWork && preview > 0 && <p className="text-xs text-gray-600">Worth {rupees(preview)}</p>}
-      {kind === 'payment' && (
+      {isPaidOut(kind) && (
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Paid by">
           {paymentModes.map((m) => (
             <button
@@ -249,7 +254,7 @@ function EntryForm({ contract, kind, entry, onDone }: { contract: ContractRow; k
         value={note}
         onChange={(e) => setNote(e.target.value)}
         className={input}
-        placeholder={isWork ? 'e.g. Ground floor walls' : kind === 'payment' ? 'e.g. Advance, week 3' : 'e.g. Cement supplied, 10 bags'}
+        placeholder={isWork ? 'e.g. Ground floor walls' : kind === 'advance' ? 'e.g. Week 3 kharcha' : kind === 'payment' ? 'e.g. Bill for ground floor' : 'e.g. Cement supplied, 10 bags'}
       />
       <Button variant="primary" block onClick={save}>
         {entry ? 'Save' : 'Add'}

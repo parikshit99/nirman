@@ -360,7 +360,7 @@ export function buildContractStatementPdf(c: ContractRow, st: ContractStatement,
   if (c.retention_pct > 0) summary.push([`Less retention ${c.retention_pct}%${c.retention_released_at ? ' (released)' : ' (held)'}`, rupees(t.retention)]);
   if (t.deductions) summary.push(['Less deductions', rupees(t.deductions)]);
   summary.push(['Less paid', rupees(t.paid)]);
-  summary.push([t.balance < 0 ? 'Paid in advance' : 'Balance due', rupees(Math.abs(t.balance))]);
+  summary.push([t.balance < 0 ? 'Paid ahead of work' : 'Balance due', rupees(Math.abs(t.balance))]);
   autoTable(doc, {
     body: summary,
     startY: lastY(doc) + 6,

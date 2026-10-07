@@ -121,7 +121,7 @@ export function contractStatementSheet(c: ContractRow, st: ContractStatement, pe
   if (c.retention_pct > 0) rows.push([null, `Less retention ${c.retention_pct}%${c.retention_released_at ? ' (released)' : ' (held)'}`, null, null, null, money(t.retention)]);
   if (t.deductions) rows.push([null, 'Less deductions', null, null, null, money(t.deductions)]);
   rows.push([null, 'Less paid', null, null, null, money(t.paid)]);
-  rows.push([null, bold(t.balance < 0 ? 'Paid in advance' : 'Balance due'), null, null, null, { ...money(Math.abs(t.balance)), fontWeight: 'bold' }]);
+  rows.push([null, bold(t.balance < 0 ? 'Paid ahead of work' : 'Balance due'), null, null, null, { ...money(Math.abs(t.balance)), fontWeight: 'bold' }]);
   return rows;
 }
 

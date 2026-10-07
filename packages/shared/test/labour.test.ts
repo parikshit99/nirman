@@ -34,6 +34,15 @@ describe('labour contracts', () => {
     expect(contractTotals({ ...plaster, retention_released_at: '2026-09-30' }, entries).balance).toBe(9300);
   });
 
+  it('counts advances (kharcha) as paid, shows them apart, and flags paying ahead of the work', () => {
+    const withKharcha = [...entries, entry('c1', 'advance', '2026-09-25', 12000, { mode: 'cash', note: 'week 4' })];
+    const t = contractTotals(plaster, withKharcha);
+    expect(t).toMatchObject({ paid: 47000, advances: 12000, balance: 7050 - 12000 });
+    expect(describeEntry(plaster, withKharcha.at(-1)!)).toBe('Advance (kharcha), Cash - week 4');
+    expect(contractStatement(plaster, withKharcha).rows.at(-1)).toMatchObject({ paid: 12000, balance: 9300 - 12000 });
+    expect(buildLabourReport([plaster], withKharcha, {}).paid).toBe(47000);
+  });
+
   it('builds a statement with a running balance and a brought-forward line', () => {
     const all = contractStatement(plaster, entries);
     expect(all.opening).toBeNull();

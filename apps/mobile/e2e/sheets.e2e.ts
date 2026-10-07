@@ -263,3 +263,29 @@ test('a backup is one .zip that restores', async ({ page }) => {
   await page.getByRole('button', { name: 'Restore', exact: true }).last().click();
   await expect(page.getByText('Backup restored')).toBeVisible();
 });
+
+test('an advance (kharcha) beyond the work measured shows as paid ahead', async ({ page }) => {
+  await page.getByRole('button', { name: 'Labour', exact: true }).click();
+  await page.getByRole('button', { name: /new contract/i }).click();
+  await page.getByLabel('Contractor', { exact: true }).fill('Ramesh');
+  await page.getByRole('dialog').getByRole('textbox', { name: 'Rate' }).fill('45');
+  await page.getByRole('button', { name: /add contract/i }).click();
+  const contract = page.getByRole('dialog', { name: 'Ramesh' });
+
+  await contract.getByRole('button', { name: 'Advance', exact: true }).click();
+  await contract.getByLabel('Amount').fill('5000');
+  await contract.getByRole('button', { name: 'Add', exact: true }).click();
+  const totals = contract.getByRole('status', { name: 'Contract totals' });
+  await expect(totals).toContainText('Paid ahead of work');
+  await expect(totals).toContainText('Advances (kharcha)');
+  // Every button stays on screen at 320 px.
+  for (const b of await contract.getByRole('button').all()) {
+    const box = await b.boundingBox();
+    if (box) expect(box.x + box.width).toBeLessThanOrEqual(321);
+  }
+
+  await contract.getByRole('button', { name: 'Work', exact: true }).click();
+  await contract.getByLabel('Quantity done').fill('200');
+  await contract.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(totals).toContainText('Balance due');
+});

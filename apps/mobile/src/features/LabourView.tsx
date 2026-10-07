@@ -11,9 +11,9 @@ export const rupees = (n: number) => `₹${Math.round(n || 0).toLocaleString('en
 
 export type StatusFilter = 'active' | 'closed' | 'all';
 
-/** Balance due, or an advance when more was paid than earned. */
+/** Balance due, or a warning when more was paid than the work measured is worth. */
 export function BalanceText({ balance, className = '' }: { balance: number; className?: string }) {
-  if (balance < 0) return <span className={`text-blue-700 ${className}`}>Advance {rupees(-balance)}</span>;
+  if (balance < 0) return <span className={`text-red-600 ${className}`}>Paid ahead {rupees(-balance)}</span>;
   return <span className={`${balance > 0 ? 'text-red-600' : 'text-green-700'} ${className}`}>{balance > 0 ? `Due ${rupees(balance)}` : 'Settled'}</span>;
 }
 

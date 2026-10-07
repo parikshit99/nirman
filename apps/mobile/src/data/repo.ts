@@ -1197,7 +1197,7 @@ export type ContractEntryInput = Omit<ContractEntryRow, 'id' | 'created_at'>;
 export async function saveContractEntry(db: Db, input: ContractEntryInput, id?: string): Promise<string> {
   return db.transaction(async (tx) => {
     const existing = id ? await getRow(tx, 'contract_entries', id) : undefined;
-    const row: ContractEntryRow = { ...input, mode: input.kind === 'payment' ? input.mode : '', note: input.note.trim(), id: existing?.id ?? newId(), created_at: existing?.created_at ?? nowISO() };
+    const row: ContractEntryRow = { ...input, mode: input.kind === 'payment' || input.kind === 'advance' ? input.mode : '', note: input.note.trim(), id: existing?.id ?? newId(), created_at: existing?.created_at ?? nowISO() };
     await writeRow(tx, 'contract_entries', row);
     const c = await getRow(tx, 'contracts', row.contract_id);
     if (c) await writeRow(tx, 'contracts', { ...c, updated_at: nowISO() });
