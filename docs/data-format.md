@@ -23,15 +23,16 @@ The `nirmaan` names are the original internal ids. They stay unchanged so existi
 
 | Table | One row per | Key columns |
 |---|---|---|
-| `lists` | purchase list or BOQ | `kind`: `audit` (Purchases) or `boq`; `status`: `draft` or `saved`; `title`, `address`, `category`, `site_date`, `notes` |
+| `projects` | project (one building job or site) | `name`, `address` (its site address, offered when saving lists and adding contracts); `status`: `active` or `closed` |
+| `lists` | purchase list or BOQ | `project_id` (a `projects` id); `kind`: `audit` (Purchases) or `boq`; `status`: `draft` or `saved`; `title`, `address`, `category`, `site_date`, `notes` |
 | `items` | line in a list | `list_id`; `item_name` (standard English name); `original_term` (word as written or spoken, e.g. "bori"); `quantity`, `unit`, `unit_price`, `total_amount`, `vendor`, `date`; `delivered_at`, the date a purchase line reached the site (blank = not marked); `ordered_as`, how it was ordered when billed in another unit (e.g. "3 bundles of 12 mm" for a line in kg); `photo_id`, the `bill_photos` row it was read from (blank for typed or spoken lines); `rates_excluded`, 1 when its price was cleared from Rates for good (the line stays in its list and in site reports) |
-| `indexed_rates` | single price added on its own (a confirmed vendor quote; versions up to 3.0.0 also stored "Index rate" here, which now saves the purchase list to History instead) | `item_name`, `unit`, `date`, `price`, `vendor`, `indexed_at`; `category` and `address`: the BOQ's for a confirmed quote; for "Index rate", the site picked when indexing, or the purchase list's once it is saved with the same line |
+| `indexed_rates` | single price added on its own (a confirmed vendor quote; versions up to 3.0.0 also stored "Index rate" here, which now saves the purchase list to History instead) | `item_name`, `unit`, `date`, `price`, `vendor`, `indexed_at`; `category` and `address`: the BOQ's for a confirmed quote; for "Index rate", the site picked when indexing, or the purchase list's once it is saved with the same line; `project_id`: the BOQ's project for a confirmed quote, else blank (Rates covers all projects) |
 | `learned_terms` | correction the app remembers | `id` is the original word, lower-cased; it maps to the `item_name` and `unit` to use instead |
 | `categories` | type of work (Civil, Electrical, …) | `name`; the built-in ones use the lower-cased name as `id` |
 | `quotes` | vendor's reply to a saved BOQ | `boq_id` (a `lists` id); `vendor`, `quote_date`; `status`: `review` or `confirmed` |
 | `quote_lines` | line in a vendor quote | `quote_id`, `position`; `boq_item_id`, the BOQ `items` row it was matched to (empty = not in the BOQ); plus `original_term`, `item_name`, `quantity`, `unit`, `unit_price`, `total_amount`, `note` |
 | `hidden_materials` | material deleted from the Rates tab and price checks | `id` is the material's key (see Conventions); `name`, `unit`, `hidden_at`. Prices recorded up to `hidden_at` are left out; later ones show again. Saved lists are not changed; removing the row restores it. The app removes a row once no saved line or rate recorded up to `hidden_at` is left for it (`unusedHiddenMaterials`). *Clear* in Settings makes them final: the `indexed_rates` they hid are deleted, the saved lines they hid get `rates_excluded = 1`, and the rows go. |
-| `contracts` | labour contract | `contractor`, `phone`, `address`, `category`, `work`; `kind`: `rate` (paid `rate` per `unit`, optional `est_quantity`) or `lump_sum` (`amount`); `retention_pct`; `start_date`; `status`: `active` or `closed`; `retention_released_at` (blank while held); `notes` |
+| `contracts` | labour contract | `project_id`; `contractor`, `phone`, `address`, `category`, `work`; `kind`: `rate` (paid `rate` per `unit`, optional `est_quantity`) or `lump_sum` (`amount`); `retention_pct`; `start_date`; `status`: `active` or `closed`; `retention_released_at` (blank while held); `notes` |
 | `contract_entries` | something recorded on a contract | `contract_id`, `date`; `kind`: `work` (`quantity` in the contract's unit, or % of a lump sum), `payment` (`amount`, `mode`: cash / upi / bank / cheque) or `deduction` (`amount`); `note` |
 | `jobs`, `job_images` | entry waiting to be read by Gemini (with its photos as base64) | temporary; deleted once read |
 | `training_samples` | opt-in (*Keep bill photos for training*): a photographed bill kept for training an on-phone model | `engine` (`phone` or `gemini`, what read it), `ocr_text` (text the phone read), `images` (JSON array of base64 JPEGs), `item_ids` (JSON array of the `items` it became), `category`. Not in backups; exported from Settings as JSON Lines with each bill's current lines |
@@ -40,7 +41,9 @@ The `nirmaan` names are the original internal ids. They stay unchanged so existi
 
 Every list and item row also has `created_at` and `updated_at`.
 
-The two working drafts always exist, with fixed ids: `draft-audit` (the open Purchases list) and `draft-boq` (the open BOQ). Saving copies the draft's items into a `saved` list: a new one, or the history record being updated, whose items are replaced. The draft itself is left as it is.
+There is always at least one project, and every project has its two working drafts: the open Purchases list (`kind = 'audit'`) and the open BOQ (`kind = 'boq'`), both `status = 'draft'` with the project's `project_id`. A new project's drafts have the ids `draft-audit-<project id>` and `draft-boq-<project id>`; drafts from before projects keep their old ids `draft-audit` and `draft-boq`, so look a draft up by project and kind, not by id. Saving copies the draft's items into a `saved` list in the same project: a new one, or the saved list being updated, whose items are replaced. The draft itself is left as it is. Quotes, quote lines, items and contract entries belong to a project through their list or contract.
+
+**Rows without a project** (from before projects, version 5.0, or restored from an older backup) are given one when the app starts (`ensureProjects` in `repo.ts`): saved lists and contracts with a site address go into a project for that address (compared lower-cased and trimmed, named after it), the rest into a project named "My site". Drafts without a project go to the project whose saved lists or contracts changed most recently. Rates from confirmed quotes get the project with their site address, if there is one.
 
 ### How the material price database is built
 
@@ -54,7 +57,7 @@ Renaming a material in the app rewrites `item_name` and `unit` on all of its ite
 
 ### Site report
 
-*History → Site report* is also computed on the fly (`buildSiteReport`): the `audit` lists saved for one `address`, optionally limited to some categories, to a date range, and to lines with a `delivered_at`. A line's date is its `delivered_at`, else its `date`, else the list's `site_date`, else the day the list was created. Names and units go through `learned_terms` as above.
+*Saved → Site report* is also computed on the fly (`buildSiteReport`): the `audit` lists saved in the open project (versions before 5.0: for one `address`), optionally limited to some categories, to a date range, and to lines with a `delivered_at`. A line's date is its `delivered_at`, else its `date`, else the list's `site_date`, else the day the list was created. Names and units go through `learned_terms` as above.
 
 ## Changing the schema
 
@@ -67,9 +70,9 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
 ```json
 {
   "app": "nirmaan-auditor",
-  "version": 10,
+  "version": 11,
   "exported_at": "2026-10-03T19:13:38.586Z",
-  "lists": [], "items": [], "indexed_rates": [], "learned_terms": [],
+  "projects": [], "lists": [], "items": [], "indexed_rates": [], "learned_terms": [],
   "categories": [], "quotes": [], "quote_lines": [], "hidden_materials": [],
   "contracts": [], "contract_entries": []
 }
@@ -86,6 +89,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
   - version 6 (before order units) has `items` rows without `ordered_as`;
   - version 7 (before labour contracts) has no `contracts` or `contract_entries`;
   - version 8 (before bill photos) has `items` rows without `photo_id`;
-  - version 9 (before clearing deleted rates) has `items` rows without `rates_excluded`.
+  - version 9 (before clearing deleted rates) has `items` rows without `rates_excluded`;
+  - version 10 (before projects) has no `projects`, and `lists`, `contracts` and `indexed_rates` rows without `project_id`; they are sorted into projects as described above.
 - Restoring replaces everything on the phone.
 - Any reimplementation should read this format, so old backups keep working.

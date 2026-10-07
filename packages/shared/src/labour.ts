@@ -159,12 +159,13 @@ export interface LabourReport {
 export function buildLabourReport(
   contracts: ContractRow[],
   entries: ContractEntryRow[],
-  opts: { address: string; from?: string; to?: string; categories?: string[] },
+  /** `address` absent: every contract given. */
+  opts: { address?: string; from?: string; to?: string; categories?: string[] },
 ): LabourReport {
   const wanted = new Set((opts.categories ?? []).map((c) => c.trim().toLowerCase()));
   const rows: LabourReportRow[] = [];
   for (const c of contracts) {
-    if (c.address !== opts.address) continue;
+    if (opts.address !== undefined && c.address !== opts.address) continue;
     if (wanted.size && !wanted.has((c.category || 'Uncategorised').toLowerCase())) continue;
     let workDone = 0;
     let paid = 0;

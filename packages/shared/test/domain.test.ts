@@ -25,7 +25,7 @@ const ts = (d: string) => `${d}T10:00:00.000Z`;
 
 function list(id: string, over: Partial<ListRow> = {}): ListRow {
   return {
-    id, kind: 'audit', status: 'saved', title: 't', address: 'Site A', category: 'Civil',
+    id, kind: 'audit', status: 'saved', project_id: 'p1', title: 't', address: 'Site A', category: 'Civil',
     site_date: '2026-01-01', notes: '', created_at: ts('2026-01-01'), updated_at: ts('2026-01-01'), ...over,
   };
 }
@@ -60,7 +60,7 @@ describe('buildItemDatabase', () => {
       item('i3', 'l3', { unit_price: 420, date: '2026-02-01', vendor: 'Gupta' }),
     ];
     const rates: IndexedRateRow[] = [{
-      id: 'r1', item_name: 'cement', unit: 'bag', date: '2026-03-01', price: 450, vendor: 'Manual', brand: '', model: '', spec: '', color: '', category: '', address: '',
+      id: 'r1', item_name: 'cement', unit: 'bag', date: '2026-03-01', price: 450, vendor: 'Manual', brand: '', model: '', spec: '', color: '', category: '', address: '', project_id: '',
       indexed_at: ts('2026-03-01'),
     }];
     const db = buildItemDatabase(lists, items, rates, {});
@@ -172,7 +172,7 @@ describe('deleting a material from the database', () => {
     const lists = [list('old', { created_at: ts('2026-02-01') }), list('new', { created_at: ts('2026-04-01') })];
     const items = [item('a', 'old', { unit_price: 400 }), item('b', 'new', { unit_price: 420 })];
     const rates: IndexedRateRow[] = [{
-      id: 'r', item_name: 'Cement', unit: 'Bag', date: '2026-02-02', price: 410, vendor: 'X', brand: '', model: '', spec: '', color: '', category: '', address: '',
+      id: 'r', item_name: 'Cement', unit: 'Bag', date: '2026-02-02', price: 410, vendor: 'X', brand: '', model: '', spec: '', color: '', category: '', address: '', project_id: '',
       indexed_at: ts('2026-02-02'),
     }];
     const key = materialKey('Cement', 'Bag');
@@ -185,7 +185,7 @@ describe('deleting a material from the database', () => {
 describe('filtering the price database (#28)', () => {
   const rate = (over: Partial<IndexedRateRow>): IndexedRateRow => ({
     id: 'r', item_name: 'Switch', unit: 'piece', date: '2026-03-01', price: 100, vendor: 'Gupta', brand: '', model: '', spec: '', color: '',
-    category: '', address: '', indexed_at: ts('2026-03-01'), ...over,
+    category: '', address: '', project_id: '', indexed_at: ts('2026-03-01'), ...over,
   });
 
   it('files quote rates under their BOQ category and site, and guesses one for rates added on their own', () => {
@@ -268,7 +268,7 @@ describe('price counted once (bug)', () => {
     const items = [item('i1', 'l1', { unit_price: 380, vendor: 'Sharma', date: '2026-10-05' })];
     const rate = (over: Partial<IndexedRateRow>): IndexedRateRow => ({
       id: 'r', item_name: 'Cement', unit: 'Bag', date: '2026-10-05', price: 380, vendor: 'Sharma', brand: '', model: '', spec: '', color: '',
-      category: '', address: '', indexed_at: ts('2026-10-05'), ...over,
+      category: '', address: '', project_id: '', indexed_at: ts('2026-10-05'), ...over,
     });
     expect(buildItemDatabase(lists, items, [rate({})], {})[0].priceHistory).toHaveLength(1);
     // A different price, date or vendor is a separate price.
@@ -280,7 +280,7 @@ describe('unusedHiddenMaterials', () => {
   const key = materialKey('Cement', 'Bag');
   const rate = (over: Partial<IndexedRateRow> = {}): IndexedRateRow => ({
     id: 'r1', item_name: 'Cement', unit: 'Bag', date: '2026-01-01', price: 400, vendor: '', brand: '', model: '', spec: '', color: '',
-    category: '', address: '', indexed_at: ts('2026-01-01'), ...over,
+    category: '', address: '', project_id: '', indexed_at: ts('2026-01-01'), ...over,
   });
 
   it('keeps a deletion that still hides saved lines or rates', () => {

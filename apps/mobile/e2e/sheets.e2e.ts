@@ -186,3 +186,34 @@ test('behaves like an app: no tap flash, no text selection on a long press, no p
   await page.getByRole('button', { name: 'Saved', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
 });
+
+test('projects: start one, switch, and each keeps its own purchase list', async ({ page }) => {
+  await expect(page.getByTestId('project-name')).toHaveText('My site');
+  await page.getByRole('button', { name: 'Add purchases' }).click();
+  await page.getByRole('button', { name: /add item manually/i }).click();
+  await page.getByLabel('Item name').fill('OPC Cement');
+  await page.getByLabel('Quantity').fill('10');
+  await page.getByRole('button', { name: /^add to/i }).click();
+  await page.getByLabel('Close manual entry').click();
+  await page.getByRole('dialog', { name: 'Add purchases' }).getByRole('button', { name: 'Close' }).click();
+
+  await page.getByRole('button', { name: /change project/i }).click();
+  await expectOnTop(page, page.getByRole('dialog', { name: 'Projects' }));
+  await page.getByRole('button', { name: 'New project' }).click();
+  const form = page.getByRole('dialog', { name: 'New project' });
+  await expectOnTop(page, form);
+  await form.getByLabel('Project name').fill('Sharma house, Sector 44 extension block');
+  await form.getByRole('button', { name: 'Start project' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByTestId('project-name')).toHaveText('Sharma house, Sector 44 extension block');
+  await expect(page.getByText('OPC Cement')).toHaveCount(0);
+
+  await page.getByRole('button', { name: /change project/i }).click();
+  await page.getByRole('dialog', { name: 'Projects' }).getByRole('button', { name: /^My site/ }).click();
+  await expect(page.getByTestId('project-name')).toHaveText('My site');
+  await expect(page.getByText('OPC Cement').first()).toBeVisible();
+
+  await page.getByRole('button', { name: /change project/i }).click();
+  await page.getByRole('button', { name: 'Edit project My site' }).click();
+  await expectOnTop(page, page.getByRole('dialog', { name: 'Project details' }));
+});

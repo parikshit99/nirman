@@ -28,7 +28,7 @@ describe('site report export', () => {
   it('lists the summary per category, a grand total and every line with its delivery date', async () => {
     const { buildSiteReport } = await import('@nirman/shared');
     const { siteReportSheet } = await import('../src/lib/exports.ts');
-    const list = { id: 'l', kind: 'audit' as const, status: 'saved' as const, title: 'Order 1', address: 'Sector 44', category: 'Civil', site_date: null, notes: '', created_at: '2026-10-01T00:00:00.000Z', updated_at: '' };
+    const list = { id: 'l', kind: 'audit' as const, status: 'saved' as const, project_id: 'p1', title: 'Order 1', address: 'Sector 44', category: 'Civil', site_date: null, notes: '', created_at: '2026-10-01T00:00:00.000Z', updated_at: '' };
     const report = buildSiteReport([list], [item({ delivered_at: '2026-10-06' })], {}, { address: 'Sector 44', deliveredOnly: true });
     const rows = values(siteReportSheet('Sector 44', 'All time', report));
     expect(rows[6]).toEqual(['Civil', 'Cement', 10, 'Bag', 380, 3800, 'Sharma', 1]);
@@ -54,7 +54,7 @@ describe('order slip export', () => {
     const { buildContractStatementPdf } = await import('../src/lib/pdf.ts');
     const ts = '2026-10-01T00:00:00.000Z';
     const c = {
-      id: 'c', contractor: 'Ramesh', phone: '98', address: 'Sector 44', category: 'Civil', work: 'Plaster', kind: 'rate' as const, rate: 18, unit: 'sqft',
+      id: 'c', project_id: 'p1', contractor: 'Ramesh', phone: '98', address: 'Sector 44', category: 'Civil', work: 'Plaster', kind: 'rate' as const, rate: 18, unit: 'sqft',
       est_quantity: 0, amount: 0, retention_pct: 5, start_date: '', status: 'active' as const, retention_released_at: '', notes: '', created_at: ts, updated_at: ts,
     };
     const entries = [

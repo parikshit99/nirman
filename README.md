@@ -4,7 +4,7 @@ An Android app for tracking construction materials on site. You photograph bills
 
 - a **purchase log** with rates, totals and vendors;
 - **Bills of Quantities** for vendor quotes, with each vendor's reply matched back to the BOQ and compared;
-- **saved sessions** per site;
+- **projects**, each with its own purchase lists, BOQs and labour contracts;
 - a **material price database** built from everything you record.
 
 Everything is stored **only on your phone**. There is no server or account. The app keeps a small diagnostic log (errors, AI reading results, steps taken, slow screens; never bill contents, prices, addresses or keys), which leaves the phone only when you send it from *Settings → Report a problem* or *Share log*.
@@ -14,6 +14,7 @@ Everything is stored **only on your phone**. There is no server or account. The 
 ## How it works
 
 - **Reads bills on the phone.** Printed bills and typed lists are read on the phone (Google ML Kit text recognition, bundled) and checked (quantity × rate = amount, the bill's total); unclear ones, like most handwritten bills, go to Gemini. *Settings → How bills are read* picks phone first, phone only or Gemini always. Opt-in: keep bill photos with their corrected lines to train an on-phone model later.
+- **Projects first.** Everything you record belongs to a project (a building job or site), picked at the top of the screen. Each project has its own open purchase list and BOQ, saved lists, labour contracts and site report; Rates covers all projects.
 - **Five tabs** along the bottom of the screen: *Purchases*, *BOQ*, *Labour*, *Rates* (every price recorded, per material) and *Saved* (saved purchase lists and BOQs). On Purchases and BOQ the list comes first; the orange *Add* button opens the entry form. Settings → Appearance switches to dark mode.
 - **Local database.** All records live in SQLite inside the app, and every screen works without internet. *Add → Add item manually* adds a line to a purchase list or BOQ without the AI, so lists can be made with no internet or API key.
 - **AI reading.** Entries go straight from the phone to Google Gemini using your own API key. An entry made offline is queued and read automatically once the phone is online. Photos and notes leave the phone only for that Gemini request.
@@ -22,7 +23,7 @@ Everything is stored **only on your phone**. There is no server or account. The 
 - **Share in any format.** *Share* on a purchase list, BOQ or quote comparison offers a PDF, an Excel sheet (.xlsx) or a picture (JPG) of each page, then opens the phone's share sheet. *Preview* shows the PDF first. A BOQ can also go out as an **order slip**: items and quantities without rates, with delivery address, date and receiver.
 - **Share into the app.** In WhatsApp (or any app), share a bill photo or a text message to *Nirman* and choose Purchases, BOQ or a vendor quote for a saved BOQ; the photos are put into that entry, ready to read.
 - **Labour contracts.** The *Labour* tab keeps each contractor's job, site and terms (rate per unit or lump sum, optional retention), with work measured, payments and deductions. It shows the balance due and shares a statement (PDF, Excel or JPG); site reports include labour.
-- **Deliveries and site reports.** Tick each purchase or BOQ line when it reaches the site, on the open list or later with *Delivered* on a saved list. *Saved → Site report* lists everything bought for one address, for all time or any dates, for some or all work types, and optionally only what was delivered, as a PDF, Excel sheet or JPG.
+- **Deliveries and site reports.** Tick each purchase or BOQ line when it reaches the site, on the open list or later with *Delivered* on a saved list. *Saved → Site report* lists everything bought for the open project, for all time or any dates, for some or all work types, and optionally only what was delivered, as a PDF, Excel sheet or JPG.
 - **Bill photos.** Photographed bills are kept with the lines read from them: *Bill* on a line or *Bills* on a saved list shows them, to check the reading.
 - **Backup.** *Settings → Save backup* shares one `.json` file with everything; save it to Google Drive, WhatsApp or email. *Restore* on any phone brings it all back. Queued, unread entries and bill photos are not included.
 

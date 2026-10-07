@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useDialogs } from '../components/Dialogs.tsx';
 import { PhotoSourceSheet } from '../components/PhotoSourceSheet.tsx';
-import { DRAFT_IDS, type Job, type ListKind } from '../data/repo.ts';
+import type { Job, ListKind } from '../data/repo.ts';
 import { chooseFromGallery, takePhoto } from '../lib/camera.ts';
 import { compressImage, dataUrlToBase64, readFileAsDataUrl } from '../lib/images.ts';
 import { isNative } from '../lib/platform.ts';
@@ -54,7 +54,7 @@ export function CapturePanel({
   incoming?: IncomingShare | null;
   onIncomingUsed?(): void;
 }) {
-  const { actions, status, settings, boqNotes, categoryNames, jobsFor, itemsFor } = useAppState();
+  const { actions, status, settings, boqNotes, categoryNames, jobsFor, itemsFor, draftIds } = useAppState();
   const dialogs = useDialogs();
   const [inputText, setInputText] = useState('');
   const [images, setImages] = useState<string[]>([]);
@@ -136,7 +136,7 @@ export function CapturePanel({
     if (!inputText.trim() && images.length === 0) return;
     stopDictation.current?.();
     await actions.enqueueJob({
-      listId: DRAFT_IDS[kind],
+      listId: draftIds[kind],
       text: inputText.trim(),
       images: images.map(dataUrlToBase64),
       category,
@@ -320,7 +320,7 @@ export function CapturePanel({
             </select>
           </div>
 
-          {kind === 'boq' && <BoqNotes notes={boqNotes} onChange={(n) => actions.setListNotes(DRAFT_IDS.boq, n)} />}
+          {kind === 'boq' && <BoqNotes notes={boqNotes} onChange={(n) => actions.setListNotes(draftIds.boq, n)} />}
 
           <button
             onClick={handleProcess}

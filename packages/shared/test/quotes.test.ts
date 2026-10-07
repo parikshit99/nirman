@@ -27,7 +27,7 @@ const line = (quote_id: string, boq_item_id: string | null, unit_price: number, 
   unit_price, total_amount: 0, note: '', brand: '', model: '', spec: '', color: '', ...over,
 });
 const rate = (item_name: string, unit: string, price: number, date: string, vendor: string, over: Partial<IndexedRateRow> = {}): IndexedRateRow => ({
-  id: `${item_name}${date}${vendor}`, item_name, unit, price, date, vendor, brand: '', model: '', spec: '', color: '', category: '', address: '', indexed_at: ts(date), ...over,
+  id: `${item_name}${date}${vendor}`, item_name, unit, price, date, vendor, brand: '', model: '', spec: '', color: '', category: '', address: '', project_id: '', indexed_at: ts(date), ...over,
 });
 
 describe('parseQuoteOutput', () => {

@@ -3,7 +3,7 @@ import { buildLabourReport, contractStatement, contractTotals, describeEntry, de
 
 const ts = '2026-10-01T00:00:00.000Z';
 const plaster: ContractRow = {
-  id: 'c1', contractor: 'Ramesh', phone: '98', address: 'Sector 44', category: 'Civil', work: 'Plaster', kind: 'rate', rate: 18, unit: 'sqft',
+  id: 'c1', project_id: 'p1', contractor: 'Ramesh', phone: '98', address: 'Sector 44', category: 'Civil', work: 'Plaster', kind: 'rate', rate: 18, unit: 'sqft',
   est_quantity: 4000, amount: 0, retention_pct: 5, start_date: '2026-09-01', status: 'active', retention_released_at: '', notes: '', created_at: ts, updated_at: ts,
 };
 const plumbing: ContractRow = { ...plaster, id: 'c2', contractor: 'Sunil', work: 'Plumbing', category: 'Plumbing', kind: 'lump_sum', rate: 0, unit: '', est_quantity: 0, amount: 250000, retention_pct: 0 };

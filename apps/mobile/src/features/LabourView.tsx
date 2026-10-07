@@ -20,7 +20,7 @@ export function BalanceText({ balance, className = '' }: { balance: number; clas
 /** Left panel of the Labour tab: totals for the contracts shown, and the button to add one. */
 export function LabourSidebar({ contracts, onNew, onSiteReport }: { contracts: ContractRow[]; onNew(): void; onSiteReport(): void }) {
   const { entriesFor, contracts: all } = useAppState();
-  const hasSites = all.some((c) => c.address);
+  const hasSites = all.length > 0;
   const totals = sumTotals(contracts.map((c) => contractTotals(c, entriesFor(c.id))));
   const box = 'p-2 bg-gray-50 rounded-lg border border-gray-100';
   return (
@@ -94,7 +94,7 @@ export function LabourView({ contracts, status, onStatus, categoryFilter, onCate
             categories={categoryNames.filter((c) => usedCategories.has(c))}
             categoryFilter={categoryFilter}
             onCategory={onCategory}
-            addresses={sites}
+            addresses={sites.length > 1 ? sites : []}
             addressFilter={addressFilter}
             onAddress={onAddress}
             addressLabel="Sites"
@@ -105,7 +105,7 @@ export function LabourView({ contracts, status, onStatus, categoryFilter, onCate
 
       {contracts.length === 0 ? (
         <EmptyState icon={HardHat} title={all.length ? 'No contracts match.' : 'No labour contracts yet.'}>
-          {all.length ? 'Check the filters or search.' : 'Add one with “New contract”: the contractor, the job, and the rate or lump sum.'}
+          {all.length ? 'Check the filters or search.' : 'Add one to this project with “New contract”: the contractor, the job, and the rate or lump sum.'}
         </EmptyState>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">

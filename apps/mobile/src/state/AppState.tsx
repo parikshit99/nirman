@@ -12,10 +12,11 @@ import {
 } from '@nirman/shared';
 import { exportBackup, parseBackup, restoreBackup } from '../data/backup.ts';
 import * as repo from '../data/repo.ts';
-import { DRAFT_IDS, type Job, type ListKind, type Snapshot } from '../data/repo.ts';
+import { findDraft, type Job, type ListKind, type Snapshot } from '../data/repo.ts';
 import type { Db } from '../data/sql.ts';
 import type { JobWorker, WorkerStatus } from '../jobs/worker.ts';
 import { describe, logError, logPerf, logStep, timed } from '../lib/diagnostics.ts';
+import { prefs } from '../lib/prefs.ts';
 
 /**
  * Log each action for the diagnostic log: its name, time taken and what it
@@ -75,8 +76,28 @@ export interface Services {
   onDataChanged(fn: () => void): () => void;
 }
 
+const PROJECT_PREF = 'nirmaan_project';
+
+/** The project to open: the one last open, else the ongoing one used most recently. */
+function pickProject(snapshot: Snapshot, wanted: string | null): string {
+  if (wanted && snapshot.projects.some((p) => p.id === wanted)) return wanted;
+  const lastUsed = new Map<string, string>();
+  for (const row of [...snapshot.lists, ...snapshot.contracts]) {
+    if (row.updated_at > (lastUsed.get(row.project_id) ?? '')) lastUsed.set(row.project_id, row.updated_at);
+  }
+  const byUse = [...snapshot.projects].sort((a, b) => (lastUsed.get(b.id) ?? b.updated_at).localeCompare(lastUsed.get(a.id) ?? a.updated_at));
+  return (byUse.find((p) => p.status === 'active') ?? byUse[0])?.id ?? '';
+}
+
 function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: Services, initial: Snapshot) {
   const [snapshot, setSnapshot] = useState(initial);
+  const [wantedProject, setWantedProject] = useState<string | null>(() => prefs.get<string | null>(PROJECT_PREF, null));
+  /** The open project: Purchases, BOQ, Labour and Saved show only its lists and contracts. */
+  const projectId = useMemo(() => pickProject(snapshot, wantedProject), [snapshot, wantedProject]);
+  const openProject = useCallback((id: string) => {
+    prefs.set(PROJECT_PREF, id);
+    setWantedProject(id);
+  }, []);
   const [status, setStatus] = useState<WorkerStatus>(worker.status);
   const [settings, setSettings] = useState<Settings>(settingsRef.current);
 
@@ -132,6 +153,11 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
 
   const actions = useMemo(
     () => instrument({
+      openProject,
+      saveProject: write(repo.saveProject),
+      setProjectStatus: write(repo.setProjectStatus),
+      deleteProject: write(repo.deleteProject),
+      moveList: write(repo.moveList),
       addItems: write(repo.addItems),
       createManualQuote: write(repo.createManualQuote),
       updateItem: write(repo.updateItem),
@@ -227,7 +253,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
         await refresh();
       },
     }, ['flushDeletes', 'processQueue', 'parseBackup', 'getBillPhotos']),
-    [db, worker, settingsRef, refresh, write, deleteLater, finishDelete, syncPending],
+    [db, worker, settingsRef, refresh, write, deleteLater, finishDelete, syncPending, openProject],
   );
 
   const derived = useMemo(() => {
@@ -237,10 +263,26 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       if (list) list.push(item);
       else byList.set(item.list_id, [item]);
     }
-    const draftList = (kind: ListKind) => snapshot.lists.find((l) => l.id === DRAFT_IDS[kind]);
-    const history: HistoryRecord[] = snapshot.lists
+    const project = snapshot.projects.find((p) => p.id === projectId);
+    const draftIds: Record<ListKind, string> = {
+      audit: findDraft(snapshot.lists, projectId, 'audit')?.id ?? '',
+      boq: findDraft(snapshot.lists, projectId, 'boq')?.id ?? '',
+    };
+    const draftList = (kind: ListKind) => snapshot.lists.find((l) => l.id === draftIds[kind]);
+    const allHistory: HistoryRecord[] = snapshot.lists
       .filter((l) => l.status === 'saved')
       .map((l) => ({ ...l, items: byList.get(l.id) ?? [] }));
+    const history = allHistory.filter((l) => l.project_id === projectId);
+    const contracts = snapshot.contracts.filter((c) => c.project_id === projectId);
+    /** Saved lists, contracts and the money spent, per project, for the project list. */
+    const projectSummary = (id: string) => {
+      const saved = allHistory.filter((h) => h.project_id === id);
+      return {
+        lists: saved.length,
+        contracts: snapshot.contracts.filter((c) => c.project_id === id).length,
+        spent: saved.filter((h) => h.kind === 'audit').reduce((n, h) => n + h.items.reduce((m, i) => m + (i.total_amount || 0), 0), 0),
+      };
+    };
     const learning = repo.learningMap(snapshot.learned);
     // Materials deleted from Data leave out everything recorded up to then, in the Data tab and in every price check.
     const deleted = Object.fromEntries(snapshot.hidden.map((h) => [h.id, h.hidden_at]));
@@ -258,11 +300,18 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       else entriesByContract.set(e.contract_id, [e]);
     }
     return {
-      contracts: snapshot.contracts,
+      projectId,
+      project,
+      projects: snapshot.projects,
+      projectSummary,
+      /** The open project's Purchases list and BOQ draft. */
+      draftIds,
+      allHistory,
+      contracts,
       entriesFor: (contractId: string): ContractEntryRow[] => entriesByContract.get(contractId) ?? [],
       /** Sites from saved lists and contracts, for address suggestions. */
-      allAddresses: [...new Set([...history.map((h) => h.address), ...snapshot.contracts.map((c) => c.address)].filter(Boolean))],
-      itemsFor: (kind: ListKind) => byList.get(DRAFT_IDS[kind]) ?? [],
+      allAddresses: [...new Set([project?.address ?? '', ...allHistory.map((h) => h.address), ...snapshot.contracts.map((c) => c.address), ...snapshot.projects.map((p) => p.address)].filter(Boolean))],
+      itemsFor: (kind: ListKind) => byList.get(draftIds[kind]) ?? [],
       learning,
       savedBoqs: history.filter((h) => h.kind === 'boq'),
       quotesFor: (boqId: string): QuoteRow[] => snapshot.quotes.filter((q) => q.boq_id === boqId),
@@ -275,10 +324,11 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       learningCount: snapshot.learned.length,
       hiddenMaterials: snapshot.hidden,
       categoryNames: snapshot.categories.map((c) => c.name),
-      uniqueAddresses: [...new Set(history.map((h) => h.address).filter(Boolean))],
-      jobsFor: (kind: ListKind) => snapshot.jobs.filter((j) => j.list_id === DRAFT_IDS[kind]),
+      /** Site addresses of saved lists in every project, for suggestions. */
+      uniqueAddresses: [...new Set([project?.address ?? '', ...allHistory.map((h) => h.address)].filter(Boolean))],
+      jobsFor: (kind: ListKind) => snapshot.jobs.filter((j) => j.list_id === draftIds[kind]),
     };
-  }, [snapshot]);
+  }, [snapshot, projectId]);
 
   // A material deleted from Rates stays listed in Settings only while it still hides an old price.
   const unusedHidden = useMemo(

@@ -22,6 +22,7 @@ import {
   type LearnedTermRow,
   type LearningMap,
   type ListRow,
+  type ProjectRow,
   type QuoteLineRow,
   type QuoteRow,
   type DataTable,
@@ -32,7 +33,17 @@ import { seedCategories } from './schema.ts';
 import type { Db, SqlExecutor, SqlValue } from './sql.ts';
 
 export type ListKind = ListRow['kind'];
-export const DRAFT_IDS: Record<ListKind, string> = { audit: 'draft-audit', boq: 'draft-boq' };
+
+/**
+ * Each project has its own open Purchases list and BOQ draft. Drafts made before projects keep their
+ * old fixed ids ('draft-audit', 'draft-boq'), so find a draft by its project and kind, never by id.
+ */
+export const draftIdFor = (projectId: string, kind: ListKind) => `draft-${kind}-${projectId}`;
+export const findDraft = (lists: ListRow[], projectId: string, kind: ListKind) =>
+  lists.find((l) => l.status === 'draft' && l.kind === kind && l.project_id === projectId);
+
+/** The project made for lists and contracts with no site address, and on a new install. */
+export const DEFAULT_PROJECT_NAME = 'My site';
 
 export type JobStatus = 'pending' | 'processing' | 'failed';
 export interface Job {
@@ -51,6 +62,7 @@ export interface Job {
 }
 
 export interface Snapshot {
+  projects: ProjectRow[];
   lists: ListRow[];
   items: ItemRow[];
   rates: IndexedRateRow[];
@@ -109,6 +121,7 @@ export const selectAll = <T extends DataTable>(table: T, order: string) =>
 
 export async function loadSnapshot(db: Db): Promise<Snapshot> {
   return db.transaction(async (tx) => {
+    const projects = await tx.all<ProjectRow>(selectAll('projects', 'created_at'));
     const lists = await tx.all<ListRow>(selectAll('lists', 'created_at DESC'));
     const items = await tx.all<ItemRow>(selectAll('items', 'created_at DESC, id'));
     const rates = await tx.all<IndexedRateRow>(selectAll('indexed_rates', 'indexed_at DESC'));
@@ -122,7 +135,7 @@ export async function loadSnapshot(db: Db): Promise<Snapshot> {
     const hidden = await tx.all<HiddenMaterialRow>(selectAll('hidden_materials', 'hidden_at'));
     const contracts = await tx.all<ContractRow>(selectAll('contracts', 'created_at DESC'));
     const contractEntries = await tx.all<ContractEntryRow>(selectAll('contract_entries', 'date, created_at'));
-    return { lists, items, rates, learned, categories, jobs, quotes, quoteLines, hidden, contracts, contractEntries };
+    return { projects, lists, items, rates, learned, categories, jobs, quotes, quoteLines, hidden, contracts, contractEntries };
   });
 }
 
@@ -134,20 +147,154 @@ export function learningMap(learned: LearnedTermRow[]): LearningMap {
 // Lists and items
 // ---------------------------------------------------------------------------
 
-/** Make sure both working drafts (current audit and BOQ lists) exist. */
-export async function ensureDrafts(db: Db) {
-  await db.transaction(ensureDraftRows);
+// ---------------------------------------------------------------------------
+// Projects
+// ---------------------------------------------------------------------------
+
+/** Make sure there is a project, every list and contract is in one, and every project has its two drafts. */
+export async function ensureProjects(db: Db) {
+  await db.transaction(ensureProjectRows);
 }
 
-async function ensureDraftRows(tx: SqlExecutor) {
-  for (const kind of ['audit', 'boq'] as const) {
-    if (await getRow(tx, 'lists', DRAFT_IDS[kind])) continue;
+const siteKey = (address: string) => address.trim().toLowerCase();
+
+/**
+ * Lists and contracts from before projects (or from an older backup) have no project: those with a
+ * site address go into a project for that address, the rest into "My site". The open Purchases list
+ * and BOQ go to the project used most recently. Safe to run again; it only fills in what is missing.
+ */
+async function ensureProjectRows(tx: SqlExecutor) {
+  const projects = await tx.all<ProjectRow>(selectAll('projects', 'created_at'));
+  const known = new Set(projects.map((p) => p.id));
+  const byAddress = new Map<string, string>();
+  for (const p of projects) if (p.address && !byAddress.has(siteKey(p.address))) byAddress.set(siteKey(p.address), p.id);
+  let noAddress = projects.find((p) => !p.address && p.name === DEFAULT_PROJECT_NAME)?.id;
+
+  const create = async (name: string, address: string, createdAt?: string) => {
     const ts = nowISO();
-    await writeRow(tx, 'lists', {
-      id: DRAFT_IDS[kind], kind, status: 'draft', title: '', address: '', category: '', site_date: null, notes: '',
-      created_at: ts, updated_at: ts,
-    });
+    const row: ProjectRow = { id: newId(), name, address, status: 'active', created_at: createdAt ?? ts, updated_at: ts };
+    await writeRow(tx, 'projects', row);
+    projects.push(row);
+    known.add(row.id);
+    return row.id;
+  };
+  const projectFor = async (address: string, createdAt: string) => {
+    const key = siteKey(address);
+    if (!key) return (noAddress ??= await create(DEFAULT_PROJECT_NAME, '', createdAt));
+    let id = byAddress.get(key);
+    if (!id) {
+      id = await create(address.trim(), address.trim(), createdAt);
+      byAddress.set(key, id);
+    }
+    return id;
+  };
+
+  for (const table of ['lists', 'contracts'] as const) {
+    const rows = await tx.all<{ id: string; address: string; created_at: string; project_id: string }>(
+      `SELECT id, address, created_at, project_id FROM ${table} ${table === 'lists' ? `WHERE status = 'saved'` : ''} ORDER BY created_at`,
+    );
+    for (const row of rows) {
+      if (!known.has(row.project_id)) await tx.run(`UPDATE ${table} SET project_id = ? WHERE id = ?`, [await projectFor(row.address, row.created_at), row.id]);
+    }
   }
+  // Rates from confirmed quotes: the project of their site, where there is one.
+  for (const rate of await tx.all<{ id: string; address: string }>(`SELECT id, address FROM indexed_rates WHERE project_id = '' AND address != ''`)) {
+    const id = byAddress.get(siteKey(rate.address));
+    if (id) await tx.run('UPDATE indexed_rates SET project_id = ? WHERE id = ?', [id, rate.id]);
+  }
+
+  const drafts = await tx.all<ListRow>(`SELECT ${tableColumns.lists.join(', ')} FROM lists WHERE status = 'draft' ORDER BY created_at`);
+  const orphans = drafts.filter((d) => !known.has(d.project_id));
+  if (orphans.length || projects.length === 0) {
+    const [recent] = await tx.all<{ project_id: string }>(
+      `SELECT project_id, MAX(updated_at) AS at FROM (
+         SELECT project_id, updated_at FROM lists WHERE status = 'saved' UNION ALL SELECT project_id, updated_at FROM contracts
+       ) GROUP BY project_id ORDER BY at DESC LIMIT 1`,
+    );
+    const target = recent && known.has(recent.project_id) ? recent.project_id : (noAddress ??= await create(DEFAULT_PROJECT_NAME, ''));
+    for (const orphan of orphans) {
+      const existing = drafts.find((d) => d.project_id === target && d.kind === orphan.kind);
+      if (existing) {
+        // Two open lists of one kind for a project: keep one, with the lines of both.
+        await tx.run('UPDATE items SET list_id = ? WHERE list_id = ?', [existing.id, orphan.id]);
+        await tx.run('UPDATE jobs SET list_id = ? WHERE list_id = ?', [existing.id, orphan.id]);
+        await tx.run('DELETE FROM lists WHERE id = ?', [orphan.id]);
+      } else {
+        await tx.run('UPDATE lists SET project_id = ? WHERE id = ?', [target, orphan.id]);
+        drafts.push({ ...orphan, project_id: target });
+      }
+    }
+  }
+
+  for (const p of projects) {
+    for (const kind of ['audit', 'boq'] as const) {
+      if (drafts.some((d) => d.project_id === p.id && d.kind === kind && known.has(d.project_id))) continue;
+      const ts = nowISO();
+      await writeRow(tx, 'lists', {
+        id: draftIdFor(p.id, kind), kind, status: 'draft', project_id: p.id, title: '', address: '', category: '', site_date: null, notes: '',
+        created_at: ts, updated_at: ts,
+      });
+    }
+  }
+}
+
+export type ProjectInput = Pick<ProjectRow, 'name' | 'address'>;
+
+/** Start a project (with its own empty Purchases list and BOQ), or rename one / change its site address. */
+export async function saveProject(db: Db, input: ProjectInput, id?: string): Promise<string> {
+  return db.transaction(async (tx) => {
+    const existing = id ? await getRow(tx, 'projects', id) : undefined;
+    const ts = nowISO();
+    const row: ProjectRow = {
+      status: 'active',
+      ...existing,
+      name: input.name.trim() || input.address.trim() || DEFAULT_PROJECT_NAME,
+      address: input.address.trim(),
+      id: existing?.id ?? newId(),
+      created_at: existing?.created_at ?? ts,
+      updated_at: ts,
+    };
+    await writeRow(tx, 'projects', row);
+    await ensureProjectRows(tx);
+    return row.id;
+  });
+}
+
+/** Close a finished project (it moves under Closed) or reopen it. Nothing in it changes. */
+export async function setProjectStatus(db: Db, id: string, status: ProjectRow['status']) {
+  await db.transaction(async (tx) => {
+    const p = await getRow(tx, 'projects', id);
+    if (p) await writeRow(tx, 'projects', { ...p, status, updated_at: nowISO() });
+  });
+}
+
+/**
+ * Delete a project with all its lists, BOQs (and their vendor quotes) and labour contracts. Prices it
+ * added to Rates stay. A new "My site" is made if it was the last project.
+ */
+export async function deleteProject(db: Db, id: string) {
+  await db.transaction(async (tx) => {
+    const lists = `SELECT id FROM lists WHERE project_id = ?`;
+    await deleteQuotesWhere(tx, `boq_id IN (${lists})`, [id]);
+    await tx.run(`DELETE FROM job_images WHERE job_id IN (SELECT id FROM jobs WHERE list_id IN (${lists}))`, [id]);
+    await tx.run(`DELETE FROM jobs WHERE list_id IN (${lists})`, [id]);
+    await tx.run(`DELETE FROM items WHERE list_id IN (${lists})`, [id]);
+    await tx.run('DELETE FROM lists WHERE project_id = ?', [id]);
+    await tx.run('DELETE FROM contract_entries WHERE contract_id IN (SELECT id FROM contracts WHERE project_id = ?)', [id]);
+    await tx.run('DELETE FROM contracts WHERE project_id = ?', [id]);
+    await tx.run(`UPDATE indexed_rates SET project_id = '' WHERE project_id = ?`, [id]);
+    await tx.run('DELETE FROM projects WHERE id = ?', [id]);
+    await pruneBillPhotos(tx);
+    await ensureProjectRows(tx);
+  });
+}
+
+/** Move a saved list or BOQ (with its vendor quotes) to another project. */
+export async function moveList(db: Db, id: string, projectId: string) {
+  await db.transaction(async (tx) => {
+    const list = await getRow(tx, 'lists', id);
+    if (list?.status === 'saved' && (await getRow(tx, 'projects', projectId))) await touch(tx, 'lists', { ...list, project_id: projectId });
+  });
 }
 
 /**
@@ -254,6 +401,15 @@ export function listItems(tx: SqlExecutor, listId: string): Promise<ItemRow[]> {
   return tx.all<ItemRow>(`SELECT ${tableColumns.items.join(', ')} FROM items WHERE list_id = ? ORDER BY created_at DESC, id`, [listId]);
 }
 
+/** The open list of a kind in a project. */
+async function draftOf(tx: SqlExecutor, projectId: string, kind: ListKind): Promise<ListRow | undefined> {
+  const [row] = await tx.all<ListRow>(
+    `SELECT ${tableColumns.lists.join(', ')} FROM lists WHERE status = 'draft' AND kind = ? AND project_id = ? ORDER BY created_at LIMIT 1`,
+    [kind, projectId],
+  );
+  return row;
+}
+
 async function copyItems(tx: SqlExecutor, fromListId: string, toListId: string) {
   const items = await listItems(tx, fromListId);
   for (const item of items) {
@@ -263,12 +419,14 @@ async function copyItems(tx: SqlExecutor, fromListId: string, toListId: string) 
 }
 
 /**
- * Save a draft as a history record. With `targetId`, the existing record's
- * metadata and items are replaced; otherwise a new record is created.
+ * Save a draft (a project's open Purchases list or BOQ) as a saved list in the same project. With
+ * `targetId`, the existing record's metadata and items are replaced; otherwise a new record is created.
  */
-export async function saveDraftToHistory(db: Db, kind: ListKind, meta: ListMeta, targetId?: string): Promise<string> {
+export async function saveDraftToHistory(db: Db, draftId: string, meta: ListMeta, targetId?: string): Promise<string> {
   return db.transaction(async (tx) => {
-    const draft = await getRow(tx, 'lists', DRAFT_IDS[kind]);
+    const draft = await getRow(tx, 'lists', draftId);
+    if (draft?.status !== 'draft') throw new Error('The open list was not found. Close and reopen the app, then try again.');
+    const kind = draft.kind;
     const notes = kind === 'boq' ? draft?.notes ?? '' : undefined;
     const existing = targetId ? await getRow(tx, 'lists', targetId) : undefined;
     const ts = nowISO();
@@ -278,6 +436,7 @@ export async function saveDraftToHistory(db: Db, kind: ListKind, meta: ListMeta,
       id,
       kind: existing?.kind ?? kind,
       status: 'saved',
+      project_id: draft.project_id,
       title: meta.title,
       address: meta.address,
       category: meta.category,
@@ -288,7 +447,7 @@ export async function saveDraftToHistory(db: Db, kind: ListKind, meta: ListMeta,
     });
     const oldItems = existing ? await listItems(tx, id) : [];
     if (existing) await tx.run('DELETE FROM items WHERE list_id = ?', [id]);
-    await copyItems(tx, DRAFT_IDS[kind], id);
+    await copyItems(tx, draftId, id);
     if (existing) await rematchQuoteLines(tx, id, oldItems);
     if ((existing?.kind ?? kind) === 'audit') await fillRateSites(tx, id, meta);
     return id;
@@ -345,23 +504,25 @@ export async function deleteList(db: Db, id: string) {
   });
 }
 
-export async function deleteAllHistory(db: Db) {
+/** Delete every saved list and BOQ of one project. */
+export async function deleteAllHistory(db: Db, projectId: string) {
   await db.transaction(async (tx) => {
-    await deleteQuotesWhere(tx, `boq_id IN (SELECT id FROM lists WHERE status = 'saved')`);
-    await tx.run(`DELETE FROM items WHERE list_id IN (SELECT id FROM lists WHERE status = 'saved')`);
-    await tx.run(`DELETE FROM lists WHERE status = 'saved'`);
+    const saved = `SELECT id FROM lists WHERE status = 'saved' AND project_id = ?`;
+    await deleteQuotesWhere(tx, `boq_id IN (${saved})`, [projectId]);
+    await tx.run(`DELETE FROM items WHERE list_id IN (${saved})`, [projectId]);
+    await tx.run(`DELETE FROM lists WHERE status = 'saved' AND project_id = ?`, [projectId]);
     await pruneBillPhotos(tx);
   });
 }
 
-/** Replace the matching draft (audit or BOQ) with a copy of a history record. */
+/** Replace the matching draft (audit or BOQ) of the record's project with a copy of a saved list. */
 export async function restoreToDraft(db: Db, historyId: string): Promise<ListKind | undefined> {
   return db.transaction(async (tx) => {
     const record = await getRow(tx, 'lists', historyId);
     if (!record) return undefined;
-    const draftId = DRAFT_IDS[record.kind];
-    const draft = await getRow(tx, 'lists', draftId);
+    const draft = await draftOf(tx, record.project_id, record.kind);
     if (!draft) return undefined;
+    const draftId = draft.id;
     await tx.run('DELETE FROM items WHERE list_id = ?', [draftId]);
     await copyItems(tx, historyId, draftId);
     if (record.kind === 'boq') await touch(tx, 'lists', { ...draft, notes: record.notes });
@@ -391,8 +552,7 @@ async function materialRowsTx(tx: SqlExecutor, keys: Set<string>) {
   };
   const items = await tx.all<ItemRow>(
     `SELECT ${tableColumns.items.join(', ')} FROM items
-     WHERE list_id IN (SELECT id FROM lists WHERE status = 'saved' OR id = ?)`,
-    [DRAFT_IDS.audit],
+     WHERE list_id IN (SELECT id FROM lists WHERE status = 'saved' OR (status = 'draft' AND kind = 'audit'))`,
   );
   const rates = await tx.all<IndexedRateRow>(selectAll('indexed_rates', 'indexed_at'));
   const inSet = (r: ItemRow | IndexedRateRow) => keys.has(keyOf(r));
@@ -556,7 +716,7 @@ export async function deleteLearnedTerm(db: Db, id: string) {
 }
 
 /** Index item rates; an identical rate (same material, date and price) is replaced. */
-type RateInput = Pick<ItemRow, 'item_name' | 'unit' | 'unit_price' | 'vendor' | 'date'> & Partial<Variant> & { category?: string; address?: string };
+type RateInput = Pick<ItemRow, 'item_name' | 'unit' | 'unit_price' | 'vendor' | 'date'> & Partial<Variant> & { category?: string; address?: string; project_id?: string };
 
 export async function indexRates(db: Db, items: RateInput[]) {
   await db.transaction((tx) => indexRatesTx(tx, items));
@@ -583,6 +743,7 @@ async function indexRatesTx(tx: SqlExecutor, items: RateInput[]) {
       ...variantOf(item),
       category: item.category ?? '',
       address: item.address ?? '',
+      project_id: item.project_id ?? '',
       indexed_at: indexedAt,
     });
   }
@@ -956,6 +1117,7 @@ export async function confirmQuote(db: Db, id: string) {
         ...Object.fromEntries(VARIANT_FIELDS.map((f) => [f, line[f] || item?.[f] || ''])),
         category: boqList?.category ?? '',
         address: boqList?.address ?? '',
+        project_id: boqList?.project_id ?? '',
       });
       const term = normalizeTerm(line.original_term);
       if (item && unitMatches && term && term !== normalizeTerm(item.item_name)) {
@@ -1049,9 +1211,9 @@ export async function clearAllData(tx: SqlExecutor, { seedDefaults = true } = {}
   for (const t of [...dataTables, 'jobs', 'job_images']) await tx.run(`DELETE FROM ${t}`);
   if (seedDefaults) {
     await seedCategories(tx);
-    await ensureDraftRows(tx);
+    await ensureProjectRows(tx);
   }
 }
 
-/** Make sure drafts exist after rows were replaced wholesale (e.g. by a restore). */
-export { ensureDraftRows, pruneBillPhotos };
+/** Make sure projects and drafts exist after rows were replaced wholesale (e.g. by a restore). */
+export { ensureProjectRows, pruneBillPhotos };

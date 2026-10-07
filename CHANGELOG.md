@@ -2,6 +2,18 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 5.0 — Projects
+
+- **Everything belongs to a project.** Tap the project name at the top to switch projects or start a new one (a name and its site address). Each project keeps its own open purchase list and BOQ, its saved lists and its labour contracts, so bills for one site never land in another's list.
+- **Your existing data is sorted for you.** Saved lists and contracts go into one project per site address; those without an address go into *My site*. The open purchase list and BOQ go to the project you used last. Rename any project from its pencil button.
+- **Move a saved list or contract** to another project from its *Edit* sheet.
+- **Close a finished project** to tidy the list, or delete it with everything in it. Prices it added stay in Rates.
+- **Rates covers all projects**, so you still see every price you have paid, wherever you bought it.
+- **Site report** is now for the open project: no need to pick the site.
+- Backups now include projects. Older backups still restore and are sorted into projects the same way.
+
+Also since 4.0: sort and filter in Rates, suggestions under the field you type in, deliveries on BOQs, editing materials in Rates, bill photos kept with their lines, one line editor everywhere, and a preview before every share.
+
 ## 4.3 — Sort and filter in Rates
 
 - **Sort materials in Rates** by the newest or oldest price, or by name (A–Z or Z–A). The phone remembers your choice.

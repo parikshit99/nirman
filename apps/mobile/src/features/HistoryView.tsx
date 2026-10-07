@@ -9,7 +9,7 @@ import { Button } from '../components/ui/Button.tsx';
 
 export function HistorySidebar({ onNewBoq, onSiteReport }: { onNewBoq(): void; onSiteReport(): void }) {
   const { history, contracts } = useAppState();
-  const hasPurchases = history.some((h) => h.kind === 'audit' && h.address) || contracts.some((c) => c.address);
+  const hasPurchases = history.some((h) => h.kind === 'audit') || contracts.length > 0;
   return (
     <div className="space-y-3 lg:space-y-6">
       <div className="hidden lg:block p-4 bg-orange-50 border border-orange-100 rounded-xl">
@@ -19,7 +19,7 @@ export function HistorySidebar({ onNewBoq, onSiteReport }: { onNewBoq(): void; o
         <p className="text-xs text-orange-700 mt-1">Manage and restore your past purchase lists and Bills of Quantities.</p>
       </div>
       <div className="hidden lg:flex p-3 bg-gray-50 rounded-lg border border-gray-100 justify-between items-center text-xs font-bold">
-        <span>On this phone</span>
+        <span>In this project</span>
         <span>{history.length} {history.length === 1 ? 'list' : 'lists'}</span>
       </div>
       <div className={`grid gap-2 ${hasPurchases ? 'grid-cols-2 lg:grid-cols-1' : 'grid-cols-1'}`}>
@@ -51,7 +51,8 @@ interface Props {
 }
 
 export function HistoryView({ records, categoryFilter, onCategory, addressFilter, onAddress, onEdit, onOpen, onQuotes, onDeliveries, onBuyAgain, onDeleteAll }: Props) {
-  const { categoryNames, uniqueAddresses, quotesFor, history } = useAppState();
+  const { categoryNames, quotesFor, history } = useAppState();
+  const addresses = [...new Set(history.map((h) => h.address).filter(Boolean))];
   const [photosOf, setPhotosOf] = useState<HistoryRecord | null>(null);
 
   return (
@@ -61,7 +62,7 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
           categories={categoryNames}
           categoryFilter={categoryFilter}
           onCategory={onCategory}
-          addresses={uniqueAddresses}
+          addresses={addresses.length > 1 ? addresses : []}
           addressFilter={addressFilter}
           onAddress={onAddress}
           addressLabel="Filter by Address"
@@ -71,7 +72,7 @@ export function HistoryView({ records, categoryFilter, onCategory, addressFilter
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {records.length === 0 ? (
           <EmptyState icon={History} title={history.length ? 'No saved lists match.' : 'Nothing saved yet.'} className="col-span-full">
-            {history.length ? 'Check the filters or search.' : 'Lists you save from Purchases or BOQ (the Save button) appear here.'}
+            {history.length ? 'Check the filters or search.' : 'Lists you save in this project from Purchases or BOQ (the Save button) appear here.'}
           </EmptyState>
         ) : (
           records.map((record) => (
