@@ -1,6 +1,6 @@
 # Moving Nirman to React Native
 
-Status: agreed October 2026. Phase 3 next.
+Status: agreed October 2026. 7.0 (Phase 7) done; Phase 8 after 7.x has run 6 weeks.
 
 The Capacitor app is replaced by a React Native (Expo) app using Android's own controls. There is no beta app beside the old one: the new app is built over the next few sessions, and the update that switches is a normal update to the same app. Phases are sized so that each one fits in **one Claude session and one PR**.
 
@@ -110,7 +110,7 @@ Losing the preferences and asking for the key once saves a whole preparation rel
    3. `PRAGMA integrity_check`, then the migrations.
    4. Show the key screen.
 4. **One upgrade test in CI:**
-   1. Install the last 6.x APK on an emulator and restore a sample backup into it.
+   1. Install the last 6.x APK on an emulator and restore a sample backup into it. (Done as: the `android` job's apps/mobile build of the same commit; `e2e/sample-backup.json` restored by core into its database file.)
    2. Install 7.0 over it.
    3. Check the list counts and totals (Maestro, one flow).
 5. **Before publishing**, the owner installs the CI artifact over 6.x on their own phone and checks their data. This is the only manual step.
@@ -170,5 +170,5 @@ Still not planned: swipe-to-delete (CLAUDE.md: delete from the edit view only) a
 - [x] Phase 4: BOQ, Saved, Projects
 - [x] Phase 5: quotes and Rates
 - [x] Phase 6: Labour, site report, sharing
-- [ ] Phase 7: Settings, first launch, 7.0
+- [x] Phase 7: Settings, first launch, 7.0
 - [ ] Phase 8: clean up

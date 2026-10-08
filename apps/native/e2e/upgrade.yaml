@@ -1,0 +1,31 @@
+# CI's upgrade test (docs/react-native-plan.md, Phase 7): run after 7.0 is installed over 6.x holding
+# e2e/sample-backup.json's data (.github/scripts/upgrade-test.sh). The same lists and totals must show.
+appId: com.nirmaan.auditor
+---
+- launchApp
+# The data was found, copied and checked; only the key has to be pasted again.
+- extendedWaitUntil:
+    visible: "Paste your Gemini key again.*"
+    timeout: 90000
+- tapOn: "Skip for now"
+- tapOn:
+    text: "Got it"
+    optional: true
+# The open purchase list: TMT bar 12 mm ₹31,000 + binding wire ₹900.
+- extendedWaitUntil:
+    visible: "₹31,900"
+    timeout: 15000
+- assertVisible: "TMT bar 12 mm"
+- tapOn: "More actions"
+- tapOn: "Settings"
+- scrollUntilVisible:
+    element: "Saved lists: 3"
+    direction: DOWN
+- assertVisible: "Projects: 1"
+- assertVisible: "Items: 6"
+- back
+- tapOn: "Saved"
+# Saved titles show in capitals.
+- assertVisible: "(?i)cement and sand"
+- assertVisible: "(?i)bricks"
+- assertVisible: "(?i)flooring boq"

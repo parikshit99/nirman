@@ -7,9 +7,9 @@ android {
         applicationId "com.nirmaan.auditor"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // Each CI build is newer than the last, so Android accepts it as an update.
-        versionCode Integer.parseInt(System.getenv("GITHUB_RUN_NUMBER") ?: "1")
-        // "1.1.<build>", set by CI from apps/mobile/package.json; "dev" for local builds.
+        // Each CI build is newer than the last, so Android accepts it as an update (VERSION_CODE: the 6.x fallback build).
+        versionCode Integer.parseInt(System.getenv("VERSION_CODE") ?: System.getenv("GITHUB_RUN_NUMBER") ?: "1")
+        // "7.0.<build>", set by CI from apps/native/package.json; "dev" for local builds.
         versionName System.getenv("APP_VERSION") ?: "dev"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

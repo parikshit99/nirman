@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProjectsSheet } from '../features/ProjectsSheet';
+import { useSettings } from '../features/SettingsHost';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 import { StatusChip } from './StatusChip';
@@ -9,14 +10,15 @@ import { Icon } from './ui/Icon';
 import { OverflowMenu, type MenuItem } from './ui/OverflowMenu';
 
 /**
- * The top of every tab: the open project (everything below belongs to it), the status, and a ⋮ menu. `children` is a
- * second row, e.g. the total and Save.
+ * The top of every tab: the open project (everything below belongs to it), the status, and a ⋮ menu (ending with
+ * Settings). `children` is a second row, e.g. the total and Save.
  */
 export function ScreenHeader({ onStatus, menu, children }: { onStatus?(): void; menu: MenuItem[]; children?: ReactNode }) {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const { project } = useAppState();
   const projects = useProjectsSheet();
+  const settings = useSettings();
   return (
     <View style={{ paddingTop: insets.top, backgroundColor: c.white, borderBottomWidth: 1, borderBottomColor: c.brandConcrete }}>
       <View style={{ minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 16, paddingRight: 4 }}>
@@ -29,8 +31,8 @@ export function ScreenHeader({ onStatus, menu, children }: { onStatus?(): void; 
           </View>
           <Icon name="arrow-drop-down" size={22} color={c.gray500} />
         </Pressable>
-        <StatusChip onPress={onStatus} />
-        <OverflowMenu items={menu} />
+        <StatusChip onPress={onStatus ?? settings.open} />
+        <OverflowMenu items={[...menu, { icon: 'settings', label: 'Settings', about: 'Gemini key, backup, appearance', onPress: settings.open }]} />
       </View>
       {children ? <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>{children}</View> : null}
     </View>
