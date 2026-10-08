@@ -80,6 +80,7 @@ jobs:
         with:
           # 32-bit x86 left out: no phone uses it, only old emulators.
           architectures: armeabi-v7a,arm64-v8a,x86_64
+          cache-name: all
           artifact: nirman-native-apk
           apk: nirman-native.apk
           keystore: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -96,6 +97,7 @@ jobs:
       - uses: ./.github/actions/build-native
         with:
           architectures: x86_64
+          cache-name: x86_64
           artifact: nirman-native-x86_64-apk
           apk: nirman-native-x86_64.apk
           keystore: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}

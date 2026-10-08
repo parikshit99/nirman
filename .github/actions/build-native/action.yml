@@ -6,6 +6,9 @@ inputs:
   architectures:
     description: CPU types to build native code for, comma-separated.
     required: true
+  cache-name:
+    description: Name for the compiled-code cache of this set of CPU types (letters, digits and dashes; no commas).
+    required: true
   artifact:
     description: Name of the uploaded artifact (the APK inside is <artifact>.apk without "-apk").
     required: true
@@ -41,7 +44,7 @@ runs:
     # runs, so only what changed is compiled again (one cache per set of CPU types).
     - uses: hendrikmuhs/ccache-action@v1.2
       with:
-        key: native-${{ inputs.architectures }}
+        key: native-${{ inputs.cache-name }}
         max-size: 2G
     - run: npm ci
       shell: bash
