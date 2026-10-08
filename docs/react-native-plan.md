@@ -124,7 +124,7 @@ Losing the preferences and asking for the key once saves a whole preparation rel
 ### Phase 8: clean up (after 7.x has run 6 weeks)
 
 - Delete `apps/mobile`, the fallback workflow and `nirmaan-before-7.db`.
-- Replace the web UI rules in CLAUDE.md with the React Native ones.
+- Remove the old-app section from docs/UI guideline.md and the `apps/mobile` notes from docs/Code guideline.md.
 - Update the README.
 
 ### Later (separate releases, each a MINOR)
@@ -132,9 +132,46 @@ Losing the preferences and asking for the key once saves a whole preparation rel
 - Reading queued bills in the background, with a notification (WorkManager).
 - Google's document scanner for bill photos.
 - App shortcuts on the launcher icon.
-- Sync groundwork and the Raspberry Pi server.
-- Web version (React Native Web, served from the Pi).
+- Raspberry Pi sync and the web version: see below.
 - iOS.
+
+## Raspberry Pi (after 7.0, three sessions)
+
+The Pi keeps a copy of every phone's data and the bill photos, so phones on the same project stay in step and a lost phone loses nothing. It serves the web version for office computers and backs itself up every night. The Gemini key stays on each phone and never goes on the Pi.
+
+Hardware: a Pi 4 or 5 with at least 4 GB of RAM, and an SSD (SD cards wear out under a database).
+
+### Pi 1: sync groundwork in the app (MINOR)
+
+These are database and core changes only, so they could also go into the current app before 7.0 if sync is needed sooner.
+
+- Migration (follow docs/Code guideline.md):
+  - `deleted_at` on every table, so deletions sync instead of rows disappearing.
+  - `updated_at` on the tables that don't have it yet.
+  - A `device_id` (made once per phone, stored in the database).
+  - A `sync_log` table of changes the Pi hasn't got yet.
+- Bill photos are stored under a hash of their contents, so the same photo is never uploaded or stored twice.
+- The repository marks rows as deleted instead of deleting them; every list query skips deleted rows.
+- Bump the backup `VERSION`, keeping older backups readable.
+
+### Pi 2: the server (`apps/server`)
+
+- Node, using `packages/core` (the same rules as the app); SQLite with the same schema. Use Postgres only if many people use it at once.
+- Endpoints:
+  - `POST /sync/push`: a phone sends its changes since the last sync.
+  - `GET /sync/pull?since=…`: a phone gets everyone else's changes.
+  - `PUT` and `GET /photos/<hash>`: upload and download bill photos.
+- When two devices change the same row, the latest `updated_at` wins.
+- A token per device, created and removed with a command-line tool on the Pi, so a phone can be cut off when someone leaves.
+- Reached through Tailscale or a Cloudflare Tunnel, with no ports opened on the router.
+- A nightly backup of the database and photos (a `systemd` timer), keeping the last 14.
+- In the app: *Settings → Sync* takes the Pi's address and the token; it syncs on start, after each save and when the phone comes back online.
+
+### Pi 3: web version
+
+- React Native Web (Expo), served by the Pi, with a login per person.
+- It reads and writes through the Pi's data rather than keeping its own copy.
+- For the office: reviewing lists, comparing quotes, site reports, printing. Reading bill photos stays on the phones.
 
 ## Rolling back
 
@@ -160,7 +197,7 @@ None of these cost extra work: they come with the libraries the new screens are 
 - Android's own PDF preview.
 - System font for text, JetBrains Mono for amounts.
 
-Still not planned: swipe-to-delete (CLAUDE.md: delete from the edit view only) and wallpaper colours (orange stays).
+Still not planned: swipe-to-delete (UX guideline: delete from the edit view only) and wallpaper colours (orange stays).
 
 ## Progress
 
@@ -172,3 +209,6 @@ Still not planned: swipe-to-delete (CLAUDE.md: delete from the edit view only) a
 - [x] Phase 6: Labour, site report, sharing
 - [x] Phase 7: Settings, first launch, 7.0
 - [ ] Phase 8: clean up
+- [ ] Pi 1: sync groundwork
+- [ ] Pi 2: server
+- [ ] Pi 3: web version
