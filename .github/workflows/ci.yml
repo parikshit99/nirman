@@ -67,53 +67,44 @@ jobs:
 
   native:
     # The app (apps/native, React Native): built and signed with the same key as every Nirman build, so it
-    # installs as an update over 6.x. Runs alongside the tests; publishing waits for all of them.
+    # installs as an update over 6.x. This is the APK that is published (every phone CPU type).
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      version: ${{ steps.build.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # full history, to count the changes since the last version bump
-      - uses: actions/setup-node@v4
+      - id: build
+        uses: ./.github/actions/build-native
         with:
-          node-version: 22
-          cache: npm
-      - uses: actions/setup-java@v4
+          # 32-bit x86 left out: no phone uses it, only old emulators.
+          architectures: armeabi-v7a,arm64-v8a,x86_64
+          artifact: nirman-native-apk
+          apk: nirman-native.apk
+          keystore: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+
+  native-test:
+    # The same app built for the emulator's CPU type only (a third of the compiling), so the upgrade test
+    # doesn't wait for the full build. Same code and key as the published APK.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
         with:
-          distribution: temurin
-          java-version: 17 # React Native's Gradle plugin asks for a Java 17 toolchain
-      - uses: gradle/actions/setup-gradle@v4
-      - uses: android-actions/setup-android@v3
+          fetch-depth: 0
+      - uses: ./.github/actions/build-native
         with:
-          packages: platform-tools
-      - run: npm ci
-      - name: Set the app version
-        id: version
-        run: .github/scripts/app-version.sh
-      - name: Generate the Android project
-        run: npx expo prebuild --platform android --no-install
-        working-directory: apps/native
-        env:
-          CI: 1
-      - name: Build release APK
-        # 32-bit x86 left out: no phone uses it, only old emulators.
-        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86_64
-        working-directory: apps/native/android
-      - name: Sign the APK
-        env:
-          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-        run: .github/scripts/sign-apk.sh apps/native/android/app/build/outputs/apk/release/app-release.apk nirman-native.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: nirman-native-apk
-          path: nirman-native.apk
+          architectures: x86_64
+          artifact: nirman-native-x86_64-apk
+          apk: nirman-native-x86_64.apk
+          keystore: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
 
   upgrade:
     # 6.x with data on a phone, then 7.x installed over it: the lists and totals must all be there
     # (docs/react-native-plan.md, Phase 7). On an Android emulator, checked with Maestro.
-    needs: [android, native]
+    needs: [android, native-test]
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -134,7 +125,7 @@ jobs:
           name: nirman-apk
       - uses: actions/download-artifact@v4
         with:
-          name: nirman-native-apk
+          name: nirman-native-x86_64-apk
       - name: Install Maestro
         run: |
           curl -fsSL "https://get.maestro.mobile.dev" | bash
@@ -158,7 +149,7 @@ jobs:
           disk-size: 4096M # the default 7 GB userdata doesn't fit on the runner
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
           disable-animations: true
-          script: .github/scripts/upgrade-test.sh nirman.apk nirman-native.apk sample.db
+          script: .github/scripts/upgrade-test.sh nirman.apk nirman-native-x86_64.apk sample.db
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

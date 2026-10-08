@@ -1,0 +1,78 @@
+name: Build the app (apps/native)
+description: Builds and signs the React Native app's release APK for the given CPU types, and uploads it as an artifact.
+# Used by CI's `native` job (every phone CPU type: the APK that is published) and `native-test` job (x86_64 only,
+# for the emulator in the upgrade test). Needs the repository checked out with its full history.
+inputs:
+  architectures:
+    description: CPU types to build native code for, comma-separated.
+    required: true
+  artifact:
+    description: Name of the uploaded artifact (the APK inside is <artifact>.apk without "-apk").
+    required: true
+  apk:
+    description: File name of the signed APK.
+    required: true
+  keystore:
+    description: RELEASE_KEYSTORE_BASE64 (composite actions can't read secrets themselves).
+    required: false
+  keystore-password:
+    description: RELEASE_KEYSTORE_PASSWORD.
+    required: false
+outputs:
+  version:
+    description: The app version, e.g. 7.0.3.
+    value: ${{ steps.version.outputs.version }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 17 # React Native's Gradle plugin asks for a Java 17 toolchain
+    - uses: gradle/actions/setup-gradle@v4 # caches Gradle, its downloads and its build cache between runs
+    - uses: android-actions/setup-android@v3
+      with:
+        packages: platform-tools
+    # Most of the build is compiling React Native's C++ for each CPU type; ccache keeps the compiled files between
+    # runs, so only what changed is compiled again (one cache per set of CPU types).
+    - uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: native-${{ inputs.architectures }}
+        max-size: 2G
+    - run: npm ci
+      shell: bash
+    - name: Set the app version
+      id: version
+      run: .github/scripts/app-version.sh
+      shell: bash
+    - name: Generate the Android project
+      run: npx expo prebuild --platform android --no-install
+      working-directory: apps/native
+      shell: bash
+      env:
+        CI: '1'
+    - name: Build release APK
+      run: ./gradlew assembleRelease --no-daemon --build-cache -PreactNativeArchitectures=${{ inputs.architectures }}
+      working-directory: apps/native/android
+      shell: bash
+      env:
+        # CMake (React Native's C++) compiles through ccache; paths are made relative so the cache hits on any runner.
+        CMAKE_C_COMPILER_LAUNCHER: ccache
+        CMAKE_CXX_COMPILER_LAUNCHER: ccache
+        CCACHE_BASEDIR: ${{ github.workspace }}
+        CCACHE_NOHASHDIR: 'true'
+        CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
+    - name: Sign the APK
+      run: .github/scripts/sign-apk.sh apps/native/android/app/build/outputs/apk/release/app-release.apk ${{ inputs.apk }}
+      shell: bash
+      env:
+        RELEASE_KEYSTORE_BASE64: ${{ inputs.keystore }}
+        RELEASE_KEYSTORE_PASSWORD: ${{ inputs.keystore-password }}
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact }}
+        path: ${{ inputs.apk }}
