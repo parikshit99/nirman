@@ -54,7 +54,7 @@ function SavedTab() {
     <SavedScreen
       about={ABOUT.Saved}
       onQuotes={quotes.open}
-      extraMenu={hasPurchases ? [{ icon: 'assignment', label: 'Site report', about: 'Everything bought and paid for this project', onPress: siteReport.open }] : []}
+      onSiteReport={hasPurchases ? siteReport.open : undefined}
     />
   );
 }

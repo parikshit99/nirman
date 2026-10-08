@@ -95,10 +95,16 @@ export function LabourScreen({ about }: { about: string }) {
           </View>
         </View>
       )}
-      <View style={{ marginHorizontal: 16 }}>
-        <Button variant="primary" block icon="add" onPress={() => setContractForm({})}>
+      {/* Side by side, or one under the other on a narrow phone, so neither label is cut off. */}
+      <View style={{ marginHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        <Button variant="primary" icon="add" onPress={() => setContractForm({})} style={{ flexGrow: 1 }}>
           New contract
         </Button>
+        {hasSites && (
+          <Button variant="secondary" icon="assignment" onPress={siteReport.open} style={{ flexGrow: 1 }}>
+            Site report
+          </Button>
+        )}
       </View>
       {all.length > 0 && (
         <>
