@@ -67,7 +67,7 @@ jobs:
 
   native:
     # The app (apps/native, React Native): built and signed with the same key as every Nirman build, so it
-    # installs as an update over 6.x. This is the APK that is published (every phone CPU type).
+    # installs as an update over 6.x. This is the APK that is published: arm64 only, the phones it runs on (S25 Ultra).
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.build.outputs.version }}
@@ -78,17 +78,17 @@ jobs:
       - id: build
         uses: ./.github/actions/build-native
         with:
-          # 32-bit x86 left out: no phone uses it, only old emulators.
-          architectures: armeabi-v7a,arm64-v8a,x86_64
-          cache-name: all
+          # 64-bit ARM only: every phone using the app (a Galaxy S25 Ultra). Add armeabi-v7a for older 32-bit phones.
+          architectures: arm64-v8a
+          cache-name: arm64
           artifact: nirman-native-apk
           apk: nirman-native.apk
           keystore: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
           keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
 
   native-test:
-    # The same app built for the emulator's CPU type only (a third of the compiling), so the upgrade test
-    # doesn't wait for the full build. Same code and key as the published APK.
+    # The same app built for the emulator's CPU type (x86_64; an arm64 build can't run on CI's emulator), in
+    # parallel with the published one. Same code and key.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
