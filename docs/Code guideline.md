@@ -12,7 +12,7 @@ How to change Nirman's code without breaking anyone's data. For screens, also re
 | `packages/shared` | Types, validation, the Gemini prompt and parsing, price, quote and labour rules | Shared by both apps |
 
 Where new code goes:
-- **Rules and data** (anything a test can check without a screen) go in `packages/core` or `packages/shared`, never in an app. They will also run on the Raspberry Pi server.
+- **Rules and data** (anything a test can check without a screen) go in `packages/core` or `packages/shared`, never in an app. Sync and the web version will use them too.
 - **Screens** go in `apps/native/src/features/`, parts used by several screens in `src/components/`, and the shared UI pieces in `src/components/ui/`.
 - **Android code** goes in the local Expo module `apps/native/modules/nirman-native` (Kotlin). Never edit `apps/native/android/`: prebuild generates it and it isn't committed. The module has `readText` (ML Kit), `haptic`, `takeShared` and the `shared` event (WhatsApp shares), `databasePath` and the first-launch file helpers (`databaseInfo`, `copyDatabase`, `setDatabaseAside`), `renderPdf` (PDF pages as JPG) and `shareFiles`.
 - **Data** in `apps/native` opens the database through `src/data/db.ts` (the 6.x file, in place); everything else comes from `@nirman/core`.
@@ -59,9 +59,9 @@ These rules protect installed phones. Breaking one can lose someone's work.
 
 ## Security and privacy
 
-- Never put the Gemini API key in the app, the repo, logs or the Pi. CI fails the build if the APK contains anything that looks like a Google API key (`.github/scripts/sign-apk.sh`).
+- Never put the Gemini API key in the app, the repo, logs, Supabase or the web version. The Supabase `service_role` key never goes in the app, the web version or the repo either. CI fails the build if the APK contains anything that looks like a Google API key (`.github/scripts/sign-apk.sh`).
 - The key is kept in the phone's secure storage and sent only to Google.
-- Photos and notes leave the phone only for the Gemini request, a backup the user shares, or (later) the user's own Pi.
+- Photos and notes leave the phone only for the Gemini request, a backup the user shares, or (later) sync to the team's Supabase project.
 
 ## Diagnostics
 

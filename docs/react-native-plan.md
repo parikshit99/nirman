@@ -132,46 +132,63 @@ Losing the preferences and asking for the key once saves a whole preparation rel
 - Reading queued bills in the background, with a notification (WorkManager).
 - Google's document scanner for bill photos.
 - App shortcuts on the launcher icon.
-- Raspberry Pi sync and the web version: see below.
+- Sync between phones and the web version (Supabase and GitHub Pages): see below.
 - iOS.
 
-## Raspberry Pi (after 7.0, three sessions)
+## Sync and the web version (after 7.0, three sessions)
 
-The Pi keeps a copy of every phone's data and the bill photos, so phones on the same project stay in step and a lost phone loses nothing. It serves the web version for office computers and backs itself up every night. The Gemini key stays on each phone and never goes on the Pi.
+Several people edit the same projects: on site from their phones, in the office from a browser. Supabase holds the shared copy (a Postgres database, sign-in and photo storage); the web version is a static site on GitHub Pages that talks to Supabase directly. There is no server of our own to run or back up.
 
-Hardware: a Pi 4 or 5 with at least 4 GB of RAM, and an SSD (SD cards wear out under a database).
+- **Phones stay offline-first.** Each phone keeps its own SQLite file, as now, and syncs with Supabase when it has a connection. A site with no signal loses nothing; changes go up later.
+- **The web version is online-only.** It needs a connection, and it keeps nothing important in the browser.
+- **The Gemini key stays on each phone.** It never goes into Supabase, the web version or the repo. Reading bill photos stays on the phones.
 
-### Pi 1: sync groundwork in the app (MINOR)
+### What it costs
 
-These are database and core changes only, so they could also go into the current app before 7.0 if sync is needed sooner.
+- **Supabase free tier** is enough to start: a 500 MB database and 1 GB of file storage. A free project is paused after a week with no use and must be resumed from the dashboard; the Pro plan (about $25 a month) removes the pause, adds daily backups and much more storage. Check the current limits before starting. Bill photos fill storage first, so they are resized before upload.
+- **GitHub Pages** is free for public repositories. This repository is private, so Pages needs GitHub Pro (about $4 a month). The site itself is public either way, which is fine: it holds no data, and everything behind it needs a sign-in. If paying for Pro isn't wanted, Cloudflare Pages does the same for free from a private repository.
+
+### Sync 1: groundwork in the app (MINOR)
+
+Database and core changes only, so both apps get them while `apps/mobile` is still the fallback.
 
 - Migration (follow docs/Code guideline.md):
   - `deleted_at` on every table, so deletions sync instead of rows disappearing.
-  - `updated_at` on the tables that don't have it yet.
-  - A `device_id` (made once per phone, stored in the database).
-  - A `sync_log` table of changes the Pi hasn't got yet.
+  - `updated_at` on the tables that don't have it yet, set on every change.
+  - `project_id` on every row that belongs to a project (lists, items, quotes, contracts, entries, photos), so access can be checked per project.
+  - A `sync_state` table: the last time each table was pulled, and which rows changed since the last push.
+- Ids stay random text ids made on the phone, so two phones never make the same id.
 - Bill photos are stored under a hash of their contents, so the same photo is never uploaded or stored twice.
-- The repository marks rows as deleted instead of deleting them; every list query skips deleted rows.
+- The repository marks rows as deleted instead of deleting them; every list query skips deleted rows. *Clear deleted* removes them for good only once they have synced.
 - Bump the backup `VERSION`, keeping older backups readable.
 
-### Pi 2: the server (`apps/server`)
+### Sync 2: Supabase and sync on the phones (MINOR)
 
-- Node, using `packages/core` (the same rules as the app); SQLite with the same schema. Use Postgres only if many people use it at once.
-- Endpoints:
-  - `POST /sync/push`: a phone sends its changes since the last sync.
-  - `GET /sync/pull?since=…`: a phone gets everyone else's changes.
-  - `PUT` and `GET /photos/<hash>`: upload and download bill photos.
-- When two devices change the same row, the latest `updated_at` wins.
-- A token per device, created and removed with a command-line tool on the Pi, so a phone can be cut off when someone leaves.
-- Reached through Tailscale or a Cloudflare Tunnel, with no ports opened on the router.
-- A nightly backup of the database and photos (a `systemd` timer), keeping the last 14.
-- In the app: *Settings → Sync* takes the Pi's address and the token; it syncs on start, after each save and when the phone comes back online.
+- **Supabase project** set up from files in the repo (`supabase/migrations/`, applied with the Supabase CLI), never by hand in the dashboard, so it can be rebuilt. The Postgres tables mirror the SQLite schema plus:
+  - `server_updated_at`, set by a trigger on every write. Pulls use it rather than the phone's clock, which may be wrong.
+  - `teams`, `team_members` (role: owner, editor or viewer) and `project_members`.
+- **Row Level Security on every table**: a person sees and changes only rows of projects they belong to; viewers only read. This is what keeps data private, because the Supabase URL and its public (anon) key are in the app and the web version and anyone can see them. The `service_role` key bypasses these rules: it never goes in the app, the web version or the repo (only, if ever needed, in a GitHub secret).
+- **Bill photos** go to a private Supabase Storage bucket under `<project>/<hash>.jpg`, with the same per-project rules.
+- **Sign-in:** Supabase Auth with Google sign-in or an email link (no passwords to forget). The owner invites people by email from *Settings → Team*.
+- **Sync** in `packages/core` (`sync.ts`, tested without a phone), using `@supabase/supabase-js`:
+  - Push: send the rows changed since the last push (upsert), then the photos Supabase hasn't got.
+  - Pull: fetch rows with `server_updated_at` after the last pull, per table, and write them into SQLite in one transaction.
+  - When two people change the same row, the later save wins. Lists are made of many small rows (each line, each entry is its own row), so two people adding lines to the same list don't overwrite each other; only editing the very same line at the same time does.
+  - Runs on start, after each save, when the phone comes back online, and from a *Sync now* button.
+- **First sync** on a phone that already has data: upload everything once, with a progress bar. If two phones already hold different copies of the same lists (from restoring one backup on both), show it and ask which to keep; never merge silently.
+- **In the app:** *Settings → Sync* to sign in, see the last sync time and anything waiting to go up. A small status in the header when changes are waiting or sync fails, in plain words ("3 changes waiting for signal").
+- **Backups:** *Save backup* keeps working. Supabase Pro has daily backups; on the free tier, a weekly GitHub Actions job exports the database to a private place.
 
-### Pi 3: web version
+### Sync 3: web version on GitHub Pages (MINOR)
 
-- React Native Web (Expo), served by the Pi, with a login per person.
-- It reads and writes through the Pi's data rather than keeping its own copy.
-- For the office: reviewing lists, comparing quotes, site reports, printing. Reading bill photos stays on the phones.
+- React Native Web through Expo: `npx expo export --platform web` in `apps/native`, built and published by a CI job (`actions/deploy-pages`) on every merge to `main`.
+- The site is served from `https://parikshit99.github.io/nirman/`, so Expo's `baseUrl` is `/nirman/`; `index.html` is copied to `404.html` so links to a screen open after a refresh.
+- Data: the web version reads and writes Supabase directly (no SQLite copy), through the same repository functions behind a Supabase-backed `Db`-like layer, or a separate read/write module in `packages/core` if the SQL doesn't map cleanly. Decide in this session after trying one screen. (`expo-sqlite` on the web needs response headers GitHub Pages can't send, so a full local copy in the browser is not the plan.)
+- Android-only pieces get a web version or are hidden: reading bill photos (hidden; use the phone), `renderPdf` (show the PDF in the browser instead), `shareFiles` (download the file), haptics (nothing).
+- Live updates: the web version subscribes to Supabase Realtime for the open project, so a purchase saved on site appears in the office without a refresh.
+- Layout: the wide-screen layout (tabs in the header, form on the left); it must still work on a phone browser.
+- For the office: reviewing lists, comparing quotes, site reports, statements, printing.
+- No secrets in the build: only the Supabase URL and anon key, which are public by design. CI checks the built site for anything that looks like a Google API key or a `service_role` key, as it does for the APK.
 
 ## Rolling back
 
@@ -209,6 +226,6 @@ Still not planned: swipe-to-delete (UX guideline: delete from the edit view only
 - [x] Phase 6: Labour, site report, sharing
 - [x] Phase 7: Settings, first launch, 7.0
 - [ ] Phase 8: clean up
-- [ ] Pi 1: sync groundwork
-- [ ] Pi 2: server
-- [ ] Pi 3: web version
+- [ ] Sync 1: groundwork
+- [ ] Sync 2: Supabase and sync on the phones
+- [ ] Sync 3: web version on GitHub Pages
