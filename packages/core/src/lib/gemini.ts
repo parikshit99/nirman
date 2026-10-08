@@ -236,7 +236,7 @@ export function createGeminiExtractor(apiKey: string, model: string, onModelRepl
     async extract(req) {
       const output = await generate(
         contentParts(req.text, req.images, IMAGE_INSTRUCTION, TEXT_INSTRUCTION),
-        buildSystemInstruction({ learning: req.learning, category: req.category, captureDate: req.capture_date }),
+        buildSystemInstruction({ learning: req.learning, materials: req.materials, category: req.category, captureDate: req.capture_date }),
         RESPONSE_SCHEMA,
       );
       return parseExtractionOutput(output, loadConversions());

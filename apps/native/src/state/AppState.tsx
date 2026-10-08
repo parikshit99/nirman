@@ -198,6 +198,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       deleteAllHistory: write(repo.deleteAllHistory),
       bulkEditMaterials: write(repo.bulkEditMaterials),
       renameMaterial: write(repo.renameMaterial),
+      undoMatch: write(repo.undoMatch),
       hideMaterial: write(repo.hideMaterial),
       hideMaterials: write(repo.hideMaterials),
       /** Delete from Data after the undo window; the card shows struck through until then. */

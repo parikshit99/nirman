@@ -11,12 +11,14 @@ import { DEFAULT_CONVERSIONS, toBilledUnits, type ConversionSettings } from './c
 
 export interface PromptOptions {
   learning?: LearningMap;
+  /** Names already used for materials, so the same thing gets the same name every time. */
+  materials?: { name: string; unit: string }[];
   category?: string;
   /** YYYY-MM-DD used when the source has no date. */
   captureDate: string;
 }
 
-export function buildSystemInstruction({ learning, category, captureDate }: PromptOptions): string {
+export function buildSystemInstruction({ learning, materials, category, captureDate }: PromptOptions): string {
   const categoryContext = category
     ? `\n\nWORK CATEGORY CONTEXT: The materials are for a "${category}" task. Please interpret generic terms accordingly. For example, if task is "Electrical", "tape" means "PVC Electrical Tape". If "Plumbing", it means "Teflon Tape". If "Painter", it means "Masking Tape". Make sure to include the specific type in the item_name based on this category.`
     : '';
@@ -44,6 +46,7 @@ export function buildSystemInstruction({ learning, category, captureDate }: Prom
          unit "sqft"; if only a count of pieces is written, give it with unit "piece".
        - Otherwise leave ordered_as "".
     ${learningContext(learning)}
+    ${materialsContext(materials)}
     ${categoryContext}
 
     IMPORTANT: Return a JSON array of objects conforming to the provided schema.
@@ -62,6 +65,14 @@ function learningContext(learning?: LearningMap): string {
   return entries.length > 0
     ? `\n\nUSER PREFERENCES (Follow these rules strictly based on user's past corrections):
        ${entries.map(([term, pref]) => `- When you see ${quote(term)}, always use name: ${quote(pref.item_name)} and unit: ${quote(pref.unit)}`).join('\n')}`
+    : '';
+}
+
+function materialsContext(materials?: { name: string; unit: string }[]): string {
+  return materials?.length
+    ? `\n\nKNOWN MATERIALS (name | unit): when an item is one of these (another spelling, a short form or a brand of it),
+       use exactly this item_name, and its unit where the bill's unit is of the same kind. Otherwise name it as usual.
+       ${materials.map((m) => `- ${quote(m.name)}${m.unit ? ` | ${quote(m.unit)}` : ''}`).join('\n')}`
     : '';
 }
 

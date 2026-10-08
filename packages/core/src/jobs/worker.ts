@@ -1,5 +1,5 @@
-import { boxesToRows, matchQuoteLines, parseBill, todayISO, variantLabel, type BillReading, type LearnedTermRow, type MaterialInput, type TextBox } from '@nirman/shared';
-import { completeJob, completeQuoteJob, getJobImages, learningMap, listItems, saveTrainingSample, setJobStatus, type Job } from '../data/repo.ts';
+import { boxesToRows, extractedMaterialSchema, matchQuoteLines, namesForReading, parseBill, standardizeLine, todayISO, variantLabel, type BillReading, type LearnedTermRow, type MaterialInput, type TextBox } from '@nirman/shared';
+import { completeJob, completeQuoteJob, getJobImages, knownMaterials, learningMap, listItems, saveTrainingSample, setJobStatus, type Job } from '../data/repo.ts';
 import type { Db } from '../data/sql.ts';
 import { classifyError, createGeminiExtractor, type Extractor } from '../lib/gemini.ts';
 import { log, scrub } from '../lib/diagnostics.ts';
@@ -177,7 +177,14 @@ export class JobWorker {
       const images = await getJobImages(this.db, job.id);
       facts.photos = images.length;
       const learning = learningMap(await this.db.all<LearnedTermRow>('SELECT * FROM learned_terms'));
-      const finish = async (items: MaterialInput[], engine: string, ocrText = '') => {
+      const known = job.quote_id ? [] : await knownMaterials(this.db);
+      const finish = async (read: MaterialInput[], engine: string, ocrText = '') => {
+        // One name per material: matched to Rates (or the starter catalog), keeping what was read so it can be undone.
+        const items = read.map((m) => {
+          const { line, readAs } = standardizeLine(extractedMaterialSchema.parse(m), known, learning);
+          return readAs ? { ...line, read_as: JSON.stringify(readAs) } : line;
+        });
+        facts.matched = items.filter((i) => i.read_as).length;
         const ids = await completeJob(this.db, job.id, items);
         if (collectTraining && images.length) await saveTrainingSample(this.db, { engine, ocr_text: ocrText, images, item_ids: ids, category: job.category });
       };
@@ -276,6 +283,7 @@ export class JobWorker {
         category: job.category || undefined,
         capture_date: job.capture_date || todayISO(),
         learning,
+        materials: namesForReading(known),
       });
       if (items.length === 0) {
         await setJobStatus(this.db, job.id, 'failed', 'No items detected. Make sure the photo or text is clear, then retry.');

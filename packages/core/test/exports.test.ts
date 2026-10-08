@@ -4,7 +4,7 @@ import { listSheet } from '../src/lib/exports.ts';
 
 const item = (over: Partial<ItemRow>): ItemRow => ({
   id: 'i', list_id: 'l', item_name: 'Cement', original_term: '', quantity: 10, unit: 'Bag', unit_price: 380, total_amount: 3800,
-  vendor: 'Sharma', date: '2026-10-05', brand: 'UltraTech', model: '', spec: '53 grade', color: '', delivered_at: '', ordered_as: '', photo_id: '', rates_excluded: 0, created_at: '', updated_at: '', ...over,
+  vendor: 'Sharma', date: '2026-10-05', brand: 'UltraTech', model: '', spec: '53 grade', color: '', delivered_at: '', ordered_as: '', photo_id: '', rates_excluded: 0, read_as: '', created_at: '', updated_at: '', ...over,
 });
 const values = (rows: ReturnType<typeof listSheet>) =>
   rows.map((r) => r.map((c) => (c && typeof c === 'object' && 'value' in c ? c.value : c)));

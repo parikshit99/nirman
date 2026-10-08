@@ -10,6 +10,10 @@ import {
   dataTables,
   tableColumns,
   todayISO,
+  unitFactor,
+  unmatchLine,
+  type KnownMaterial,
+  type ReadAs,
   type CategoryRow,
   type ContractEntryRow,
   type ContractRow,
@@ -332,6 +336,7 @@ async function insertMaterials(tx: SqlExecutor, listId: string, input: MaterialI
       ordered_as: m.ordered_as,
       photo_id: photoId,
       rates_excluded: 0,
+      read_as: m.read_as ?? '',
       created_at: ts,
       updated_at: ts,
     });
@@ -541,11 +546,14 @@ async function materialRowsTx(tx: SqlExecutor, keys: Set<string>) {
   return { items: items.filter(inSet), rates: rates.filter(inSet), learning, sharedTerms };
 }
 
-async function renameMaterialTx(tx: SqlExecutor, keys: Set<string>, to: { item_name: string; unit: string }) {
+async function renameMaterialTx(tx: SqlExecutor, keys: Set<string>, to: { item_name: string; unit: string }, convert = false) {
   const item_name = to.item_name.trim();
   const unit = to.unit.trim() || 'unit';
   if (!item_name) return;
   const { items, rates, learning, sharedTerms } = await materialRowsTx(tx, keys);
+  // Merging per MT into per kg: quantities and rates follow the unit (the total stays as billed). A unit simply
+  // corrected (convert false), or one that doesn't convert (Bag → kg), keeps its numbers.
+  const factorOf = (row: { item_name: string; unit: string; original_term?: string }) => (convert ? (unitFactor(applyLearning(learning, row).unit, unit) ?? 1) : 1);
   // A learned word already shows all its rows as this material, so it must follow the rename. A new
   // word is remembered only if nothing outside this material uses it; a learned word maps to one
   // name and unit, so it would otherwise pull other lines in.
@@ -555,11 +563,21 @@ async function renameMaterialTx(tx: SqlExecutor, keys: Set<string>, to: { item_n
     }
   };
   for (const item of items) {
-    await touch(tx, 'items', { ...item, item_name, unit });
+    const f = factorOf(item);
+    const converted =
+      f === 1
+        ? {}
+        : {
+            quantity: Math.round(item.quantity * f * 1000) / 1000,
+            unit_price: Math.round((item.unit_price / f) * 100) / 100,
+            ordered_as: [item.ordered_as, `${item.quantity} ${applyLearning(learning, item).unit}`].filter(Boolean).join('; '),
+          };
+    await touch(tx, 'items', { ...item, ...converted, item_name, unit });
     await remember(termOf(item));
   }
   for (const rate of rates) {
-    await writeRow(tx, 'indexed_rates', { ...rate, item_name, unit });
+    const f = factorOf(rate);
+    await writeRow(tx, 'indexed_rates', { ...rate, ...(f === 1 ? {} : { price: Math.round((rate.price / f) * 100) / 100 }), item_name, unit });
     await remember(termOf(rate));
   }
   // Renaming onto a hidden material shows it again rather than making these prices vanish too.
@@ -569,10 +587,54 @@ async function renameMaterialTx(tx: SqlExecutor, keys: Set<string>, to: { item_n
 /**
  * Rename a material or change its unit everywhere it is used. Renaming to an
  * existing material merges the two. The old names are remembered, so future
- * readings of the same words get the new name too.
+ * readings of the same words get the new name too. With `convert`, quantities
+ * and rates are converted when the unit changes within a kind (MT → kg, brass → cft).
  */
-export async function renameMaterial(db: Db, key: string, to: { item_name: string; unit: string }) {
-  await db.transaction((tx) => renameMaterialTx(tx, new Set([key]), to));
+export async function renameMaterial(db: Db, key: string, to: { item_name: string; unit: string }, convert = false) {
+  await db.transaction((tx) => renameMaterialTx(tx, new Set([key]), to, convert));
+}
+
+/**
+ * Materials in Rates (by their learned names), with how many lines and rates use each: what a new reading is
+ * matched to. Lines and materials deleted from Rates are left out.
+ */
+export async function knownMaterials(db: Db): Promise<KnownMaterial[]> {
+  const learning = learningMap(await db.all<LearnedTermRow>(selectAll('learned_terms', 'id')));
+  const hidden = new Set((await db.all<{ id: string }>('SELECT id FROM hidden_materials')).map((h) => h.id));
+  const rows = [
+    ...(await db.all<{ item_name: string; unit: string; original_term: string }>(
+      `SELECT item_name, unit, original_term FROM items WHERE rates_excluded = 0
+       AND list_id IN (SELECT id FROM lists WHERE status = 'saved' OR (status = 'draft' AND kind = 'audit'))`,
+    )),
+    ...(await db.all<{ item_name: string; unit: string }>('SELECT item_name, unit FROM indexed_rates')),
+  ];
+  const byKey = new Map<string, KnownMaterial>();
+  for (const row of rows) {
+    if (!row.item_name.trim()) continue;
+    const { item_name, unit } = applyLearning(learning, row);
+    const key = materialKey(item_name, unit);
+    if (hidden.has(key)) continue;
+    const k = byKey.get(key);
+    if (k) k.uses = (k.uses ?? 0) + 1;
+    else byKey.set(key, { name: item_name, unit, uses: 1 });
+  }
+  return [...byKey.values()];
+}
+
+/** Put a matched line back as it was read (its own name and unit), and forget the match. */
+export async function undoMatch(db: Db, itemId: string) {
+  await db.transaction(async (tx) => {
+    const item = await getRow(tx, 'items', itemId);
+    if (!item?.read_as) return;
+    let read: ReadAs;
+    try {
+      read = JSON.parse(item.read_as) as ReadAs;
+    } catch {
+      return;
+    }
+    const line = unmatchLine(item, read);
+    await touch(tx, 'items', { ...line, total_amount: item.total_amount, read_as: '' });
+  });
 }
 
 /**
