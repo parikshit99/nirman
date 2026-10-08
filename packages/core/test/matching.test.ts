@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildItemDatabase, materialKey, type ExtractionRequest } from '@nirman/shared';
-import { addItems, enqueueJob, indexRates, knownMaterials, learningMap, loadSnapshot, renameMaterial, undoMatch } from '../src/data/repo.ts';
+import { addItems, addTypedItems, enqueueJob, indexRates, knownMaterials, learningMap, loadSnapshot, renameMaterial, undoMatch } from '../src/data/repo.ts';
 import type { Extractor } from '../src/lib/gemini.ts';
 import { JobWorker } from '../src/jobs/worker.ts';
 import { DEFAULT_SETTINGS } from '../src/lib/settings.ts';
@@ -36,6 +36,15 @@ describe('matching lines as they are read (#89)', () => {
     await undoMatch(db, matched.id);
     const undone = (await loadSnapshot(db)).items.find((i) => i.id === matched.id)!;
     expect(undone).toMatchObject({ item_name: 'Mount air', unit: 'pcs', quantity: 3, unit_price: 250, read_as: '' });
+  });
+
+  it('matches lines typed by hand the same way', async () => {
+    const db = await freshDb();
+    await addItems(db, DRAFT_IDS.audit, [line('Mountair', 'piece', 2, 240)]);
+    const [stored] = await addTypedItems(db, DRAFT_IDS.audit, [line('mount-air', 'Pcs', 1, 245)]);
+    expect(stored).toMatchObject({ item_name: 'Mountair', unit: 'piece' });
+    const typed = (await loadSnapshot(db)).items.find((i) => i.read_as)!;
+    expect(typed).toMatchObject({ item_name: 'Mountair', original_term: 'mount-air' });
   });
 
   it('converts a reading in MT to the kg its material is priced in', async () => {

@@ -58,7 +58,7 @@ Renaming a material in the app rewrites `item_name` and `unit` on all of its ite
 
 ### One name per material (since 7.1)
 
-When an entry is read (`standardizeLine`, `packages/shared/src/catalog.ts`, run by the worker before the lines are stored), each line gets one name:
+When an entry is read, or a line is typed with *Add item manually* (`standardizeLine` in `packages/shared/src/catalog.ts`, through `matchMaterials` in `repo.ts`, before the lines are stored), each line gets one name:
 1. A word already in `learned_terms` is left to it.
 2. Otherwise the closest material in Rates (`knownMaterials`: names after `learned_terms`, without deleted materials and BOQ-only lines) is used when the names are the same apart from case, spacing, punctuation or one letter (`nameSimilarity` ≥ 0.8; numbers and codes must agree), and the units are the same kind.
 3. Otherwise the built-in starter catalog (`CATALOG`: cement, TMT bar, sand, aggregate, bricks, pipes…) by the words on the bill, including brand short forms ("UT" → UltraTech cement).

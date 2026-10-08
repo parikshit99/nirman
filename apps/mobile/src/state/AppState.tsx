@@ -185,6 +185,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       deleteProject: write(repo.deleteProject),
       moveList: write(repo.moveList),
       addItems: write(repo.addItems),
+      addTypedItems: write(repo.addTypedItems),
       createManualQuote: write(repo.createManualQuote),
       updateItem: write(repo.updateItem),
       setDelivered: write(repo.setDelivered),

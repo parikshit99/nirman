@@ -10,6 +10,7 @@ import {
   dataTables,
   tableColumns,
   todayISO,
+  standardizeLine,
   unitFactor,
   unmatchLine,
   type KnownMaterial,
@@ -356,6 +357,26 @@ export async function setDelivered(db: Db, ids: string[], date: string) {
 
 export async function addItems(db: Db, listId: string, materials: MaterialInput[]) {
   await db.transaction((tx) => insertMaterials(tx, listId, materials));
+}
+
+/**
+ * One name per material for lines just read or typed: each is matched to a material in Rates or the starter catalog
+ * (`standardizeLine`), keeping what was written in `read_as` so the match can be undone.
+ */
+export async function matchMaterials(db: Db, materials: MaterialInput[]): Promise<MaterialInput[]> {
+  const known = await knownMaterials(db);
+  const learning = learningMap(await db.all<LearnedTermRow>(selectAll('learned_terms', 'id')));
+  return materials.map((m) => {
+    const { line, readAs } = standardizeLine(extractedMaterialSchema.parse(m), known, learning);
+    return readAs ? { ...line, read_as: JSON.stringify(readAs) } : line;
+  });
+}
+
+/** Add lines typed by hand, matched like read ones ("Mount air" typed today joins "Mountair" in Rates). Returns them as stored. */
+export async function addTypedItems(db: Db, listId: string, materials: MaterialInput[]): Promise<MaterialInput[]> {
+  const matched = await matchMaterials(db, materials);
+  await addItems(db, listId, matched);
+  return matched;
 }
 
 export type ItemPatch = Partial<Pick<ItemRow, 'item_name' | 'quantity' | 'unit' | 'unit_price' | 'vendor' | 'date' | 'delivered_at' | 'ordered_as' | 'rates_excluded' | VariantField>>;

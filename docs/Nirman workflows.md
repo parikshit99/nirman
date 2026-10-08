@@ -79,7 +79,7 @@ flowchart LR
 
 Notes:
 - The 75% threshold is `PHONE_CONFIDENCE` in `worker.ts`.
-- **One name per material** (since 7.1, `standardizeLine`): a line whose name is a material already in Rates with a different spacing, punctuation or one letter off ("Mount air" / "Mountair") gets that name; otherwise one in the starter catalog ("Cement - UT" → Cement, brand UltraTech). A unit of the same kind is converted (2 MT → 2000 kg; the total stays). The line shows *Matched to Rates* with *Undo*. Words the owner already merged keep their learned name.
+- **One name per material** (since 7.1, `standardizeLine`; lines typed with *Add item manually* too): a line whose name is a material already in Rates with a different spacing, punctuation or one letter off ("Mount air" / "Mountair") gets that name; otherwise one in the starter catalog ("Cement - UT" → Cement, brand UltraTech). A unit of the same kind is converted (2 MT → 2000 kg; the total stays). The line shows *Matched to Rates* with *Undo*. Words the owner already merged keep their learned name.
 - Temporary errors back off; 3 time-outs in a row stop the queue.
 - **Vendor quotes** follow the same path (since 5.3): read on the phone and each line matched to the BOQ there, so they work offline. Gemini is asked only when the phone is unsure and the phone is online. In phone-only mode a quote the phone can't read fails with "Use *Type rates*".
 
