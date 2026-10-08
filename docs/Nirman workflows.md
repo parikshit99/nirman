@@ -1,98 +1,188 @@
 # Nirman workflows
 
-How changes get from a branch to people's phones, and the routine jobs around that. **Update this file in the same PR whenever a workflow changes**: anything in `.github/` (workflows, `actions/`, `scripts/`), the release or version steps, signing, or how bugs come in.
+How bills, BOQs, vendor quotes and labour contracts move through the app: what goes in, what the phone does with it, where it is kept and what leaves the phone. Updated for **7.0** from the *Nirman Workflows* diagrams (drawn at 5.0).
 
-## Overview
+**Keep this file current.** When a change alters one of these flows, update the section and its diagram in the same PR. That covers a new way in, a reading step, where prices go, saving, quotes, labour, what leaves the phone, or how an update reaches users. The diagrams are Mermaid, which GitHub draws.
 
-1. **Branch → PR.** CI runs on every pull request: tests, both app builds, the upgrade test.
-2. **Merge to `main`.** CI runs again and, if everything passes, publishes the APK as the `latest` release.
-3. **Users download** the APK from the stable link (README). It installs over the previous version and keeps their data.
-4. **Problems come back** through *Settings → Report a problem* (a GitHub issue labelled `bug`, with the on-phone log).
+Code these flows come from:
+- `packages/core/src/jobs/worker.ts` (reading)
+- `packages/core/src/data/repo.ts` (saving, quotes, contracts)
+- `packages/shared/src/domain.ts` (Rates, price checks)
+- the screens in `apps/native/src/features/`.
 
-## CI (`.github/workflows/ci.yml`)
+## A-01 Overview
 
-Runs on every push to `main`, every pull request, and by hand (*Run workflow*).
+Everything lives in one SQLite database on the phone, grouped by project (one site). The only outside service in daily use is Gemini, for bills the phone can't read by itself. Rates is the one view that spans all projects.
 
-| Job | What it does | Needs |
-|---|---|---|
-| `test` | `npm ci`, `npm run lint`, `npm test`, then builds the old app and runs its layout checks at 320–412 px (Playwright) | — |
-| `android` | Builds and signs the old Capacitor app (`apps/mobile`, 6.x). Not published: it keeps the fallback buildable and is installed first in the upgrade test | — |
-| `native` | Builds and signs the app that ships (`apps/native`) for arm64 (64-bit phones). This is the published APK. To support older 32-bit phones, add `armeabi-v7a` to `architectures` | — |
-| `native-test` | The same app built for x86_64, to run on CI's emulator | — |
-| `upgrade` | On an Android 14 emulator: installs 6.x with sample data (`apps/native/e2e/sample-backup.json`, turned into a 6.x database by `make-6x-db.ts`), installs 7.x over it, and checks lists and totals with Maestro (`apps/native/e2e/upgrade.yaml`). On failure it uploads a screenshot, the phone's log and Maestro's output as `upgrade-failure` | `android`, `native-test` |
-| `publish` | Only on `main`: publishes the `native` APK (see *Releases*) | `test`, `native`, `upgrade` |
+```mermaid
+flowchart LR
+  subgraph IN[Ways in]
+    P[Bill photo<br/>camera or Photo Picker]
+    V[Voice note]
+    T[Typed text]
+    W[Shared from WhatsApp]
+    M[Add item manually]
+  end
+  G([Gemini<br/>your own API key])
+  R[Read items<br/>queued; phone reads first,<br/>Gemini if unsure;<br/>learned names applied]
+  subgraph PRJ[Project = one site]
+    OL[Open purchase list<br/>rate, vendor, delivered]
+    OB[Open BOQ<br/>what is to be ordered]
+    LC[Labour contracts]
+    SL[Saved lists<br/>purchase lists and BOQs]
+  end
+  RT[[Rates<br/>every price, all projects]]
+  Q[Vendor quotes<br/>on a saved BOQ]
+  OUT[PDF · Excel · JPG<br/>preview, then Share]
+  SH([Share sheet<br/>WhatsApp · Drive · email])
 
-Nothing is published unless the tests, the build and the upgrade test all pass.
+  P & V & T & W --> R
+  R <-.-> G
+  R --> OL & OB
+  M -- no AI needed --> OL
+  OL & OB -- Save list moves it --> SL
+  SL -- Open: edit in place --> OL
+  OL -- rate entered --> RT
+  SL --> RT
+  SL --> Q -- confirmed --> RT
+  RT -. Last paid check .-> OL
+  SL & LC --> OUT --> SH
+```
 
-**Shared pieces:**
-- `.github/actions/build-native`: prebuild (`expo prebuild`), Gradle release build, signing and upload for `apps/native`.
-  - It is used by `native` and `native-test`.
-  - It caches Gradle and the compiled C++ (`ccache`, one cache per CPU type), so a run only recompiles what changed.
-- `.github/scripts/app-version.sh` sets the version (see *Versions*).
-- `.github/scripts/sign-apk.sh`:
-  - Signs with the release key and the rotation lineage from the old debug key, so every build installs as an update.
-  - Without the key secrets, it falls back to the debug key with a warning.
-  - **Fails the build if the APK contains anything that looks like a Google API key.**
-- `.github/scripts/upgrade-test.sh` is the emulator script of the `upgrade` job.
-- `.github/scripts/publish.sh` publishes the releases.
+Saving **moves** the open list into Saved, and an empty one is ready for the next bill (since 6.0). *Open* on a saved list edits that list itself; nothing is copied.
 
-## Versions
+Also on the phone:
+- **Backup** (`.zip`, by hand): everything, bill photos included, except entries not yet read.
+- **Problem log:** *Settings → Report a problem* / *Share log*.
+- **Bill photos:** kept with their lines.
 
-- **MAJOR.MINOR** is set by hand in `apps/native/package.json`. Deciding the size is covered in [Code guideline](Code%20guideline.md#versions).
-- **PATCH** is counted by `app-version.sh`: the number of commits since MAJOR.MINOR last changed.
-- **Android's `versionCode`** is the CI run number, so every build is newer than the last.
+## A-02 Reading a bill
 
-## Releases
+Every photo, voice note or text becomes a queued entry. The worker runs on app start, resume, reconnect and after each new entry, one entry at a time. *Settings → How bills are read* picks phone first (default), phone only, or Gemini always.
 
-`publish.sh`, run by the `publish` job:
-1. Moves the `latest` tag and adds `v<version>`.
-2. Writes the release notes: the newest CHANGELOG section (the same text as the in-app *What's new*), the version, the commit, the date in IST and the latest change's title.
-3. Uploads the APK as `nirman.apk` to the `latest` release. The README's download link points there and never changes.
-4. Uploads the same APK as `nirman-<version>.apk` to a `v<version>` release, and keeps the 5 newest version releases. Older releases are deleted; their tags stay.
+```mermaid
+flowchart LR
+  E[Entry queued<br/>pending] --> PH[Read on phone<br/>ML Kit, offline]
+  PH --> S{At least 75% sure?}
+  S -- yes --> OK[Lines added to the open list,<br/>photo kept with them]
+  S -- no --> GA{Gemini allowed<br/>and a key?}
+  GA -- no --> F1[Failed: type the items]
+  GA -- yes --> ON{Online?}
+  ON -- no --> WT[Waits for a connection]
+  ON -- yes --> GM[Gemini reads<br/>processing] --> ANY{Any items?}
+  ANY -- yes --> OK
+  ANY -- no --> F2[Failed: retry or type it]
+  E -. Gemini always: skip the phone .-> GA
+  WT -. runs again on start, resume, reconnect .-> E
+```
 
-**Making a feature release:**
-1. Bump the minor number in `apps/native/package.json`.
-2. Add `## 7.1 — <title>` at the top of `CHANGELOG.md`, written for site supervisors.
-3. Merge. The CHANGELOG test fails if the version and the newest section don't match.
+Notes:
+- The 75% threshold is `PHONE_CONFIDENCE` in `worker.ts`.
+- Temporary errors back off; 3 time-outs in a row stop the queue.
+- **Vendor quotes** follow the same path (since 5.3): read on the phone and each line matched to the BOQ there, so they work offline. Gemini is asked only when the phone is unsure and the phone is online. In phone-only mode a quote the phone can't read fails with "Use *Type rates*".
 
-**A fix** needs nothing extra: merging publishes it as the next patch.
+## A-03 Where prices go
 
-## Rolling back (`.github/workflows/fallback.yml`)
+There is no price table to keep in step. Rates is worked out from the lines themselves each time something changes, so editing or deleting a line changes Rates with it.
 
-*Build 6.x fallback*, run by hand only (*Actions → Build 6.x fallback → Run workflow*). Use it if 7.x loses data, won't start, or reading bills breaks and can't be fixed within a day.
+```mermaid
+flowchart LR
+  A[Open purchase list<br/>as soon as a rate is entered] --> DB
+  B[Saved purchase lists<br/>every project] --> DB
+  C[Confirmed vendor quotes<br/>stored as added rates] --> DB
+  D[Today's price<br/>added by hand in Rates] --> DB
+  DB[[Rates · buildItemDatabase<br/>− lines left out of Rates<br/>− materials deleted, up to that day<br/>→ learned names merge spellings<br/>→ grouped by brand / size / colour]]
+  DB --> L[Last paid check on each line<br/>higher red, lower green ±2%]
+  DB --> RT[Rates tab<br/>trend, range, vendors, filters, edit]
+  DB --> QC[Quote comparison<br/>vendor rate vs last paid]
+  DB -. edits in Rates write back to the line .-> B
+```
 
-What it does:
-- Builds the old Capacitor app from current `main`.
-- Gives it a `versionCode` one above CI's newest run, so phones accept it as an update.
-- Publishes it as `latest`, with the version `<version>-fallback.<run>` and a note at the top of the release.
-- It uses the same `packages/core`, so it opens the same database with every migration.
-- Users keep their data but paste the Gemini key again.
+- **Last paid** and the quote comparison check this project's last price first. Only when this site has none is another site's price shown, with its address ("Last paid at Dwarka"). Since 5.1.
+- A price check never compares a line with itself.
 
-Once 7.x is fixed, merging the fix publishes a newer 7.x as usual. Delete this workflow in Phase 8 of [react-native-plan.md](react-native-plan.md).
+## A-04 BOQ and vendor quotes
 
-**For one user,** an older APK can be installed by hand from a `v<version>` release: *Save backup*, uninstall, install, *Restore*.
+A BOQ is what has to be ordered. Once saved, it can be sent out as an order slip, collect vendor quotes, and have lines ticked off as they arrive.
 
-## Secrets
+```mermaid
+flowchart LR
+  OB[Open BOQ<br/>items, quantities] -- Save list --> SB[Saved BOQ]
+  SB --> OS[Order slip<br/>no rates; deliver to, date]
+  SB --> DT[Delivered ticks<br/>what is still to come]
+  SB --> VR[Vendor reply<br/>photo, WhatsApp share or Type rates]
+  VR --> MT[Read and matched<br/>line → BOQ Sr. no.<br/>phone first, Gemini if unsure]
+  VR -. typed rates skip reading .-> RV
+  MT --> RV[You review<br/>match the rest, Confirm]
+  RV --> CMP[Comparison<br/>lowest marked]
+  RV --> RTS[Rates<br/>under the BOQ's names]
+```
 
-| Secret | Used by | What |
-|---|---|---|
-| `RELEASE_KEYSTORE_BASE64` | `sign-apk.sh` (all builds) | The release signing key (p12, base64). It must stay the same forever: a different key means phones refuse the update |
-| `RELEASE_KEYSTORE_PASSWORD` | `sign-apk.sh` | Its password |
+Confirmed prices are saved under the BOQ's item names, so vendors line up side by side.
 
-The Gemini API key is never a secret here; each user enters their own on the phone.
+## A-05 Labour contracts
 
-## Bugs from users
+Each contract is a running account with one contractor, for one job on the project's site.
 
-1. The user taps *Settings → Report a problem*. This opens a pre-filled GitHub issue labelled `bug`, with the on-phone log.
-2. Read the log in the issue: the steps carry what was done, without photos or the key.
-3. Fix on a branch, with a test that reproduces it where possible, then follow the overview above.
+```mermaid
+flowchart LR
+  C[Contract<br/>rate per unit or lump sum,<br/>retention %, estimate] --> WM[Work measured]
+  C --> PY[Payments]
+  C --> AD["Advances (kharcha)"]
+  C --> DD[Deductions]
+  WM & PY & AD & DD --> BAL[Balance due<br/>retention held;<br/>Paid ahead in red if paid<br/>more than the work]
+  BAL --> CL[Close contract<br/>releases the retention]
+  BAL --> ST[Statement · Site report<br/>PDF, Excel or JPG]
+```
 
-## Working on a change (developers and Claude)
+Labour entries never feed Rates. The project's site report brings purchases and labour together.
 
-1. Branch from the latest `main`.
-2. Read the guideline for what you're changing ([Code](Code%20guideline.md), [UI](UI%20guideline.md), [UX](UX%20guideline.md)).
-3. Before pushing:
-   - `npm run lint`, `npm test`, `npm run build`
-   - after changing `apps/native`: `npx expo export --platform android` in `apps/native`.
-4. Open a PR and wait for CI. If the `upgrade` job fails, download `upgrade-failure` from the run.
-5. Merge to `main`. The release follows automatically.
+## A-06 What leaves the phone
+
+Nirman has no server or account (until the Raspberry Pi phases of [react-native-plan.md](react-native-plan.md)). Data leaves the phone only along these paths, and only Gemini runs without a tap from the user each time.
+
+| Path | What goes | When | Where to |
+|---|---|---|---|
+| Gemini reading | The photo or text of one entry, learned names, the BOQ lines for a quote | Automatically, for entries the phone can't read with confidence (or always, if chosen) | Google Gemini, with the user's own key |
+| Share | A PDF, Excel sheet or JPG the user previewed | On Share | Any app from the share sheet |
+| Backup | Everything as one `.zip`, bill photos included; not entries waiting to be read | On *Save backup*; a reminder after a week | Wherever the user saves it |
+| Report a problem | The on-phone log: steps, item names, rates, vendors; never photos or the key | On *Report a problem* or *Share log* | A GitHub issue, or any app |
+| Update | Nothing goes out; the new APK comes in | When the user downloads it | GitHub release (sign-in needed while the repo is private) |
+
+## A-07 Shipping an update
+
+How a change reaches phones. CI is `.github/workflows/ci.yml`; the checks to run before pushing are in [Code guideline](Code%20guideline.md).
+
+```mermaid
+flowchart LR
+  BR[Branch + PR] --> CI{CI}
+  CI --> TS[test: lint, unit tests,<br/>old app's layout checks]
+  CI --> NB[native: build + sign<br/>apps/native, arm64]
+  CI --> UP[upgrade: 6.x with data,<br/>7.x installed over it,<br/>lists and totals checked]
+  TS & NB & UP -- all pass, on main --> PB[publish: latest release<br/>+ v‹version›, keeps 5]
+  PB --> PHN[Users download nirman.apk,<br/>installs over, data kept]
+  PHN -. Report a problem .-> ISS[GitHub issue labelled bug,<br/>with the log] -.-> BR
+  FB[Build 6.x fallback<br/>by hand, only if 7.x breaks] -.-> PB
+```
+
+How the build is signed and released:
+- **Signing:** every APK is signed with the same release key, with its rotation lineage (`.github/scripts/sign-apk.sh`). The build fails if the APK contains anything that looks like an API key.
+- **Version:** MAJOR.MINOR comes from `apps/native/package.json`; PATCH is the number of commits since it changed (`app-version.sh`). `versionCode` is the CI run number.
+- **Release notes** are the newest CHANGELOG section, the same text as *What's new* in the app.
+- **Rolling back:** *Build 6.x fallback* (`.github/workflows/fallback.yml`) builds the old app from `main` with a higher `versionCode`. Users keep their data and paste the Gemini key again. It is removed in Phase 8.
+
+## A-08 Points to analyse
+
+Places where the flows depend on the user or on one device.
+
+1. **One phone holds everything.** There is no sync yet, so a lost phone loses whatever came after the last backup. The Raspberry Pi phases fix this.
+2. **Backups are by hand.** A reminder prompts after a week, but nothing is saved off the phone automatically.
+3. **Unclear handwriting needs Gemini and a connection.** Phone-only mode means typing those in.
+4. **Rates mix all sites.** Price checks prefer this site's price; *Leave out of Rates* and the site filter in Rates are the other controls.
+5. **Updates are manual.** New versions are downloaded from GitHub. Going back to an older one needs: backup, uninstall, install, restore. A fallback build installs over 7.x instead.
+6. **After 7.0, the Gemini key is pasted once again.** Until then, entries that need Gemini wait.
+
+Resolved since 5.0:
+- Saving no longer copies lines (6.0).
+- Vendor quotes no longer need Gemini (5.3).
+- Backups include bill photos (5.1).
