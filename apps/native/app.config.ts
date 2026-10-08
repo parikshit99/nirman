@@ -1,4 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { ExpoConfig } from 'expo/config';
+
+/** The newest section of CHANGELOG.md: this version's What's new, built into the app. */
+function latestChangelog(): string {
+  const text = readFileSync(join(__dirname, '../../CHANGELOG.md'), 'utf8');
+  const start = text.indexOf('\n## ');
+  if (start < 0) return '';
+  const end = text.indexOf('\n## ', start + 1);
+  return text.slice(start + 1, end < 0 ? undefined : end).trim();
+}
 
 // The same app as apps/mobile (same id, same signing in CI), so 7.0 installs as an update over 6.x.
 const config: ExpoConfig = {
@@ -32,6 +43,7 @@ const config: ExpoConfig = {
       { action: 'SEND', category: ['DEFAULT'], data: [{ mimeType: 'text/plain' }] },
     ],
   },
+  extra: { changelog: latestChangelog() },
   plugins: [
     ['react-native-bottom-tabs', { theme: 'material3' }],
     'expo-sqlite',

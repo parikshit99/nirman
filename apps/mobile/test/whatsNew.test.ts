@@ -10,7 +10,8 @@ describe("what's new", () => {
   });
 
   it('ships the notes for this version series', async () => {
-    const { default: pkg } = await import('../package.json', { with: { type: 'json' } });
+    // Since 7.0 the version is set in the React Native app's package.json (it is what ships).
+    const { default: pkg } = await import('../../native/package.json', { with: { type: 'json' } });
     expect(latestNotes?.version).toBe(pkg.version.split('.').slice(0, 2).join('.'));
   });
 });

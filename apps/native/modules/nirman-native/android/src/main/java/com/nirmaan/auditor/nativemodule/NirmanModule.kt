@@ -50,6 +50,43 @@ class NirmanModule : Module() {
     /** Full path of a database file in the app's databases folder, where @capacitor-community/sqlite keeps it. */
     Function("databasePath") { name: String -> context.getDatabasePath(name).absolutePath }
 
+    // --- First launch after 6.x -------------------------------------------------------------
+    // The databases folder is outside what expo-file-system may touch, so these are done here.
+
+    /**
+     * The database file (and its -wal/-journal companions), the free space beside it, and whether the
+     * Capacitor app has left files (its WebView folder), which means it had data on this phone.
+     */
+    Function("databaseInfo") { name: String ->
+      val file = context.getDatabasePath(name)
+      val dataDir = context.filesDir.parentFile
+      mapOf(
+        "exists" to file.exists(),
+        "size" to companions(file).sumOf { it.length().toDouble() },
+        "freeBytes" to (file.parentFile?.takeIf { it.exists() } ?: context.filesDir).usableSpace.toDouble(),
+        "otherAppFiles" to (dataDir != null && File(dataDir, "app_webview").exists())
+      )
+    }
+
+    /** Copies a database file and its companions to `to` (same folder); false if there was nothing to copy. */
+    AsyncFunction("copyDatabase") { from: String, to: String ->
+      val source = context.getDatabasePath(from)
+      if (!source.exists()) return@AsyncFunction false
+      val target = context.getDatabasePath(to)
+      for (file in companions(source)) file.copyTo(File(target.path + file.path.removePrefix(source.path)), overwrite = true)
+      true
+    }
+
+    /** Renames a database file and its companions to `to` (same folder), so a new one can start in its place. */
+    Function("setDatabaseAside") { from: String, to: String ->
+      val source = context.getDatabasePath(from)
+      val target = context.getDatabasePath(to)
+      for (file in companions(source)) file.renameTo(File(target.path + file.path.removePrefix(source.path)))
+    }
+
+    /** Whether a file in the databases folder exists. */
+    Function("databaseExists") { name: String -> context.getDatabasePath(name).exists() }
+
     // --- TextReader -------------------------------------------------------------------------
     // Reads the text on a bill photo on the phone itself (Google ML Kit text recognition, model
     // bundled in the app), so no internet or API key is needed. Returns each line with its
@@ -190,6 +227,10 @@ class NirmanModule : Module() {
     if (last == 0 || cropped >= height * 0.95) return bitmap
     return Bitmap.createBitmap(bitmap, 0, 0, width, cropped)
   }
+
+  /** A SQLite file and those that belong with it (write-ahead log, shared memory, rollback journal) that exist. */
+  private fun companions(file: File): List<File> =
+    listOf("", "-wal", "-shm", "-journal").map { File(file.path + it) }.filter { it.exists() }
 
   private fun handle(intent: Intent?): Boolean {
     if (intent == null) return false

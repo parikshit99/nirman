@@ -3,21 +3,23 @@ import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, View, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import type { Snapshot } from '@nirman/core';
-import { logError } from '@nirman/core';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DialogProvider } from './components/ui/Dialogs';
-import { startServices } from './data/services';
+import { restoreBeforeStart, startApp, type StartResult } from './data/startup';
 import { LabourScreen } from './features/LabourScreen';
 import { ListScreen } from './features/ListScreen';
 import { ProjectsHost } from './features/ProjectsSheet';
 import { QuotesHost, useQuotes } from './features/QuotesHost';
 import { RatesScreen } from './features/RatesScreen';
 import { SavedScreen } from './features/SavedScreen';
+import { SettingsHost } from './features/SettingsHost';
+import { ShareHost } from './features/ShareHost';
+import { StartProblem } from './features/StartProblem';
 import { SiteReportHost, useSiteReport } from './features/SiteReport';
-import { AppStateProvider, useAppState, type Services } from './state/AppState';
+import { navigationRef } from './navigation';
+import { AppStateProvider, useAppState } from './state/AppState';
 import { dark, light, useColors } from './theme';
 
 const ICONS = {
@@ -80,41 +82,47 @@ function Tabs() {
   );
 }
 
-/** Opens the database, then shows the app; says so if it can't be opened. */
+/** Opens the data (on the first launch after 6.x: finds, copies and checks it first), then shows the app; if it can't, says so and offers Restore from backup. */
 function Boot() {
   const c = useColors();
-  const [ready, setReady] = useState<{ services: Services; initial: Snapshot } | null>(null);
-  const [failure, setFailure] = useState<Error | null>(null);
-  useEffect(() => {
-    startServices().then(setReady, (err: Error) => {
-      logError(err, 'startup');
-      setFailure(err);
-    });
-  }, []);
-  if (failure) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 8, backgroundColor: c.brandGray }}>
-        <Text style={{ fontSize: 18, fontWeight: '700', color: c.brandDark }}>Could not open the app's storage</Text>
-        <Text style={{ fontSize: 14, textAlign: 'center', color: c.gray500 }}>{failure.message}</Text>
-      </View>
-    );
-  }
-  if (!ready) {
+  const [result, setResult] = useState<StartResult | null>(null);
+  const start = (opts?: Parameters<typeof startApp>[0]) => {
+    setResult(null);
+    void startApp(opts).then(setResult);
+  };
+  useEffect(() => start(), []);
+  if (!result) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.brandGray }}>
         <ActivityIndicator color={c.brandPrimary} />
       </View>
     );
   }
+  if (!result.ok) {
+    return (
+      <StartProblem
+        problem={result.problem}
+        onContinue={start}
+        onRestore={async (file) => {
+          await restoreBeforeStart(file);
+          start({ withoutCopy: true, allowEmpty: true });
+        }}
+      />
+    );
+  }
   return (
-    <AppStateProvider services={ready.services} initial={ready.initial}>
+    <AppStateProvider services={result.services} initial={result.initial}>
       <ProjectsHost>
         <QuotesHost>
           <SiteReportHost>
-            <Stack.Navigator screenOptions={{ headerShown: false }}>
-              {/* Full screens (Sheet kind="screen") are native dialogs for now; pushed routes can go above the tabs here. */}
-              <Stack.Screen name="Home" component={Tabs} />
-            </Stack.Navigator>
+            <SettingsHost>
+              <ShareHost>
+                <Stack.Navigator screenOptions={{ headerShown: false }}>
+                  {/* Full screens (Sheet kind="screen") are native dialogs for now; pushed routes can go above the tabs here. */}
+                  <Stack.Screen name="Home" component={Tabs} />
+                </Stack.Navigator>
+              </ShareHost>
+            </SettingsHost>
           </SiteReportHost>
         </QuotesHost>
       </ProjectsHost>
@@ -134,7 +142,7 @@ export default function App() {
     <SafeAreaProvider>
       <ErrorBoundary>
         <DialogProvider>
-          <NavigationContainer theme={theme}>
+          <NavigationContainer ref={navigationRef} theme={theme}>
             <Boot />
           </NavigationContainer>
         </DialogProvider>

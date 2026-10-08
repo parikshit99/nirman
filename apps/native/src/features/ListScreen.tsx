@@ -20,6 +20,7 @@ import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 import { CapturePanel, QueuedReadings } from './CapturePanel';
 import { ItemLog } from './ItemLog';
+import { useIncomingShare } from './ShareHost';
 import { BoqShareChoice, OrderSlipSheet } from './OrderSlipSheet';
 
 /** One vendor on every line, or several. */
@@ -155,6 +156,11 @@ export function ListScreen({
   ];
 
   const closeAdd = useCallback(() => setAddOpen(false), []);
+  // Photos or text shared from another app (e.g. WhatsApp) for this list open the entry form with them.
+  const incoming = useIncomingShare(kind);
+  useEffect(() => {
+    if (incoming.share) setAddOpen(true);
+  }, [incoming.share]);
   useEffect(() => logStep('tab', { to: kind }), [kind]);
 
   const banner = (
@@ -227,6 +233,8 @@ export function ListScreen({
         <CapturePanel
           key={`${projectId}-${kind}`}
           kind={kind}
+          incoming={incoming.share}
+          onIncomingUsed={incoming.used}
           onVendorQuote={
             onVendorQuote &&
             (() => {

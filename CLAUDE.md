@@ -2,16 +2,16 @@
 
 Android app (Capacitor + React) for tracking construction purchases, BOQs and vendor quotes. See README.md for the layout and docs/data-format.md for the data. Run `npm run lint`, `npm test` and `npm run build` before every push; after a UI change also `npm run test:e2e -w apps/mobile` (checks 320–412 px). UI rules are under *UI and UX* below.
 
-**Moving to React Native:** the app is being rebuilt in React Native, in phases; follow [docs/react-native-plan.md](docs/react-native-plan.md). Until the switch, database changes must work for both apps (they share the schema), and the Capacitor app must stay buildable as the fallback.
+**Moving to React Native:** since 7.0 the app that ships is `apps/native` (React Native); see [docs/react-native-plan.md](docs/react-native-plan.md). Until Phase 8, the Capacitor app (`apps/mobile`) gets fixes only, database changes must work for both apps (they share the schema), and it must stay buildable as the fallback (*Build 6.x fallback* workflow).
 
 ## Versions: deciding the size of a change
 
-Versions are `MAJOR.MINOR.PATCH`. MAJOR.MINOR is set by hand in `apps/mobile/package.json`; CI counts PATCH automatically as the number of commits on `main` since that was last changed (2.2.0, 2.2.1, 2.2.2 … back to .0 at the next bump). Pick the size of every change before merging it:
+Versions are `MAJOR.MINOR.PATCH`. MAJOR.MINOR is set by hand in `apps/native/package.json` (since 7.0); CI counts PATCH automatically as the number of commits on `main` since that was last changed (2.2.0, 2.2.1, 2.2.2 … back to .0 at the next bump). Pick the size of every change before merging it:
 
 | Change | Examples | What to do |
 |---|---|---|
 | **Fix / small update** → PATCH, automatic | bug fix, wording, layout or colour tweak, faster code, a small improvement to an existing screen, CI or docs | Nothing: don't touch the version or CHANGELOG.md. |
-| **New feature** → MINOR (2.2 → 2.3) | a new button, screen, report, calculator, share option or setting; a new kind of data saved (a database migration) | Bump the minor number in `apps/mobile/package.json` (patch stays 0) and add a `## 2.3 — <title>` section at the top of CHANGELOG.md. It becomes the release notes and the in-app *What's new* screen. |
+| **New feature** → MINOR (2.2 → 2.3) | a new button, screen, report, calculator, share option or setting; a new kind of data saved (a database migration) | Bump the minor number in `apps/native/package.json` (patch stays 0) and add a `## 2.3 — <title>` section at the top of CHANGELOG.md. It becomes the release notes and the in-app *What's new* screen. |
 | **Major release** → MAJOR (2.x → 3.0) | a redesign or new main tab; several features released together; a change in how the app is used every day; anything that needs a reinstall or makes old backups unreadable | Bump the major number (3.0.0) and add a `## 3.0 — <title>` section, listing everything since the previous major. |
 
 When unsure between two sizes, pick the smaller one. A test (`apps/mobile/test/whatsNew.test.ts`) fails if the version and the newest CHANGELOG section don't match.
@@ -73,16 +73,16 @@ Plurals must agree ("1 item", "2 items").
 
 **Code style.** Format new code like the existing code (Prettier, `--print-width 180 --single-quote`), but don't reformat lines you didn't change.
 
-## React Native UI (apps/native, until the switch)
+## React Native UI (apps/native)
 
 The new app is Expo (prebuild: `android/` is generated, never committed), React Navigation's native stack with native bottom tabs, `expo-sqlite` behind core's `Db`. The *UI and UX* rules above still apply (words, plurals, colours by meaning, text sizes, one primary action, deleting, touch targets of at least 40 dp); the web-only parts don't (Tailwind classes, `index.css`, `--inset-*`, 320 px e2e checks).
 - Colours: `useColors()` from `src/theme.ts`, the palette of `index.css` as hex with the same dark values; no other literal colours. Add a shade there when a screen needs one.
 - Shared pieces live in `src/components/ui/` with the same names and props as apps/mobile's, except where Android has its own control: `Sheet` (`kind="sheet"` is `react-native-true-sheet`'s bottom sheet, `"dialog"` and `"screen"` are native modals), `Button` (`icon` is a Material icon name, text is the child), `Tabs`, `EmptyState` (`icon` is an image), `Field`/`NumberField`/`SuggestInput` (`fields.tsx`), `Select` and `DateField` (Android's list sheet and date picker), `OverflowMenu` (the ⋮ in the header), `Icon` (Material icon names), `PriceChart`/`Sparkline` (`react-native-svg`), and `useDialogs()` (`confirm`/`alert` are Android's own dialog, `prompt` a small sheet, `toast` a Snackbar).
 - Screens live in `src/features/`, shared parts in `src/components/`; `src/state/AppState.tsx` is a copy of apps/mobile's (keep them the same until the switch).
-- Android code is one local Expo module, `modules/nirman-native` (Kotlin): `readText` (ML Kit), `haptic`, `takeShared` + the `shared` event, `databasePath`, `renderPdf` (PDF pages as JPG, for the preview and JPG share), `shareFiles`. Change it there, not in `android/`.
+- Android code is one local Expo module, `modules/nirman-native` (Kotlin): `readText` (ML Kit), `haptic`, `takeShared` + the `shared` event, `databasePath` and the first-launch file helpers (`databaseInfo`, `copyDatabase`, `setDatabaseAside`), `renderPdf` (PDF pages as JPG, for the preview and JPG share), `shareFiles`. Change it there, not in `android/`.
 - Data: `src/data/db.ts` opens the Capacitor app's file in place (`databases/nirmaanSQLite.db`). Everything else comes from `@nirman/core`.
 - React is pinned to the version Expo asks for (it may differ from apps/mobile's); `metro.config.js` makes every package use that copy.
-- Check: `npm run lint` type-checks it; `npx expo export --platform android` (in `apps/native`) bundles it without the Android SDK; CI's `native` job builds the APK.
+- Check: `npm run lint` type-checks it; `npx expo export --platform android` (in `apps/native`) bundles it without the Android SDK; CI's `native` job builds the APK, and its `upgrade` job installs it over 6.x with data on an emulator and checks it with Maestro (`e2e/upgrade.yaml`).
 
 ## Diagnostics
 

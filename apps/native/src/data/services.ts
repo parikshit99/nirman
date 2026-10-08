@@ -1,17 +1,15 @@
-import { ensureProjects, JobWorker, loadSnapshot, logPerf, migrateLocal, resetStuckJobs, settingsStore, type Snapshot } from '@nirman/core';
+import { ensureProjects, JobWorker, loadSnapshot, logPerf, migrateLocal, resetStuckJobs, settingsStore, type Db, type Snapshot } from '@nirman/core';
 import type { TextBox } from '@nirman/shared';
 import Nirman from '../../modules/nirman-native';
 import { connectivity } from '../lib/connectivity';
 import type { Services } from '../state/AppState';
-import { openNirmanDb } from './db';
 
 /** Reads the text on a photo on the phone (no internet). */
 const readPhotoText = async (image: string): Promise<TextBox[]> => (await Nirman.readText(image)).lines;
 
-/** Opens the database, brings it up to date and starts reading queued entries. */
-export async function startServices(): Promise<{ services: Services; initial: Snapshot }> {
+/** Brings the open database up to date and starts reading queued entries. */
+export async function startServices(db: Db): Promise<{ services: Services; initial: Snapshot }> {
   const started = performance.now();
-  const db = await openNirmanDb();
   await migrateLocal(db);
   await ensureProjects(db);
   await resetStuckJobs(db);

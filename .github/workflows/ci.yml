@@ -25,10 +25,9 @@ jobs:
           npm run test:e2e -w apps/mobile
 
   android:
-    # Runs alongside the tests; only publishing waits for both.
+    # The Capacitor app (apps/mobile, 6.x): kept buildable as the fallback until 7.x has run 6 weeks
+    # (docs/react-native-plan.md), and installed first in the upgrade test. Not published from here.
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,17 +46,8 @@ jobs:
           # The default list includes the long-removed 'tools' package, which makes sdkmanager fail.
           packages: platform-tools
       - run: npm ci
-      - name: Set the app version (major.minor from apps/mobile/package.json, then the number of changes since it was set)
-        id: version
-        # Feature releases bump major.minor by hand (see CLAUDE.md); every later fix on main counts up the patch:
-        # 2.2.0, 2.2.1, 2.2.2 ... and back to .0 at the next bump. Android's versionCode stays the run number.
-        run: |
-          MAJOR_MINOR=$(node -p "require('./apps/mobile/package.json').version.split('.').slice(0, 2).join('.')")
-          BUMPED_AT=$(git log -1 --format=%H -G'"version":' -- apps/mobile/package.json)
-          PATCH=$(git rev-list --count "$BUMPED_AT..HEAD")
-          echo "APP_VERSION=$MAJOR_MINOR.$PATCH" >> "$GITHUB_ENV"
-          echo "version=$MAJOR_MINOR.$PATCH" >> "$GITHUB_OUTPUT"
-          echo "Version $MAJOR_MINOR.$PATCH ($PATCH changes since $MAJOR_MINOR was set in ${BUMPED_AT::7})"
+      - name: Set the app version
+        run: .github/scripts/app-version.sh
       - name: Build web bundle
         run: npm run build -w apps/mobile
       - run: npx cap sync android
@@ -76,13 +66,51 @@ jobs:
           path: nirman.apk
 
   native:
-    # The React Native app (apps/native, docs/react-native-plan.md): built and signed like the one above,
-    # kept as an artifact for testing. Not published until 7.0.
+    # The app (apps/native, React Native): built and signed with the same key as every Nirman build, so it
+    # installs as an update over 6.x. This is the APK that is published: arm64 only, the phones it runs on (S25 Ultra).
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.build.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # full history, to count the changes since the last version bump
+      - id: build
+        uses: ./.github/actions/build-native
+        with:
+          # 64-bit ARM only: every phone using the app (a Galaxy S25 Ultra). Add armeabi-v7a for older 32-bit phones.
+          architectures: arm64-v8a
+          cache-name: arm64
+          artifact: nirman-native-apk
+          apk: nirman-native.apk
+          keystore: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+
+  native-test:
+    # The same app built for the emulator's CPU type (x86_64; an arm64 build can't run on CI's emulator), in
+    # parallel with the published one. Same code and key.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/build-native
+        with:
+          architectures: x86_64
+          cache-name: x86_64
+          artifact: nirman-native-x86_64-apk
+          apk: nirman-native-x86_64.apk
+          keystore: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+
+  upgrade:
+    # 6.x with data on a phone, then 7.x installed over it: the lists and totals must all be there
+    # (docs/react-native-plan.md, Phase 7). On an Android emulator, checked with Maestro.
+    needs: [android, native-test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -90,40 +118,53 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17 # React Native's Gradle plugin asks for a Java 17 toolchain
-      - uses: gradle/actions/setup-gradle@v4
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
+          java-version: 17
       - run: npm ci
-      - name: Set the app version (as in the android job)
-        run: |
-          MAJOR_MINOR=$(node -p "require('./apps/mobile/package.json').version.split('.').slice(0, 2).join('.')")
-          BUMPED_AT=$(git log -1 --format=%H -G'"version":' -- apps/mobile/package.json)
-          PATCH=$(git rev-list --count "$BUMPED_AT..HEAD")
-          echo "APP_VERSION=$MAJOR_MINOR.$PATCH" >> "$GITHUB_ENV"
-          echo "Version $MAJOR_MINOR.$PATCH ($PATCH changes since $MAJOR_MINOR was set in ${BUMPED_AT::7})"
-      - name: Generate the Android project
-        run: npx expo prebuild --platform android --no-install
-        working-directory: apps/native
-        env:
-          CI: 1
-      - name: Build release APK
-        # 32-bit x86 left out: no phone uses it, only old emulators.
-        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86_64
-        working-directory: apps/native/android
-      - name: Sign the APK
-        env:
-          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-        run: .github/scripts/sign-apk.sh apps/native/android/app/build/outputs/apk/release/app-release.apk nirman-native.apk
-      - uses: actions/upload-artifact@v4
+      - name: Make the 6.x database (e2e/sample-backup.json restored by core)
+        run: npx vite-node apps/native/e2e/make-6x-db.ts sample.db
+      - uses: actions/download-artifact@v4
         with:
-          name: nirman-native-apk
-          path: nirman-native.apk
+          name: nirman-apk
+      - uses: actions/download-artifact@v4
+        with:
+          name: nirman-native-x86_64-apk
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Free disk space for the emulator (tools this job doesn't use)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk/ndk /opt/ghc /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          df -h /
+      - name: Enable KVM (hardware acceleration for the emulator)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install 6.x with data, then 7.x over it
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis # lets adb put the data where 6.x keeps it
+          arch: x86_64
+          profile: pixel_7 # 412 x 915 dp, about the size of the Galaxy S25 Ultra the app runs on
+          cores: 4
+          disk-size: 4096M # the default 7 GB userdata doesn't fit on the runner
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
+          disable-animations: true
+          script: .github/scripts/upgrade-test.sh nirman.apk nirman-native-x86_64.apk sample.db
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upgrade-failure
+          path: |
+            upgrade-failure.png
+            upgrade-logcat.txt
+            ~/.maestro/tests/
+          if-no-files-found: ignore
 
   publish:
-    needs: [test, android]
+    needs: [test, native, upgrade]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -134,32 +175,9 @@ jobs:
           fetch-depth: 0 # for the tags and the latest change's message
       - uses: actions/download-artifact@v4
         with:
-          name: nirman-apk
+          name: nirman-native-apk
       - name: Publish as the latest release, and keep the last 5 builds
         env:
           GH_TOKEN: ${{ github.token }}
-          APP_VERSION: ${{ needs.android.outputs.version }}
-        run: |
-          # The fixed tag keeps the download link stable; the version tag records history.
-          git tag -f latest
-          git tag -f "v$APP_VERSION"
-          git push -f origin refs/tags/latest "refs/tags/v$APP_VERSION"
-          # Release notes: the newest CHANGELOG section, then this build's details (dates in IST).
-          WHATS_NEW=$(awk '/^## /{n++} n==1' CHANGELOG.md)
-          NOTES="$WHATS_NEW
-
-          ---
-          Version $APP_VERSION, built from main at ${GITHUB_SHA::7} on $(TZ=Asia/Kolkata date +%Y-%m-%d).
-
-          Latest change: $(git log -1 --format=%s)"
-          gh release view latest >/dev/null 2>&1 || gh release create latest --title "Nirman v$APP_VERSION" --notes "$NOTES"
-          gh release edit latest --title "Nirman v$APP_VERSION" --notes "$NOTES" --prerelease=false --latest
-          gh release upload latest nirman.apk --clobber
-
-          # The same APK under its version, to go back to in an emergency (see the README: back up, uninstall, install, restore).
-          cp nirman.apk "nirman-$APP_VERSION.apk"
-          gh release view "v$APP_VERSION" >/dev/null 2>&1 || gh release create "v$APP_VERSION" --title "Nirman v$APP_VERSION" --notes "$NOTES" --latest=false
-          gh release upload "v$APP_VERSION" "nirman-$APP_VERSION.apk" --clobber
-          # Keep the 5 newest version releases; older ones go, but their v… tags stay as history.
-          gh release list --limit 200 --json tagName,createdAt --jq '[.[] | select(.tagName | test("^v[0-9]"))] | sort_by(.createdAt) | reverse | .[5:] | .[].tagName' |
-            while read -r tag; do gh release delete "$tag" --yes; done
+          APP_VERSION: ${{ needs.native.outputs.version }}
+        run: .github/scripts/publish.sh nirman-native.apk

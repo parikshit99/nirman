@@ -49,7 +49,8 @@ export function Sheet({ kind = 'sheet', onClose, onBack, backEnabled = true, bus
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const body = (maxHeight?: number) => {
-    const inner = <View style={{ padding, gap, paddingBottom: padding + (kind === 'sheet' ? insets.bottom : 0) }}>{children}</View>;
+    // Without its own scrolling the content shrinks to the box, so a list inside it can scroll under a fixed button.
+    const inner = <View style={{ padding, gap, paddingBottom: padding + (kind === 'sheet' ? insets.bottom : 0), flexShrink: scroll ? undefined : 1 }}>{children}</View>;
     return scroll ? (
       <ScrollView keyboardShouldPersistTaps="handled" style={maxHeight ? { maxHeight } : { flex: 1 }} contentContainerStyle={{ flexGrow: kind === 'screen' ? 1 : 0 }}>
         {inner}

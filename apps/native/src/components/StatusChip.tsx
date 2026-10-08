@@ -4,7 +4,7 @@ import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 import { Icon, type IconName } from './ui/Icon';
 
-/** Connection and reading status. Opens Settings (Phase 7) when `onPress` is given. */
+/** Connection and reading status; tapping it opens Settings. */
 export function StatusChip({ onPress }: { onPress?(): void }) {
   const c = useColors();
   const { status, settings, snapshot } = useAppState();

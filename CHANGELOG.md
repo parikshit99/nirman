@@ -2,6 +2,23 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 7.0 — A real Android app
+
+Nirman is rebuilt with Android's own controls. It is the same app, updated in place: everything you saved is here as before.
+
+**After the update**
+- **Paste your Gemini key again once** (Settings → AI reading). The old app's storage can't be read by the new one; your lists don't need it.
+- Small choices start fresh: the sort order, the last work type picked and the backup reminder. The project you used last opens.
+- A copy of your data from before the update is kept on the phone, in case anything goes wrong.
+
+**What feels different**
+- Android's own bottom bar, back gesture (with the preview on Android 14 and later), bottom sheets you can drag, confirm dialogs and date picker.
+- A **⋮ menu** in the header holds Preview, Share, Clear and Settings, so everything fits on small phones.
+- **Undo** in a bar at the bottom after a delete.
+- The number keyboard for quantities and rates, and the Photo Picker for bills with no permission to give.
+- Long lists scroll smoothly, and PDFs are previewed by Android itself, page by page.
+- Photos shared from WhatsApp still go straight into Purchases, BOQ or a vendor quote.
+
 ## 6.0 — One copy of every list
 
 **How saving works now**
