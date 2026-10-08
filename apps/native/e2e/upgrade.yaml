@@ -24,7 +24,14 @@ appId: com.nirmaan.auditor
 - assertVisible: "Items: 6"
 - back
 - tapOn: "Saved"
-# Saved titles show in capitals.
-- assertVisible: "(?i)cement and sand"
-- assertVisible: "(?i)bricks"
-- assertVisible: "(?i)flooring boq"
+- assertVisible: "3 lists"
+# Saved titles show in capitals; scroll to each, as one card can fill the screen.
+- scrollUntilVisible:
+    element: "(?i)flooring boq"
+    direction: DOWN
+- scrollUntilVisible:
+    element: "(?i)bricks"
+    direction: DOWN
+- scrollUntilVisible:
+    element: "(?i)cement and sand"
+    direction: DOWN
