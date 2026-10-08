@@ -1,15 +1,21 @@
 package com.nirmaan.auditor.nativemodule
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Build
+import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import android.util.Base64
 import android.util.Log
 import android.view.HapticFeedbackConstants
 import android.webkit.MimeTypeMap
+import androidx.core.content.FileProvider
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
@@ -18,6 +24,7 @@ import expo.modules.kotlin.Promise
 import expo.modules.kotlin.functions.Queues
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 
@@ -76,6 +83,50 @@ class NirmanModule : Module() {
         .addOnFailureListener { e -> promise.reject("ERR_TEXT", e.message ?: "Text recognition failed", e) }
     }
 
+    // --- Documents --------------------------------------------------------------------------
+    // Each page of a PDF as a JPG (base64), drawn with Android's own PdfRenderer at `scale` times
+    // the PDF's size so text stays sharp. The empty part below the last line is cut off, keeping a
+    // margin, so a short list isn't mostly white. Used for the preview and for sharing as JPG.
+    AsyncFunction("renderPdf") { path: String, scale: Double ->
+      val pages = ArrayList<String>()
+      ParcelFileDescriptor.open(File(path), ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+        PdfRenderer(fd).use { renderer ->
+          for (i in 0 until renderer.pageCount) {
+            renderer.openPage(i).use { page ->
+              val bitmap = Bitmap.createBitmap(Math.ceil(page.width * scale).toInt(), Math.ceil(page.height * scale).toInt(), Bitmap.Config.ARGB_8888)
+              bitmap.eraseColor(Color.WHITE)
+              page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+              val cropped = cropBlankBottom(bitmap)
+              val out = ByteArrayOutputStream()
+              cropped.compress(Bitmap.CompressFormat.JPEG, 90, out)
+              pages.add(Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP))
+              if (cropped !== bitmap) cropped.recycle()
+              bitmap.recycle()
+            }
+          }
+        }
+      }
+      pages
+    }
+
+    // Android's share sheet for one or several files (written in the cache folder by the app):
+    // save to Files, WhatsApp, email…
+    AsyncFunction("shareFiles") { paths: List<String>, mimeTypes: List<String>, title: String ->
+      val activity = appContext.currentActivity ?: throw IllegalStateException("The app is not in front")
+      val authority = "${context.packageName}.FileSystemFileProvider"
+      val uris = ArrayList<Uri>(paths.map { FileProvider.getUriForFile(context, authority, File(it)) })
+      val type = if (mimeTypes.distinct().size == 1) mimeTypes[0] else "*/*"
+      val intent = if (uris.size == 1) Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris[0]) else Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+      intent.type = type
+      intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      // Lets the receiving app read every file.
+      val clip = ClipData.newRawUri(title, uris[0])
+      for (uri in uris.drop(1)) clip.addItem(ClipData.Item(uri))
+      intent.clipData = clip
+      activity.startActivity(Intent.createChooser(intent, title))
+      Unit
+    }
+
     // --- Haptics ----------------------------------------------------------------------------
     // A short buzz when a button is pressed, using Android's own touch feedback (the same as
     // native apps), so it follows the phone's "Touch feedback" setting and needs no vibrate permission.
@@ -115,6 +166,29 @@ class NirmanModule : Module() {
     OnDestroy {
       recognizer?.close()
     }
+  }
+
+  /** Cuts the empty part of a page below its last line, keeping a margin; the page itself if there is little to cut. */
+  private fun cropBlankBottom(bitmap: Bitmap): Bitmap {
+    val width = bitmap.width
+    val height = bitmap.height
+    val row = IntArray(width)
+    var last = 0
+    var y = height - 1
+    while (y >= 0 && last == 0) {
+      bitmap.getPixels(row, 0, width, 0, y, width, 1)
+      for (x in 0 until width step 2) {
+        val p = row[x]
+        if (Color.red(p) < 235 || Color.green(p) < 235 || Color.blue(p) < 235) {
+          last = y
+          break
+        }
+      }
+      y--
+    }
+    val cropped = minOf(height, last + 60)
+    if (last == 0 || cropped >= height * 0.95) return bitmap
+    return Bitmap.createBitmap(bitmap, 0, 0, width, cropped)
   }
 
   private fun handle(intent: Intent?): Boolean {

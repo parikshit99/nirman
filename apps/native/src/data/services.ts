@@ -1,0 +1,46 @@
+import { ensureProjects, JobWorker, loadSnapshot, logPerf, migrateLocal, resetStuckJobs, settingsStore, type Snapshot } from '@nirman/core';
+import type { TextBox } from '@nirman/shared';
+import Nirman from '../../modules/nirman-native';
+import { connectivity } from '../lib/connectivity';
+import type { Services } from '../state/AppState';
+import { openNirmanDb } from './db';
+
+/** Reads the text on a photo on the phone (no internet). */
+const readPhotoText = async (image: string): Promise<TextBox[]> => (await Nirman.readText(image)).lines;
+
+/** Opens the database, brings it up to date and starts reading queued entries. */
+export async function startServices(): Promise<{ services: Services; initial: Snapshot }> {
+  const started = performance.now();
+  const db = await openNirmanDb();
+  await migrateLocal(db);
+  await ensureProjects(db);
+  await resetStuckJobs(db);
+
+  const settings = { current: await settingsStore.load() };
+  const dataListeners = new Set<() => void>();
+  const worker = new JobWorker(
+    db,
+    () => settings.current,
+    () => dataListeners.forEach((fn) => fn()),
+    undefined,
+    // Remember a replacement model so the next reading doesn't look it up again.
+    (geminiModel) => {
+      settings.current = { ...settings.current, geminiModel };
+      void settingsStore.save(settings.current);
+    },
+    readPhotoText,
+  );
+  const services: Services = {
+    db,
+    worker,
+    settings,
+    onDataChanged(fn) {
+      dataListeners.add(fn);
+      return () => dataListeners.delete(fn);
+    },
+  };
+  const initial = await loadSnapshot(db);
+  logPerf('startup', performance.now() - started, { lists: initial.lists.length, items: initial.items.length, rates: initial.rates.length });
+  void worker.start(connectivity);
+  return { services, initial };
+}

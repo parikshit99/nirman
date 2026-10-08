@@ -32,7 +32,14 @@ const config: ExpoConfig = {
       { action: 'SEND', category: ['DEFAULT'], data: [{ mimeType: 'text/plain' }] },
     ],
   },
-  plugins: [['react-native-bottom-tabs', { theme: 'material3' }], 'expo-sqlite'],
+  plugins: [
+    ['react-native-bottom-tabs', { theme: 'material3' }],
+    'expo-sqlite',
+    'expo-secure-store',
+    'expo-font',
+    ['expo-image-picker', { cameraPermission: 'Nirman uses the camera to photograph bills.' }],
+    ['expo-speech-recognition', { microphonePermission: 'Nirman uses the microphone to type what you say.', speechRecognitionPermission: 'Nirman uses speech recognition to type what you say.' }],
+  ],
 };
 
 export default config;

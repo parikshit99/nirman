@@ -1,48 +1,124 @@
 import { createNativeBottomTabNavigator } from '@bottom-tabs/react-navigation';
-import { DarkTheme, DefaultTheme, NavigationContainer, getFocusedRouteNameFromRoute, type Theme } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Text, View, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { TabScreen } from './screens/TabScreen';
-import { dark, light } from './theme';
+import type { Snapshot } from '@nirman/core';
+import { logError } from '@nirman/core';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { DialogProvider } from './components/ui/Dialogs';
+import { startServices } from './data/services';
+import { LabourScreen } from './features/LabourScreen';
+import { ListScreen } from './features/ListScreen';
+import { ProjectsHost } from './features/ProjectsSheet';
+import { QuotesHost, useQuotes } from './features/QuotesHost';
+import { RatesScreen } from './features/RatesScreen';
+import { SavedScreen } from './features/SavedScreen';
+import { SiteReportHost, useSiteReport } from './features/SiteReport';
+import { AppStateProvider, useAppState, type Services } from './state/AppState';
+import { dark, light, useColors } from './theme';
 
-const TABS = [
-  {
-    name: 'Purchases',
-    icon: require('../assets/tabs/purchases.png'),
-    empty: 'No purchases yet.',
-    hint: 'Photograph bills or type what was bought; each item appears here with the rate paid.',
-  },
-  { name: 'BOQ', icon: require('../assets/tabs/boq.png'), empty: 'No BOQ items yet.', hint: 'Photograph a drawing or list to get a BOQ to send vendors.' },
-  {
-    name: 'Labour',
-    icon: require('../assets/tabs/labour.png'),
-    empty: 'No labour contracts yet.',
-    hint: 'Add one to this project with “New contract”: the contractor, the job, and the rate or lump sum.',
-  },
-  {
-    name: 'Rates',
-    icon: require('../assets/tabs/rates.png'),
-    empty: 'No prices yet',
-    hint: 'A price appears here as soon as you add a purchase with a rate, and when you confirm a vendor quote.',
-  },
-  { name: 'Saved', icon: require('../assets/tabs/saved.png'), empty: 'Nothing saved yet.', hint: 'Lists you save in this project from Purchases or BOQ (the Save button) appear here.' },
-] as const;
+const ICONS = {
+  Purchases: require('../assets/tabs/purchases.png'),
+  BOQ: require('../assets/tabs/boq.png'),
+  Labour: require('../assets/tabs/labour.png'),
+  Rates: require('../assets/tabs/rates.png'),
+  Saved: require('../assets/tabs/saved.png'),
+} as const;
+
+const ABOUT = {
+  Purchases: 'Photograph bills or type what was bought; get a purchase list with the rate paid for each item.',
+  BOQ: 'Photograph a drawing or list; get a blank BOQ (no rates) to send vendors, then compare their quotes.',
+  Labour: 'Labour contracts: record work measured, payments and deductions; see what each contractor is owed and share statements.',
+  Saved: 'Saved purchase lists and BOQs of this project. Open one to edit it, export it, or add vendor quotes.',
+} as const;
 
 const Tab = createNativeBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-function Tabs() {
-  const colors = useColorScheme() === 'dark' ? dark : light;
+function BoqScreen() {
+  const quotes = useQuotes();
+  return <ListScreen kind="boq" about={ABOUT.BOQ} onVendorQuote={() => quotes.pick()} />;
+}
+
+function SavedTab() {
+  const quotes = useQuotes();
+  const siteReport = useSiteReport();
+  const { history, contracts } = useAppState();
+  const hasPurchases = history.some((h) => h.kind === 'audit') || contracts.length > 0;
   return (
-    <Tab.Navigator tabBarActiveTintColor={colors.brandPrimary} tabBarInactiveTintColor={colors.gray500} tabBarStyle={{ backgroundColor: colors.white }}>
-      {TABS.map((t) => (
-        <Tab.Screen key={t.name} name={t.name} options={{ tabBarIcon: () => t.icon }}>
-          {() => <TabScreen icon={t.icon} title={t.empty} hint={t.hint} />}
-        </Tab.Screen>
-      ))}
+    <SavedScreen
+      about={ABOUT.Saved}
+      onQuotes={quotes.open}
+      extraMenu={hasPurchases ? [{ icon: 'assignment', label: 'Site report', about: 'Everything bought and paid for this project', onPress: siteReport.open }] : []}
+    />
+  );
+}
+
+function Tabs() {
+  const c = useColors();
+  return (
+    <Tab.Navigator tabBarActiveTintColor={c.brandPrimary} tabBarInactiveTintColor={c.gray500} tabBarStyle={{ backgroundColor: c.white }}>
+      <Tab.Screen name="Purchases" options={{ tabBarIcon: () => ICONS.Purchases }}>
+        {() => <ListScreen kind="audit" about={ABOUT.Purchases} />}
+      </Tab.Screen>
+      <Tab.Screen name="BOQ" options={{ tabBarIcon: () => ICONS.BOQ }}>
+        {() => <BoqScreen />}
+      </Tab.Screen>
+      <Tab.Screen name="Labour" options={{ tabBarIcon: () => ICONS.Labour }}>
+        {() => <LabourScreen about={ABOUT.Labour} />}
+      </Tab.Screen>
+      <Tab.Screen name="Rates" options={{ tabBarIcon: () => ICONS.Rates }}>
+        {() => <RatesScreen />}
+      </Tab.Screen>
+      <Tab.Screen name="Saved" options={{ tabBarIcon: () => ICONS.Saved }}>
+        {() => <SavedTab />}
+      </Tab.Screen>
     </Tab.Navigator>
+  );
+}
+
+/** Opens the database, then shows the app; says so if it can't be opened. */
+function Boot() {
+  const c = useColors();
+  const [ready, setReady] = useState<{ services: Services; initial: Snapshot } | null>(null);
+  const [failure, setFailure] = useState<Error | null>(null);
+  useEffect(() => {
+    startServices().then(setReady, (err: Error) => {
+      logError(err, 'startup');
+      setFailure(err);
+    });
+  }, []);
+  if (failure) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 8, backgroundColor: c.brandGray }}>
+        <Text style={{ fontSize: 18, fontWeight: '700', color: c.brandDark }}>Could not open the app's storage</Text>
+        <Text style={{ fontSize: 14, textAlign: 'center', color: c.gray500 }}>{failure.message}</Text>
+      </View>
+    );
+  }
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.brandGray }}>
+        <ActivityIndicator color={c.brandPrimary} />
+      </View>
+    );
+  }
+  return (
+    <AppStateProvider services={ready.services} initial={ready.initial}>
+      <ProjectsHost>
+        <QuotesHost>
+          <SiteReportHost>
+            <Stack.Navigator screenOptions={{ headerShown: false }}>
+              {/* Full screens (Sheet kind="screen") are native dialogs for now; pushed routes can go above the tabs here. */}
+              <Stack.Screen name="Home" component={Tabs} />
+            </Stack.Navigator>
+          </SiteReportHost>
+        </QuotesHost>
+      </ProjectsHost>
+    </AppStateProvider>
   );
 }
 
@@ -56,12 +132,13 @@ export default function App() {
   };
   return (
     <SafeAreaProvider>
-      <NavigationContainer theme={theme}>
-        <Stack.Navigator>
-          {/* Full screens (Sheet kind="screen") will be pushed on this stack, above the tabs. */}
-          <Stack.Screen name="Home" component={Tabs} options={({ route }) => ({ title: getFocusedRouteNameFromRoute(route) ?? TABS[0].name })} />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <ErrorBoundary>
+        <DialogProvider>
+          <NavigationContainer theme={theme}>
+            <Boot />
+          </NavigationContainer>
+        </DialogProvider>
+      </ErrorBoundary>
       <StatusBar style="auto" />
     </SafeAreaProvider>
   );
