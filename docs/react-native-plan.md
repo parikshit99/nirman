@@ -124,7 +124,7 @@ Losing the preferences and asking for the key once saves a whole preparation rel
 ### Phase 8: clean up (after 7.x has run 6 weeks)
 
 - Delete `apps/mobile`, the fallback workflow and `nirmaan-before-7.db`.
-- Replace the web UI rules in CLAUDE.md with the React Native ones.
+- Remove the old-app section from docs/UI guideline.md and the `apps/mobile` notes from docs/Code guideline.md.
 - Update the README.
 
 ### Later (separate releases, each a MINOR)
@@ -145,7 +145,7 @@ Hardware: a Pi 4 or 5 with at least 4 GB of RAM, and an SSD (SD cards wear out u
 
 These are database and core changes only, so they could also go into the current app before 7.0 if sync is needed sooner.
 
-- Migration (follow CLAUDE.md):
+- Migration (follow docs/Code guideline.md):
   - `deleted_at` on every table, so deletions sync instead of rows disappearing.
   - `updated_at` on the tables that don't have it yet.
   - A `device_id` (made once per phone, stored in the database).
@@ -197,7 +197,7 @@ None of these cost extra work: they come with the libraries the new screens are 
 - Android's own PDF preview.
 - System font for text, JetBrains Mono for amounts.
 
-Still not planned: swipe-to-delete (CLAUDE.md: delete from the edit view only) and wallpaper colours (orange stays).
+Still not planned: swipe-to-delete (UX guideline: delete from the edit view only) and wallpaper colours (orange stays).
 
 ## Progress
 
