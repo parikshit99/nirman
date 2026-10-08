@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from 'react';
-import { Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import type { ReleaseNotes } from '@nirman/core';
 import { Button } from '../components/ui/Button';
 import { Sheet, SheetHeader } from '../components/ui/Sheet';
@@ -50,9 +50,12 @@ function render(lines: string[], c: Colors) {
 export function WhatsNewSheet({ notes, onClose }: { notes: ReleaseNotes; onClose(): void }) {
   const c = useColors();
   return (
-    <Sheet kind="dialog" onClose={onClose} label="What's new" gap={8}>
+    <Sheet kind="dialog" scroll={false} onClose={onClose} label="What's new" gap={8}>
       <SheetHeader icon="auto-awesome" title={notes.title || `Nirman ${notes.version}`} subtitle={`What's new · version ${notes.version}`} onClose={onClose} />
-      {render(notes.lines, c)}
+      {/* Only the notes scroll: Got it stays in view on small screens. */}
+      <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: 8 }}>
+        {render(notes.lines, c)}
+      </ScrollView>
       <Button variant="primary" block style={{ marginTop: 8 }} onPress={onClose}>
         Got it
       </Button>

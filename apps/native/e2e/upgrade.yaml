@@ -8,9 +8,8 @@ appId: com.nirmaan.auditor
     visible: "Paste your Gemini key again.*"
     timeout: 90000
 - tapOn: "Skip for now"
-- tapOn:
-    text: "Got it"
-    optional: true
+# What's new for 7.0, once after the update.
+- tapOn: "Got it"
 # The open purchase list: TMT bar 12 mm ₹31,000 + binding wire ₹900.
 - extendedWaitUntil:
     visible: "₹31,900"
