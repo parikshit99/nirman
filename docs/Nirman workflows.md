@@ -143,7 +143,7 @@ Labour entries never feed Rates. The project's site report brings purchases and 
 
 ## A-06 What leaves the phone
 
-Nirman has no server or account (until the Raspberry Pi phases of [react-native-plan.md](react-native-plan.md)). Data leaves the phone only along these paths, and only Gemini runs without a tap from the user each time.
+Nirman has no server or account yet (until the sync phases of [react-native-plan.md](react-native-plan.md), which add Supabase). Data leaves the phone only along these paths, and only Gemini runs without a tap from the user each time.
 
 | Path | What goes | When | Where to |
 |---|---|---|---|
@@ -179,7 +179,7 @@ How the build is signed and released:
 
 Places where the flows depend on the user or on one device.
 
-1. **One phone holds everything.** There is no sync yet, so a lost phone loses whatever came after the last backup. The Raspberry Pi phases fix this.
+1. **One phone holds everything.** There is no sync yet, so a lost phone loses whatever came after the last backup. The sync phases (Supabase) fix this.
 2. **Backups are by hand.** A reminder prompts after a week, but nothing is saved off the phone automatically.
 3. **Unclear handwriting needs Gemini and a connection.** Phone-only mode means typing those in.
 4. **Rates mix all sites.** Price checks prefer this site's price; *Leave out of Rates* and the site filter in Rates are the other controls.
