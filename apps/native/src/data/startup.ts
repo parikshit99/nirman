@@ -26,7 +26,17 @@ export type StartResult = { ok: true; services: Services; initial: Snapshot } | 
  * is, keeps a copy of it, checks it and then brings it up to date. Never starts empty silently: anything wrong comes
  * back as a problem, and the app offers Restore from backup.
  */
-export async function startApp({ withoutCopy = false, allowEmpty = false }: { withoutCopy?: boolean; allowEmpty?: boolean } = {}): Promise<StartResult> {
+export async function startApp(opts: { withoutCopy?: boolean; allowEmpty?: boolean } = {}): Promise<StartResult> {
+  try {
+    return await start(opts);
+  } catch (err) {
+    // Anything unexpected (e.g. the files couldn't be checked) still ends on the screen with Restore from backup.
+    logError(err, 'startup');
+    return { ok: false, problem: { kind: 'damaged', detail: (err as Error).message } };
+  }
+}
+
+async function start({ withoutCopy = false, allowEmpty = false }: { withoutCopy?: boolean; allowEmpty?: boolean }): Promise<StartResult> {
   const first = !prefs.get(READY_PREF, false);
   let check = false;
   if (first) {

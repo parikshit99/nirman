@@ -45,6 +45,15 @@ if ! adb shell ls $DIR/nirmaan-before-7.db >/dev/null 2>&1; then
 fi
 if [ $status -ne 0 ]; then
   adb exec-out screencap -p > upgrade-failure.png || true
-  adb logcat -d -t 400 '*:E' ReactNativeJS:V > upgrade-logcat.txt || true
+  adb logcat -d > upgrade-logcat.txt || true
+  echo "::group::The app's process"
+  adb shell pidof $PKG || echo "not running"
+  echo "::endgroup::"
+  echo "::group::Text on the screen"
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 && adb shell cat /sdcard/ui.xml | grep -oE '(text|content-desc)="[^"]+"' || true
+  echo "::endgroup::"
+  echo "::group::Crashes and app log"
+  grep -E 'AndroidRuntime|FATAL|ReactNativeJS|ReactNative|Expo|Nirman|SharedFiles|nirmaan' upgrade-logcat.txt | tail -200 || true
+  echo "::endgroup::"
 fi
 exit $status
