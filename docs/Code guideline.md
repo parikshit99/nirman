@@ -59,7 +59,7 @@ These rules protect installed phones. Breaking one can lose someone's work.
 
 ## Security and privacy
 
-- Never put the Gemini API key in the app, the repo, logs or the Pi. The APK must never contain anything that looks like a Google API key (`AIza…`); the 6.x CI checked this, and the `native` job should too.
+- Never put the Gemini API key in the app, the repo, logs or the Pi. CI fails the build if the APK contains anything that looks like a Google API key (`.github/scripts/sign-apk.sh`).
 - The key is kept in the phone's secure storage and sent only to Google.
 - Photos and notes leave the phone only for the Gemini request, a backup the user shares, or (later) the user's own Pi.
 
