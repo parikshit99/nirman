@@ -36,12 +36,17 @@ runs:
         distribution: temurin
         java-version: 17 # React Native's Gradle plugin asks for a Java 17 toolchain
     - uses: gradle/actions/setup-gradle@v4 # caches Gradle, its downloads and its build cache between runs
+      with:
+        # A self-hosted runner keeps ~/.gradle on its own disk; uploading it to GitHub's cache would only cost time.
+        cache-disabled: ${{ runner.environment == 'self-hosted' }}
     - uses: android-actions/setup-android@v3
       with:
         packages: platform-tools
     # Most of the build is compiling React Native's C++ for each CPU type; ccache keeps the compiled files between
     # runs, so only what changed is compiled again (one cache per set of CPU types).
-    - uses: hendrikmuhs/ccache-action@v1.2
+    # On a self-hosted runner ccache is installed by .github/scripts/setup-wsl-runner.sh and keeps its own cache dir.
+    - if: runner.environment == 'github-hosted'
+      uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: native-${{ inputs.cache-name }}
         max-size: 2G
@@ -68,6 +73,9 @@ runs:
         CCACHE_BASEDIR: ${{ github.workspace }}
         CCACHE_NOHASHDIR: 'true'
         CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
+        # Gradle downloads the NDK afresh on every run, so its compiler always has a new date; by default ccache
+        # takes that as a new compiler and misses every file (2 hits in 144). Compare the compiler's version instead.
+        CCACHE_COMPILERCHECK: '%compiler% --version'
     - name: Sign the APK
       run: .github/scripts/sign-apk.sh apps/native/android/app/build/outputs/apk/release/app-release.apk ${{ inputs.apk }}
       shell: bash
