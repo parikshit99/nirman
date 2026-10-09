@@ -1,6 +1,6 @@
 # Building the app on the owner's PC
 
-CI's app build (the `native` job: the APK, about 6 to 11 minutes on GitHub) can run on the owner's Windows 11 PC instead, where it costs no Actions minutes. The PC has more cores than GitHub's free runners (2 for a private repo), and its caches (Gradle, ccache, the Android SDK) stay on its disk instead of being downloaded every run. `changes`, `test` and `publish` always stay on GitHub.
+CI's app build (the `native` job: the APK, about 6 to 11 minutes on GitHub) can run on the owner's Windows 11 PC instead, where it costs no Actions minutes. The PC has more cores than GitHub's free runners (2 for a private repo), and its caches (Gradle, ccache, the Android SDK) stay on its disk instead of being downloaded every run. `test` and `publish` always stay on GitHub.
 
 The job runs in Ubuntu inside WSL2, so the CI scripts work unchanged. Uploading caches to GitHub is skipped on a self-hosted runner (`runner.environment`).
 

@@ -20,25 +20,21 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Whether a pull request touches the Android build itself (.github/scripts/changed-parts.sh). `test` already checks
-  # the app's code and bundles it, so a pull request builds the APK only when that changed, or when it has the label
-  # `build-apk` (an APK to try on a phone). Never while it is a draft. Pushes to main and manual runs always build.
-  changes:
-    if: github.event_name == 'pull_request'
+  # Lint, unit tests and bundling. On a pull request it also works out whether the PR touches the Android build itself
+  # (.github/scripts/changed-parts.sh): `test` already checks the app's code and bundles it, so a pull request builds
+  # the APK only when that changed, or when it has the label `build-apk` (an APK to try on a phone). Never while it is
+  # a draft. Pushes to main and manual runs always build.
+  test:
     runs-on: ubuntu-latest
     outputs:
       android: ${{ steps.parts.outputs.android }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }} # full history only to compare a PR with its base
       - id: parts
+        if: github.event_name == 'pull_request'
         run: .github/scripts/changed-parts.sh "${{ github.event.pull_request.base.sha }}"
-
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -52,10 +48,11 @@ jobs:
   native:
     # The app (apps/native, React Native): built and signed with the same key as every Nirman build, so it
     # installs as an update over 6.x and every 7.x. This is the APK that is published: arm64 only, the phones it runs on (S25 Ultra).
-    needs: changes
+    # After `test`, so a change that fails lint or the tests doesn't also spend ~12 minutes on the APK.
+    needs: test
     if: >-
-      !cancelled() && (github.event_name != 'pull_request' || (!github.event.pull_request.draft &&
-      (needs.changes.outputs.android == 'true' || contains(github.event.pull_request.labels.*.name, 'build-apk'))))
+      github.event_name != 'pull_request' || (!github.event.pull_request.draft &&
+      (needs.test.outputs.android == 'true' || contains(github.event.pull_request.labels.*.name, 'build-apk')))
     # On the owner's PC when the repository variable NATIVE_RUNNER is "self-hosted" (docs/self-hosted-runner.md).
     runs-on: ${{ vars.NATIVE_RUNNER == 'self-hosted' && fromJSON('["self-hosted", "linux", "x64", "nirman-pc"]') || 'ubuntu-latest' }}
     outputs:
