@@ -61,7 +61,7 @@ export function SiteReport({ onClose }: { onClose(): void }) {
   };
 
   const chip = (on: boolean) => ({ minHeight: 40, paddingHorizontal: 12, justifyContent: 'center' as const, borderRadius: 20, borderWidth: 1, borderColor: on ? c.orange500 : c.gray200, backgroundColor: on ? c.orange500 : c.white });
-  const chipText = (on: boolean) => ({ fontSize: 12, fontWeight: '700' as const, letterSpacing: 0.4, textTransform: 'uppercase' as const, color: on ? c.white : c.gray500 });
+  const chipText = (on: boolean) => ({ fontSize: 12, fontWeight: '700' as const, letterSpacing: 0.4, textTransform: 'uppercase' as const, color: on ? c.onPrimary : c.gray500 });
   const label = { fontSize: 12, fontWeight: '700' as const, color: c.gray600, marginBottom: 4 };
   const panel = { padding: 12, borderRadius: 12, backgroundColor: c.gray50, flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const, gap: 8 };
 

@@ -39,7 +39,7 @@ export function Button({
 }) {
   const c = useColors();
   const look = {
-    primary: { bg: c.brandPrimary, border: 'transparent', fg: c.white },
+    primary: { bg: c.brandPrimary, border: 'transparent', fg: c.onPrimary },
     secondary: { bg: c.white, border: c.gray200, fg: c.gray800 },
     danger: { bg: c.red600, border: 'transparent', fg: '#fff' },
     dangerOutline: { bg: c.white, border: c.red200, fg: c.red600 },

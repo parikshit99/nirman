@@ -1,12 +1,17 @@
+import { useMemo, useSyncExternalStore } from 'react';
 import { useColorScheme } from 'react-native';
+import { ORANGE, accentShades, textOn, type AccentShades } from '@nirman/shared';
+import { DEFAULT_ACCENT, look, onLookChange, seedOf, type Look } from './lib/theme';
 
 // The colours of the 6.x app's index.css (Tailwind's palette and the brand), as hex: React Native has no oklch.
 // Dark mode redefines the same names, as `:root.dark` does there; shades it doesn't list keep their light value.
 // Generated once from those files; when a dark shade is added there, add it here too.
 
 export const light = {
+  ...ORANGE.light,
+  /** Text and icons on brandPrimary and orange500 (buttons, the Add button, picked chips). */
+  onPrimary: '#ffffff',
   white: '#ffffff',
-  brandPrimary: '#ff7a00',
   brandDark: '#121212',
   brandGray: '#f5f5f5',
   brandConcrete: '#e4e3e0',
@@ -20,16 +25,6 @@ export const light = {
   gray700: '#364153',
   gray800: '#1e2939',
   gray900: '#101828',
-  orange50: '#fff7ed',
-  orange100: '#ffedd4',
-  orange200: '#ffd6a7',
-  orange300: '#ffb86a',
-  orange400: '#ff8904',
-  orange500: '#ff6900',
-  orange600: '#f54900',
-  orange700: '#ca3500',
-  orange800: '#9f2d00',
-  orange900: '#7e2a0c',
   red50: '#fef2f2',
   red100: '#ffe2e2',
   red200: '#ffc9c9',
@@ -66,6 +61,8 @@ export type Colors = typeof light;
 
 export const dark: Colors = {
   ...light,
+  ...ORANGE.dark,
+  onPrimary: '#16181c',
   white: '#16181c',
   brandGray: '#0c0d10',
   brandDark: '#eaebed',
@@ -80,13 +77,6 @@ export const dark: Colors = {
   gray700: '#caced4',
   gray800: '#dcdee2',
   gray900: '#edeef1',
-  orange50: '#381f11',
-  orange100: '#4e270d',
-  orange200: '#773a10',
-  orange600: '#ff822a',
-  orange700: '#ff9e53',
-  orange800: '#ffb777',
-  orange900: '#ffd1a3',
   red50: '#3b1c1c',
   red100: '#4e2021',
   red200: '#7a3336',
@@ -103,7 +93,35 @@ export const dark: Colors = {
   blue800: '#aed4ff',
 };
 
-/** The palette for the phone's light or dark setting. */
+// The orange shades (and brandPrimary) are Nirman's orange, or are worked out from the colour chosen in Settings →
+// Appearance (packages/shared/src/palette.ts). Pure black turns dark mode's backgrounds black (OLED screens).
+
+const cache = new Map<string, Colors>();
+
+/** The palette for light or dark mode in the chosen look. */
+export function paletteFor(mode: 'light' | 'dark', l: Look): Colors {
+  const seed = seedOf(l);
+  const black = mode === 'dark' && l.style === 'black';
+  const key = `${mode}|${seed}|${black}`;
+  let colors = cache.get(key);
+  if (!colors) {
+    const base = mode === 'dark' ? dark : light;
+    const shades: AccentShades = accentShades(seed, ORANGE[mode], base.white);
+    colors = {
+      ...base,
+      ...shades,
+      // Nirman's orange keeps its usual text colour; any other colour gets white or near-black, whichever reads.
+      onPrimary: seed === DEFAULT_ACCENT ? base.onPrimary : textOn(shades),
+      ...(black && { white: '#000000', brandGray: '#000000', gray50: '#101114' }),
+    };
+    cache.set(key, colors);
+  }
+  return colors;
+}
+
+/** The palette for the phone's (or the app's) light or dark setting, in the colour chosen in Settings. */
 export function useColors(): Colors {
-  return useColorScheme() === 'dark' ? dark : light;
+  const mode = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const l = useSyncExternalStore(onLookChange, look);
+  return useMemo(() => paletteFor(mode, l), [mode, l]);
 }

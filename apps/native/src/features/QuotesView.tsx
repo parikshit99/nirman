@@ -47,7 +47,7 @@ export function QuotesView({ boqId, initial, onClose }: { boqId: string; initial
           </Pressable>
         ) : (
           <View style={{ padding: 8, borderRadius: 8, backgroundColor: c.brandPrimary }}>
-            <Icon name="local-shipping" size={18} color={c.white} />
+            <Icon name="local-shipping" size={18} color={c.onPrimary} />
           </View>
         )}
         <View style={{ flex: 1, minWidth: 0 }}>

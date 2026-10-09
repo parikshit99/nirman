@@ -20,7 +20,7 @@ import { StartProblem } from './features/StartProblem';
 import { SiteReportHost, useSiteReport } from './features/SiteReport';
 import { navigationRef } from './navigation';
 import { AppStateProvider, useAppState } from './state/AppState';
-import { dark, light, useColors } from './theme';
+import { useColors } from './theme';
 
 const ICONS = {
   Purchases: require('../assets/tabs/purchases.png'),
@@ -132,7 +132,7 @@ function Boot() {
 
 export default function App() {
   const scheme = useColorScheme();
-  const colors = scheme === 'dark' ? dark : light;
+  const colors = useColors();
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
   const theme: Theme = {
     ...base,

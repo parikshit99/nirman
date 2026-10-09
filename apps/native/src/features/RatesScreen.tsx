@@ -486,7 +486,7 @@ function ChoiceChips({ options, value, onChange }: { options: string[]; value: s
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
       {['All', ...options].map((o) => (
         <Pressable key={o} accessibilityRole="button" accessibilityState={{ selected: value === o }} onPress={() => onChange(o)} style={{ minHeight: 40, maxWidth: '100%', paddingHorizontal: 16, justifyContent: 'center', borderRadius: 20, borderWidth: 1, borderColor: value === o ? c.orange500 : c.gray200, backgroundColor: value === o ? c.orange500 : c.white }}>
-          <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: value === o ? c.white : c.gray700 }}>
+          <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: value === o ? c.onPrimary : c.gray700 }}>
             {o}
           </Text>
         </Pressable>

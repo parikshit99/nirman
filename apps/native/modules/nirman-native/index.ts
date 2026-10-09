@@ -29,6 +29,8 @@ declare class NirmanNativeModule extends NativeModule<{ shared: () => void }> {
   shareFiles(paths: string[], mimeTypes: string[], title: string): Promise<void>;
   /** Android's own touch feedback. */
   haptic(type: HapticType): Promise<void>;
+  /** The phone's wallpaper colour (Material You, Android 12+) as "#rrggbb"; null on older phones. */
+  systemAccent(): string | null;
   /** The share that started or reached the app, once; listen for "shared" to hear of a new one. */
   takeShared(): SharedPayload | null;
 }

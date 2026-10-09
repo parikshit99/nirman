@@ -172,6 +172,16 @@ class NirmanModule : Module() {
       Unit
     }
 
+    // --- Wallpaper colour -------------------------------------------------------------------
+    /** The phone's wallpaper colour (Material You, Android 12+) as "#rrggbb"; null on older phones. */
+    Function("systemAccent") {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        String.format("#%06x", 0xFFFFFF and context.getColor(android.R.color.system_accent1_500))
+      } else {
+        null
+      }
+    }
+
     // --- Haptics ----------------------------------------------------------------------------
     // A short buzz when a button is pressed, using Android's own touch feedback (the same as
     // native apps), so it follows the phone's "Touch feedback" setting and needs no vibrate permission.
