@@ -29,7 +29,7 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * Nirman's own Android code, ported from apps/mobile's Capacitor plugins
+ * Nirman's own Android code, ported from the 6.x app's Capacitor plugins
  * (TextReaderPlugin, SharedFilesPlugin, HapticsPlugin) with the same logic,
  * plus where the Capacitor app keeps its database.
  */
@@ -86,6 +86,14 @@ class NirmanModule : Module() {
 
     /** Whether a file in the databases folder exists. */
     Function("databaseExists") { name: String -> context.getDatabasePath(name).exists() }
+
+    /** Deletes a database file and its companions (the copy kept from before 7.0, once it is old enough); false if none was there. */
+    Function("deleteDatabase") { name: String ->
+      val file = context.getDatabasePath(name)
+      val existed = file.exists()
+      for (f in companions(file)) f.delete()
+      existed
+    }
 
     // --- TextReader -------------------------------------------------------------------------
     // Reads the text on a bill photo on the phone itself (Google ML Kit text recognition, model

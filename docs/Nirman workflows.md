@@ -160,20 +160,18 @@ How a change reaches phones. CI is `.github/workflows/ci.yml`; the checks to run
 ```mermaid
 flowchart LR
   BR[Branch + PR] --> CI{CI}
-  CI --> TS[test: lint, unit tests,<br/>old app's layout checks]
+  CI --> TS[test: lint, unit tests]
   CI --> NB[native: build + sign<br/>apps/native, arm64]
-  CI --> UP[upgrade: 6.x with data,<br/>7.x installed over it,<br/>lists and totals checked]
-  TS & NB & UP -- all pass, on main --> PB[publish: latest release<br/>+ v‹version›, keeps 5]
+  TS & NB -- all pass, on main --> PB[publish: latest release<br/>+ v‹version›, keeps 5]
   PB --> PHN[Users download nirman.apk,<br/>installs over, data kept]
   PHN -. Report a problem .-> ISS[GitHub issue labelled bug,<br/>with the log] -.-> BR
-  FB[Build 6.x fallback<br/>by hand, only if 7.x breaks] -.-> PB
 ```
 
 How the build is signed and released:
 - **Signing:** every APK is signed with the same release key, with its rotation lineage (`.github/scripts/sign-apk.sh`). The build fails if the APK contains anything that looks like an API key.
 - **Version:** MAJOR.MINOR comes from `apps/native/package.json`; PATCH is the number of commits since it changed (`app-version.sh`). `versionCode` is the CI run number.
 - **Release notes** are the newest CHANGELOG section, the same text as *What's new* in the app.
-- **Rolling back:** *Build 6.x fallback* (`.github/workflows/fallback.yml`) builds the old app from `main` with a higher `versionCode`. Users keep their data and paste the Gemini key again. It is removed in Phase 8.
+- **Going back** to an older 7.x: backup, uninstall, install it from the releases, restore (the last 5 builds are kept). The 6.x fallback build was removed in Phase 8.
 
 ## A-08 Points to analyse
 
@@ -183,7 +181,7 @@ Places where the flows depend on the user or on one device.
 2. **Backups are by hand.** A reminder prompts after a week, but nothing is saved off the phone automatically.
 3. **Unclear handwriting needs Gemini and a connection.** Phone-only mode means typing those in.
 4. **Rates mix all sites.** Price checks prefer this site's price; *Leave out of Rates* and the site filter in Rates are the other controls.
-5. **Updates are manual.** New versions are downloaded from GitHub. Going back to an older one needs: backup, uninstall, install, restore. A fallback build installs over 7.x instead.
+5. **Updates are manual.** New versions are downloaded from GitHub. Going back to an older one needs: backup, uninstall, install, restore.
 6. **After 7.0, the Gemini key is pasted once again.** Until then, entries that need Gemini wait.
 
 Resolved since 5.0:

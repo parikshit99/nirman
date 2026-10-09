@@ -1,6 +1,6 @@
 # Moving Nirman to React Native
 
-Status: agreed October 2026. 7.0 (Phase 7) done; Phase 8 after 7.x has run 6 weeks.
+Status: agreed October 2026. 7.0 (Phase 7) done; Phase 8 done early, on the owner's call (October 2026), a day after 7.0. Next: the sync phases.
 
 The Capacitor app is replaced by a React Native (Expo) app using Android's own controls. There is no beta app beside the old one: the new app is built over the next few sessions, and the update that switches is a normal update to the same app. Phases are sized so that each one fits in **one Claude session and one PR**.
 
@@ -11,7 +11,7 @@ The Capacitor app is replaced by a React Native (Expo) app using Android's own c
 3. **Never start empty silently.** If the existing data can't be opened or checked on first launch, say so and offer *Restore from backup*.
 4. **Same backup file.** Backups from either app restore in the other.
 5. **Feature freeze on `apps/mobile`** from Phase 2 until the switch: fixes only, so nothing is built twice.
-6. **Keep `apps/mobile` buildable** until 7.x has run 6 weeks. It is the fallback (see *Rolling back*).
+6. **Keep `apps/mobile` buildable** until 7.x has run 6 weeks. It is the fallback (see *Rolling back*). (Ended early: Phase 8 removed it.)
 
 ## What carries over, and what doesn't
 
@@ -121,11 +121,12 @@ Losing the preferences and asking for the key once saves a whole preparation rel
    - Add a manual CI workflow *Build 6.x fallback* (see *Rolling back*).
 7. Read: `components/SettingsModal.tsx`, `components/ShareTargetSheet.tsx`, `components/WhatsNewModal.tsx`, `.github/workflows/ci.yml`.
 
-### Phase 8: clean up (after 7.x has run 6 weeks)
+### Phase 8: clean up (planned after 7.x had run 6 weeks; done early)
 
-- Delete `apps/mobile`, the fallback workflow and `nirmaan-before-7.db`.
-- Remove the old-app section from docs/UI guideline.md and the `apps/mobile` notes from docs/Code guideline.md.
-- Update the README.
+- Deleted `apps/mobile`, the fallback workflow, the upgrade test (`upgrade` job, `apps/native/e2e`) and the old app's CI build.
+- `nirmaan-before-7.db` is deleted by the app itself 6 weeks after it was made (`forgetOldCopy` in `startup.ts`), so phones still get the 6 weeks, and one updating from 6.x later too. The first-launch code for 6.x stays.
+- The old debug key (first in the signing lineage) moved to `.github/keys/debug.keystore`; the version check test to `packages/core/test/changelog.test.ts`.
+- Removed the old-app notes from the guidelines and updated the README.
 
 ### Later (separate releases, each a MINOR)
 
@@ -150,7 +151,7 @@ Several people edit the same projects: on site from their phones, in the office 
 
 ### Sync 1: groundwork in the app (MINOR)
 
-Database and core changes only, so both apps get them while `apps/mobile` is still the fallback.
+Database and core changes, plus what the app needs to use them.
 
 - Migration (follow docs/Code guideline.md):
   - `deleted_at` on every table, so deletions sync instead of rows disappearing.
@@ -192,9 +193,7 @@ Database and core changes only, so both apps get them while `apps/mobile` is sti
 
 ## Rolling back
 
-Android won't install an older `versionCode`, so the fallback workflow builds `apps/mobile` from current `main` with a new run number and publishes it to `latest`. It uses the same `packages/core`, so it knows every migration and opens the same file. The Gemini key would have to be pasted again.
-
-Roll back if anyone loses data, the app won't start, or reading bills breaks and can't be fixed within a day.
+Since Phase 8 there is no 6.x fallback. To go back to an older 7.x: *Save backup*, uninstall, install the older APK from the releases (the last 5 are kept), *Restore*. A phone that still has `nirmaan-before-7.db` (its first 6 weeks on 7.x) also has its data as it was before 7.0.
 
 ## Native controls this brings
 
@@ -225,7 +224,7 @@ Still not planned: swipe-to-delete (UX guideline: delete from the edit view only
 - [x] Phase 5: quotes and Rates
 - [x] Phase 6: Labour, site report, sharing
 - [x] Phase 7: Settings, first launch, 7.0
-- [ ] Phase 8: clean up
+- [x] Phase 8: clean up (early)
 - [ ] Sync 1: groundwork
 - [ ] Sync 2: Supabase and sync on the phones
 - [ ] Sync 3: web version on GitHub Pages

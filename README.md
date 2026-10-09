@@ -39,21 +39,21 @@ Everything is stored **only on your phone**. There is no server or account. The 
 
 ## Development
 
-Requirements: Node 22. Android builds also need JDK 21 and the Android SDK (or Android Studio).
+Requirements: Node 22. Android builds also need JDK 17 and the Android SDK (or Android Studio).
 
 ```bash
 npm install
-npm run dev        # the app in a browser at http://localhost:3000 (data kept in IndexedDB)
+npm run dev        # Expo's dev server, for a development build of the app on a phone or emulator
 npm run lint       # type-check
 npm test           # unit tests
+npm run build      # bundle the app for Android (no SDK needed): catches import and bundling errors
 ```
 
 Code layout:
 
 ```
-apps/mobile      React + Vite UI, packaged as an Android app with Capacitor
-apps/native      the React Native (Expo) app replacing it, being built (docs/react-native-plan.md)
-packages/core    shared by the apps, no browser or Capacitor code:
+apps/native      the app: React Native (Expo), with Android's own controls
+packages/core    no screens, so sync and the web version can share it:
   src/data       SQLite schema, repository and backup
   src/jobs       queue worker that reads queued entries (on the phone or with Gemini)
   src/lib        Gemini, settings, PDF and Excel, the problem log
@@ -67,11 +67,10 @@ All records are in a standard SQLite database, and backups are a zip of plain JS
 ### Building the Android app
 
 ```bash
-npm run build
-cd apps/mobile
-npx cap sync android
-npx cap open android            # build/run from Android Studio, or:
-cd android && ./gradlew assembleDebug
+cd apps/native
+npm run prebuild                # generates android/ (not committed)
+npm run android                 # build and run on a phone or emulator, or:
+cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
 ```
 
 ### Versions
@@ -82,4 +81,4 @@ Versions are `MAJOR.MINOR.PATCH` (e.g. `2.2.3`):
 
 [docs/Code guideline.md](docs/Code%20guideline.md) has the rules for deciding which kind a change is. Android's internal version code is the CI build number, so every APK still installs over the previous one as an update. The version shows in *Settings → On this phone*, in Android's App info, in the release title, and as a `v2.2.3` tag on the commit it was built from. Local builds show `dev`.
 
-CI (`.github/workflows/ci.yml`) type-checks, runs the tests and builds a release APK on every push, signed with the key in the repo secrets `RELEASE_KEYSTORE_BASE64` (the PKCS12 keystore, base64) and `RELEASE_KEYSTORE_PASSWORD` (key alias `nirman`). Keep a copy of that keystore somewhere safe: without it, the next update needs an uninstall. Builds of `main` are published to the [`latest` release](https://github.com/parikshit99/nirman/releases/tag/latest), which is where the download link above points. The [last 5 builds](https://github.com/parikshit99/nirman/releases) are also kept as `v4.3.2`-style releases, to go back to in an emergency: Android won't install an older version over a newer one, so *Settings → Save backup*, uninstall, install the older APK and *Restore* (a backup made by a newer version may not restore in an older one if the data format changed in between). Since 7.0 the published APK is the React Native app (`apps/native`); CI first installs it over the 6.x app holding sample data on an emulator and checks the lists and totals. If 7.x must be rolled back, run the *Build 6.x fallback* workflow (see docs/react-native-plan.md). Builds of a pull request are under that workflow run's *Artifacts*. Local builds (`./gradlew assembleDebug`) use the debug key in `android/app/debug.keystore`.
+CI (`.github/workflows/ci.yml`) type-checks, runs the tests and builds a release APK on every push, signed with the key in the repo secrets `RELEASE_KEYSTORE_BASE64` (the PKCS12 keystore, base64) and `RELEASE_KEYSTORE_PASSWORD` (key alias `nirman`). Keep a copy of that keystore somewhere safe: without it, the next update needs an uninstall. Builds of `main` are published to the [`latest` release](https://github.com/parikshit99/nirman/releases/tag/latest), which is where the download link above points. The [last 5 builds](https://github.com/parikshit99/nirman/releases) are also kept as `v4.3.2`-style releases, to go back to in an emergency: Android won't install an older version over a newer one, so *Settings → Save backup*, uninstall, install the older APK and *Restore* (a backup made by a newer version may not restore in an older one if the data format changed in between). Builds of a pull request are under that workflow run's *Artifacts*. CI signs every APK with the release key and the rotation record from the old debug key (`.github/keys/debug.keystore`), which phones that once had a debug-signed build need; keep that file too.

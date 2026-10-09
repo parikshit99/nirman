@@ -5,7 +5,7 @@ const { getDefaultConfig } = require('expo/metro-config');
 const config = getDefaultConfig(__dirname);
 
 // React Native needs exactly the React version it was built with (here, in apps/native/node_modules);
-// apps/mobile uses a newer one at the root, which packages hoisted there would otherwise load.
+// another package puts a newer one at the root, which packages hoisted there would otherwise load.
 const react = path.dirname(require.resolve('react/package.json', { paths: [__dirname] }));
 const resolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {

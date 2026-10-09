@@ -2,7 +2,7 @@ import type React from 'react';
 import { Image, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import { useColors } from '../../theme';
 
-/** What a list shows when it has nothing in it (or nothing matches the filters). Same props as apps/mobile's, with an image for the icon. */
+/** What a list shows when it has nothing in it (or nothing matches the filters). Same props as the 6.x app's, with an image for the icon. */
 export function EmptyState({
   icon,
   title,

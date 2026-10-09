@@ -1,7 +1,6 @@
 name: Build the app (apps/native)
 description: Builds and signs the React Native app's release APK for the given CPU types, and uploads it as an artifact.
-# Used by CI's `native` job (arm64: the APK that is published) and `native-test` job (x86_64, for the emulator in
-# the upgrade test). Needs the repository checked out with its full history.
+# Used by CI's `native` job (arm64: the APK that is published). Needs the repository checked out with its full history.
 inputs:
   architectures:
     description: CPU types to build native code for, comma-separated.

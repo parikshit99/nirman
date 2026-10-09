@@ -10,7 +10,7 @@ OUT=$2
 BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
 APKSIGNER="$BUILD_TOOLS/apksigner"
 echo "APKSIGNER=$APKSIGNER" >> "$GITHUB_ENV"
-DEBUG_KEY=(--ks apps/mobile/android/app/debug.keystore --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android)
+DEBUG_KEY=(--ks .github/keys/debug.keystore --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android)
 if [ -n "${RELEASE_KEYSTORE_BASE64:-}" ]; then
   echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
   RELEASE_KEY=(--ks "$RUNNER_TEMP/release.p12" --ks-pass env:RELEASE_KEYSTORE_PASSWORD --ks-key-alias nirman)

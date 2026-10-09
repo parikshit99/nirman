@@ -8,8 +8,11 @@ import { startServices } from './services';
 const READY_PREF = 'nirmaan_native_ready';
 /** Set on the first launch over 6.x: the Gemini key has to be pasted again (it was in the old app's storage). */
 export const FROM_6X_PREF = 'nirmaan_from_6x';
-/** A copy of 6.x's database, kept as it was before 7.0 first opened it (deleted in Phase 8 of the move). */
+/** A copy of 6.x's database, kept as it was before 7.x first opened it, for 6 weeks (forgetOldCopy). */
 export const BEFORE_7_FILE = 'nirmaan-before-7.db';
+/** When the copy was made (ms); 0 or missing for a copy made before this was recorded. */
+const BEFORE_7_SINCE_PREF = 'nirmaan_before_7_since';
+const KEEP_COPY_MS = 42 * 24 * 60 * 60 * 1000;
 
 export type StartProblem =
   /** 6.x left its files on this phone but its database isn't there. */
@@ -49,6 +52,7 @@ async function start({ withoutCopy = false, allowEmpty = false }: { withoutCopy?
       if (!withoutCopy && !Nirman.databaseExists(BEFORE_7_FILE)) {
         if (info.freeBytes < 2 * info.size) return { ok: false, problem: { kind: 'no-space', size: info.size, free: info.freeBytes } };
         await Nirman.copyDatabase(DATABASE_FILE, BEFORE_7_FILE);
+        prefs.set(BEFORE_7_SINCE_PREF, Date.now());
       }
     }
   }
@@ -67,11 +71,32 @@ async function start({ withoutCopy = false, allowEmpty = false }: { withoutCopy?
     }
     const started = await startServices(db);
     prefs.set(READY_PREF, true);
+    forgetOldCopy();
     return { ok: true, ...started };
   } catch (err) {
     logError(err, 'startup');
     await db?.close().catch(() => {});
     return { ok: false, problem: { kind: 'damaged', detail: (err as Error).message } };
+  }
+}
+
+/**
+ * The copy from before 7.x is deleted 6 weeks after it was made, once the app has started with the data (the 6.x app
+ * it could go back to is gone; anyone updating from 6.x later still gets their 6 weeks). A copy made before the date was
+ * recorded starts its 6 weeks now. Never stops the app from starting.
+ */
+function forgetOldCopy() {
+  try {
+    if (!Nirman.databaseExists(BEFORE_7_FILE)) return;
+    const since = prefs.get(BEFORE_7_SINCE_PREF, 0);
+    if (!since) prefs.set(BEFORE_7_SINCE_PREF, Date.now());
+    else if (Date.now() - since >= KEEP_COPY_MS) {
+      Nirman.deleteDatabase(BEFORE_7_FILE);
+      prefs.set(BEFORE_7_SINCE_PREF, 0);
+      logStep('deleted the copy of the data from before 7.0', { keptDays: Math.round((Date.now() - since) / 86400000) });
+    }
+  } catch (err) {
+    logError(err, 'startup');
   }
 }
 
