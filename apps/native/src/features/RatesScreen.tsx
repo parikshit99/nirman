@@ -17,16 +17,17 @@ import {
   type MaterialFilter,
 } from '@nirman/shared';
 import { MATERIAL_SORTS, saveMaterialSort, savedMaterialSort, sortMaterials, type MaterialSort } from '@nirman/core';
+import { ActionFab, useHideOnScroll, type FabAction } from '../components/ActionFab';
 import { LineEditor, type LineValues } from '../components/LineEditor';
 import { MATERIAL_FILTER_FIELDS, MaterialFilters } from '../components/MaterialFilters';
 import { PriceChart } from '../components/PriceChart';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { SwipeRow } from '../components/SwipeRow';
 import { UndoButton } from '../components/UndoButton';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Icon, type IconName } from '../components/ui/Icon';
-import { OverflowMenu, type MenuItem } from '../components/ui/OverflowMenu';
 import { Field, NumberField } from '../components/ui/fields';
 import { Sheet, SheetHeader, SheetLabel, SheetOption } from '../components/ui/Sheet';
 import { Tabs } from '../components/ui/Tabs';
@@ -70,8 +71,8 @@ export function RatesScreen() {
   const query = search.trim();
   const filtered = useMemo(() => {
     const base = query ? new Fuse(itemDatabase, { keys: ['name', 'variants.label'], threshold: 0.4 }).search(query).map((r) => r.item) : itemDatabase;
-    return filterMaterials(base, materialFilter).filter((e) => (categoryFilter === 'All' || e.categories.some((x) => x.toLowerCase() === categoryFilter.toLowerCase())) && (addressFilter === 'All' || e.addresses.includes(addressFilter)));
-  }, [itemDatabase, query, materialFilter, categoryFilter, addressFilter]);
+    return filterMaterials(base, materialFilter).filter((e) => !pendingDeletes.has(e.key) && (categoryFilter === 'All' || e.categories.some((x) => x.toLowerCase() === categoryFilter.toLowerCase())) && (addressFilter === 'All' || e.addresses.includes(addressFilter)));
+  }, [itemDatabase, query, materialFilter, categoryFilter, addressFilter, pendingDeletes]);
   const entries = useMemo(() => sortMaterials(filtered, sort), [filtered, sort]);
   const totalMaterials = itemDatabase.length;
   const unsavedPriced = itemsFor('audit').filter((i) => i.unit_price > 0 && !pendingDeletes.has(i.id)).length;
@@ -138,13 +139,19 @@ export function RatesScreen() {
     }
   };
 
-  const menu: MenuItem[] =
-    tab === 'materials' && entries.length > 0
+  // The small button at the bottom right, as on Purchases and BOQ: for the materials shown.
+  const fabActions: FabAction[] =
+    tab === 'materials' && entries.length > 0 && !selectMode
       ? [
-          { icon: 'file-download', label: 'Export CSV', about: 'The materials shown, for Excel', onPress: exportCsv },
-          { icon: 'delete-outline', label: entries.length === totalMaterials ? 'Delete all' : `Delete ${entries.length} shown`, about: 'Remove their prices from Rates', onPress: () => void deleteFromRates(entries) },
+          { icon: 'delete-outline', label: entries.length === totalMaterials ? 'Delete all' : `Delete ${entries.length} shown`, tone: 'danger', onPress: () => void deleteFromRates(entries) },
+          { icon: 'file-download', label: 'Export CSV', tone: 'primary', onPress: exportCsv },
         ]
       : [];
+  const [fabHidden, onListScroll] = useHideOnScroll();
+  const swipeDelete = (m: MaterialEntry) => {
+    actions.deleteMaterialLater({ key: m.key, name: m.name, unit: m.unit });
+    dialogs.undoable(`Deleted “${m.name}” from Rates`, () => actions.undoDelete(m.key));
+  };
 
   const sortLabel = MATERIAL_SORTS.find((o) => o.id === sort)!;
 
@@ -171,8 +178,6 @@ export function RatesScreen() {
             >
               {selectMode ? 'Cancel' : 'Select'}
             </Button>
-            {/* Export and Delete, for the materials shown (they were in the header's ⋮ before Settings took its place). */}
-            <OverflowMenu items={menu} />
           </View>
           {filterChips.length > 0 && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
@@ -250,7 +255,9 @@ export function RatesScreen() {
           keyExtractor={(item) => item.key}
           extraData={{ selected, selectMode, open, openVariants, pendingDeletes }}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: 24 }}
+          contentContainerStyle={{ paddingBottom: 96 }}
+          onScroll={(e) => onListScroll(e.nativeEvent.contentOffset.y)}
+          scrollEventThrottle={32}
           ListHeaderComponent={header}
           ListEmptyComponent={
             totalMaterials > 0 ? (
@@ -274,21 +281,27 @@ export function RatesScreen() {
               </View>
             </View>
           }
-          renderItem={({ item }) => (
-            <MaterialCard
-              item={item}
-              selectMode={selectMode}
-              selected={selected.has(item.key)}
-              priceListOpen={open === item.key}
-              variantsOpen={openVariants === item.key}
-              onToggleSelect={() => toggle(item.key)}
-              onEdit={() => setEditing(item)}
-              onTogglePrices={() => setOpen(open === item.key ? null : item.key)}
-              onToggleVariants={() => setOpenVariants(openVariants === item.key ? null : item.key)}
-            />
-          )}
+          renderItem={({ item }) => {
+            const card = (
+              <MaterialCard
+                item={item}
+                selectMode={selectMode}
+                selected={selected.has(item.key)}
+                priceListOpen={open === item.key}
+                variantsOpen={openVariants === item.key}
+                onToggleSelect={() => toggle(item.key)}
+                onEdit={() => setEditing(item)}
+                onTogglePrices={() => setOpen(open === item.key ? null : item.key)}
+                onToggleVariants={() => setOpenVariants(openVariants === item.key ? null : item.key)}
+              />
+            );
+            // Swipe left past half the row to delete, with Undo; not while selecting.
+            return selectMode ? card : <SwipeRow onDelete={() => swipeDelete(item)}>{card}</SwipeRow>;
+          }}
         />
       )}
+
+      <ActionFab label="" showMain={false} onPress={() => undefined} actions={fabActions} actionsLabel="Export or delete the materials shown" hidden={fabHidden} />
 
       {sheet === 'filter' && (
         <FilterSheet
@@ -351,24 +364,7 @@ function MaterialCard({
   onToggleVariants(): void;
 }) {
   const c = useColors();
-  const { actions, pendingDeletes } = useAppState();
   const points = item.priceHistory.filter((h) => h.price > 0);
-  if (pendingDeletes.has(item.key)) {
-    return (
-      <View style={{ paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.red50 }}>
-        <View style={{ flex: 1, minWidth: 0, opacity: 0.6 }}>
-          <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '700', textDecorationLine: 'line-through', color: c.brandDark }}>
-            {item.name}
-          </Text>
-          <Text style={{ fontSize: 12, textDecorationLine: 'line-through', color: c.gray600 }}>
-            per {item.unit} · {plural(item.priceHistory.length, 'price')}
-          </Text>
-        </View>
-        <Text style={{ fontSize: 12, color: c.red600 }}>Deleted</Text>
-        <UndoButton onUndo={() => actions.undoDelete(item.key)} label={item.name} />
-      </View>
-    );
-  }
   const chip = { minHeight: 40, flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4 };
   return (
     <Pressable

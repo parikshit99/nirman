@@ -4,11 +4,13 @@ import { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { contractTotals, sumTotals, type ContractRow, type ContractTotals } from '@nirman/shared';
 import { prefs } from '@nirman/core';
+import { ActionFab, useHideOnScroll } from '../components/ActionFab';
 import { ContractForm } from '../components/ContractForm';
 import { FilterChips } from '../components/FilterChips';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { UndoButton } from '../components/UndoButton';
+import { SwipeRow } from '../components/SwipeRow';
 import { Button } from '../components/ui/Button';
+import { useDialogs } from '../components/ui/Dialogs';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Icon } from '../components/ui/Icon';
 import { RollingText } from '../components/ui/RollingText';
@@ -40,8 +42,12 @@ export function BalanceText({ balance, align }: { balance: number; align?: 'righ
 export function LabourScreen({ about }: { about: string }) {
   const c = useColors();
   const state = useAppState();
-  const { actions, contracts: all, entriesFor, pendingDeletes, categoryNames, allAddresses, projects, projectId, project, uniqueAddresses } = state;
+  const { actions, contracts: everyContract, entriesFor, pendingDeletes, categoryNames, allAddresses, projects, projectId, project, uniqueAddresses } = state;
   const siteReport = useSiteReport();
+  const dialogs = useDialogs();
+  // A contract swiped away (or deleted in its sheet) leaves at once; the strip at the bottom offers Undo.
+  const all = useMemo(() => everyContract.filter((x) => !pendingDeletes.has(x.id)), [everyContract, pendingDeletes]);
+  const [fabHidden, onListScroll] = useHideOnScroll();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [addressFilter, setAddressFilter] = useState('All');
@@ -72,6 +78,11 @@ export function LabourScreen({ about }: { about: string }) {
     if (!editing) setOpenContract(id);
   };
 
+  const deleteWithUndo = (contract: ContractRow) => {
+    actions.deleteContractLater(contract.id);
+    dialogs.undoable(`Deleted the contract with ${contract.contractor}`, () => actions.undoDelete(contract.id));
+  };
+
   const hasSites = all.length > 0 || uniqueAddresses.length > 0;
   const box = { flex: 1, padding: 8, alignItems: 'center' as const, borderRadius: 8, borderWidth: 1, borderColor: c.gray100, backgroundColor: c.gray50 };
   const header = (
@@ -93,17 +104,14 @@ export function LabourScreen({ about }: { about: string }) {
           </View>
         </View>
       )}
-      {/* Side by side, or one under the other on a narrow phone, so neither label is cut off. */}
-      <View style={{ marginHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        <Button variant="primary" icon="add" onPress={() => setContractForm({})} style={{ flexGrow: 1 }}>
-          New contract
-        </Button>
-        {hasSites && (
-          <Button variant="secondary" icon="assignment" onPress={siteReport.open} style={{ flexGrow: 1 }}>
+      {/* On show, as on Saved (#91); New contract is the + at the bottom right. */}
+      {hasSites && (
+        <View style={{ marginHorizontal: 16 }}>
+          <Button variant="secondary" icon="assignment" onPress={siteReport.open}>
             Site report
           </Button>
-        )}
-      </View>
+        </View>
+      )}
       {all.length > 0 && (
         <>
           <FilterChips categories={categoryNames.filter((x) => usedCategories.has(x))} categoryFilter={categoryFilter} onCategory={setCategoryFilter} addresses={sites.length > 1 ? sites : []} addressFilter={addressFilter} onAddress={setAddressFilter} addressLabel="Sites" />
@@ -126,8 +134,9 @@ export function LabourScreen({ about }: { about: string }) {
       <FlashList
         data={contracts}
         keyExtractor={(x) => x.id}
-        extraData={pendingDeletes}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 96 }}
+        onScroll={(e) => onListScroll(e.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={32}
         ListHeaderComponent={header}
         ListEmptyComponent={
           <EmptyState icon={require('../../assets/tabs/labour.png')} title={all.length ? 'No contracts match.' : 'No labour contracts yet.'}>
@@ -135,16 +144,14 @@ export function LabourScreen({ about }: { about: string }) {
           </EmptyState>
         }
         renderItem={({ item }) => (
-          <View style={{ marginHorizontal: 16, marginTop: 12 }}>
-            <ContractCard contract={item} totals={contractTotals(item, entriesFor(item.id))} pending={pendingDeletes.has(item.id)} onOpen={() => setOpenContract(item.id)} />
-            {pendingDeletes.has(item.id) && (
-              <View style={{ position: 'absolute', top: 12, right: 12 }}>
-                <UndoButton onUndo={() => actions.undoDelete(item.id)} label={item.contractor} />
-              </View>
-            )}
+          <View style={{ marginHorizontal: 16, marginTop: 12, borderRadius: 12, overflow: 'hidden' }}>
+            <SwipeRow onDelete={() => deleteWithUndo(item)}>
+              <ContractCard contract={item} totals={contractTotals(item, entriesFor(item.id))} onOpen={() => setOpenContract(item.id)} />
+            </SwipeRow>
           </View>
         )}
       />
+      <ActionFab label="New contract" onPress={() => setContractForm({})} actions={hasSites ? [{ icon: 'assignment', label: 'Site report', tone: 'primary', onPress: siteReport.open }] : []} actionsLabel="Site report" hidden={fabHidden} />
       {openContract && <ContractSheet contractId={openContract} onEdit={(contract) => setContractForm({ contract })} onClose={() => setOpenContract(null)} />}
       {contractForm && (
         <ContractForm
@@ -166,15 +173,14 @@ export function LabourScreen({ about }: { about: string }) {
   );
 }
 
-function ContractCard({ contract: x, totals: t, pending, onOpen }: { contract: ContractRow; totals: ContractTotals; pending: boolean; onOpen(): void }) {
+function ContractCard({ contract: x, totals: t, onOpen }: { contract: ContractRow; totals: ContractTotals; onOpen(): void }) {
   const c = useColors();
   const progress = t.progress === null ? null : Math.min(1, t.progress);
-  const strike = pending ? { textDecorationLine: 'line-through' as const } : null;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`Open contract with ${x.contractor}`} disabled={pending} onPress={onOpen} style={{ padding: 16, gap: 8, borderRadius: 12, borderWidth: 1, borderColor: c.brandConcrete, backgroundColor: c.white, opacity: pending ? 0.4 : 1 }}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`Open contract with ${x.contractor}`} onPress={onOpen} style={{ padding: 16, gap: 8, borderRadius: 12, borderWidth: 1, borderColor: c.brandConcrete, backgroundColor: c.white }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text numberOfLines={1} style={[{ fontSize: 14, fontWeight: '700', color: c.gray900 }, strike]}>
+          <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '700', color: c.gray900 }}>
             {x.contractor}
           </Text>
           <Text numberOfLines={1} style={{ fontSize: 12, color: c.gray600 }}>

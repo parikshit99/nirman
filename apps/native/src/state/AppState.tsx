@@ -196,6 +196,8 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       updateListMeta: write(repo.updateListMeta),
       renameList: write(repo.renameList),
       deleteList: write(repo.deleteList),
+      /** A saved list swiped away: gone from Saved now, deleted after the undo window. */
+      deleteListLater: deleteLater(repo.deleteList),
       deleteAllHistory: write(repo.deleteAllHistory),
       bulkEditMaterials: write(repo.bulkEditMaterials),
       renameMaterial: write(repo.renameMaterial),

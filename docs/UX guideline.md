@@ -57,7 +57,7 @@ Deleting is never silent:
 
 Where Delete lives:
 - **Lines, prices and saved lists** are deleted from their edit view (`LineEditor`'s Delete, the saved list's Edit sheet). Not with a bin on every row or card (it was tapped by mistake).
-- **Purchase and BOQ lines** can also be swiped left to delete (since 7.3), but only past half the row's width, and always with Undo. Swiping right marks them delivered. A long press picks several lines for Delivered or Delete.
+- **Purchase and BOQ lines, saved lists, contracts and materials in Rates** can also be swiped left to delete (since 7.3; all of them since 7.4), but only past half the row's width, and always with Undo. Swiping right marks a line delivered. A long press picks several lines for Delivered or Delete.
 - **"Delete all"** is a labelled button at the end of its list, not a bare icon.
 - **Small rows that undo** (contract entries, queued readings, photos in an entry) may keep an icon button.
 

@@ -1,18 +1,17 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
-import { LayoutAnimation, Pressable, Text, View, useWindowDimensions } from 'react-native';
-import Swipeable, { SwipeDirection, type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
+import { LayoutAnimation, Pressable, Text, View } from 'react-native';
 import { lastPaidFor, materialKey, todayISO, variantLabel, type ItemRow, type LastPaid, type MaterialEntry, type ReadAs } from '@nirman/shared';
 import type { ListKind } from '@nirman/core';
 import { BillPhotosSheet } from '../components/BillPhotos';
 import { DeliveredToggle } from '../components/DeliveredToggle';
+import { SwipeRow } from '../components/SwipeRow';
 import { LineEditor } from '../components/LineEditor';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Icon } from '../components/ui/Icon';
 import { rupees } from '../lib/format';
-import { haptic } from '../lib/haptics';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 
@@ -147,7 +146,14 @@ export function ItemLog({ kind, items: allItems, searching, onAdd, header, onScr
             </View>
           );
           // Swipe right: delivered (or not); swipe left past half the row: delete, with Undo. Not while editing or picking.
-          return editingId === item.id || selecting ? row : <SwipeRow item={item} onDelivered={(date) => actions.setDelivered([item.id], date)} onDelete={() => deleteWithUndo(item)}>{row}</SwipeRow>;
+          return editingId === item.id || selecting ? row : (
+            <SwipeRow
+              onDelete={() => deleteWithUndo(item)}
+              left={item.delivered_at ? { icon: 'undo', label: 'Not delivered', color: c.gray600, onPress: () => actions.setDelivered([item.id], '') } : { icon: 'check', label: 'Delivered', color: c.green600, onPress: () => actions.setDelivered([item.id], todayISO()) }}
+            >
+              {row}
+            </SwipeRow>
+          );
         }}
       />
       {photosOf && <BillPhotosSheet photoIds={[photosOf.photo_id]} title={photosOf.item_name} onClose={() => setPhotosOf(null)} />}
@@ -253,44 +259,5 @@ function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onLongPress, o
         )}
       </View>
     </View>
-  );
-}
-
-/**
- * A line that can be swiped, as chats are in Telegram: to the right marks it delivered (or not delivered, if it was);
- * to the left, past half its width, deletes it (the strip at the bottom offers Undo).
- */
-function SwipeRow({ item, onDelivered, onDelete, children }: { item: ItemRow; onDelivered(date: string): void; onDelete(): void; children: ReactElement }) {
-  const c = useColors();
-  const { width } = useWindowDimensions();
-  const ref = useRef<SwipeableMethods>(null);
-  const delivered = !!item.delivered_at;
-  const panel = (bg: string, icon: 'check' | 'undo' | 'delete-outline', label: string, side: 'left' | 'right') => (
-    <View style={{ width, flexDirection: 'row', alignItems: 'center', justifyContent: side === 'left' ? 'flex-start' : 'flex-end', gap: 8, paddingHorizontal: 24, backgroundColor: bg }}>
-      <Icon name={icon} size={22} color="#fff" />
-      <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>{label}</Text>
-    </View>
-  );
-  return (
-    <Swipeable
-      ref={ref}
-      friction={1.5}
-      overshootFriction={8}
-      leftThreshold={96}
-      rightThreshold={width / 2}
-      renderLeftActions={() => panel(delivered ? c.gray600 : c.green600, delivered ? 'undo' : 'check', delivered ? 'Not delivered' : 'Delivered', 'left')}
-      renderRightActions={() => panel(c.red600, 'delete-outline', 'Delete', 'right')}
-      onSwipeableOpen={(direction) => {
-        haptic('confirm');
-        if (direction === SwipeDirection.RIGHT) {
-          onDelivered(delivered ? '' : todayISO());
-          ref.current?.close();
-        } else {
-          onDelete();
-        }
-      }}
-    >
-      {children}
-    </Swipeable>
   );
 }

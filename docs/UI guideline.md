@@ -16,8 +16,9 @@ Use these; don't hand-build them again. They have the same names and props as th
 | `EmptyState` | Every empty list (texts: see the UX guideline). |
 | `Field`, `NumberField`, `SuggestInput` (`fields.tsx`) | Every text and number input. `NumberField` opens the number keyboard. |
 | `Select`, `DateField` | Pick from a list (Android's list sheet) and dates (Android's date picker). Never a home-made dropdown or calendar. |
-| `OverflowMenu` | A ⋮ inside a screen, for its secondary actions that don't fit (Rates: Export, Delete). Not in the header. |
-| `ActionFab` (`components/`) | Purchases and BOQ, bottom right above the tabs, as in Telegram: the round Add button and, above it, a small one that pops up Save, Share, Preview and Clear. Both slide away while scrolling down. |
+| `OverflowMenu` | A ⋮ inside a screen, for its secondary actions that don't fit. Not in the header. |
+| `ActionFab` (`components/`) | Every list tab, bottom right above the tabs, as in Telegram: the round Add button (Purchases and BOQ: add items; Saved: new BOQ; Labour: new contract; Rates has none) and, above it, a small one that pops up the tab's other actions (Save, Share, Preview, Clear; Site report; Export CSV, Delete). Both slide away while scrolling down (`useHideOnScroll`). Give the list `paddingBottom: 96` so its last row clears them. |
+| `SwipeRow` (`components/`) | A row or card that swipes left past half its width to delete (the caller shows `dialogs.undoable`), and optionally right for one other action (Delivered). Purchase and BOQ lines, saved lists, contracts, materials in Rates. |
 | `Icon` | Material icon names only. |
 | `PressScale` | A Pressable that shrinks a little while held. `Button`, `SheetOption` and chips use it; use it for anything else that looks like a button. |
 | `RollingText` | Money totals and counts in headers: the digits roll to the new value. Monospace. |

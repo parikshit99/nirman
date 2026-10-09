@@ -2,6 +2,21 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 7.4 — The new buttons on every tab
+
+**Saved**
+- Every saved list has a **Share** button: PDF, Excel or JPG (a BOQ also as an order slip), without opening it first.
+- The round button at the bottom right starts a **new BOQ**; the small one above it has *Site report*, *New purchase list* and *Delete all saved lists*.
+- **Swipe** a saved list to the left to delete it, with Undo.
+
+**Labour**
+- **New contract** is the round **+** at the bottom right; *Site report* is also in the small button above it.
+- **Swipe** a contract to the left to delete it, with Undo.
+
+**Rates**
+- *Export CSV* and *Delete* are in the small button at the bottom right, instead of the ⋮.
+- **Swipe** a material to the left to delete it from Rates, with Undo.
+
 ## 7.3 — Smoother, Telegram-style
 
 **Purchases and BOQ**
