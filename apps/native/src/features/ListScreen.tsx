@@ -237,7 +237,7 @@ export function ListScreen({
       </View>
 
       <View style={{ flex: 1 }}>
-        <ItemLog kind={kind} items={filteredItems} searching={!!query} onAdd={() => setAddOpen(true)} header={banner} onScroll={onListScroll} selected={selected} onToggleSelect={toggleSelect} />
+        <ItemLog kind={kind} items={filteredItems} searching={!!query} onAdd={() => setAddOpen(true)} header={banner} onScroll={onListScroll} selected={selected} onToggleSelect={toggleSelect} onClear={canClear ? clearCurrent : undefined} />
         {selected.size === 0 && (listedItems.length > 0 || fabActions.length > 0) && (
           <ActionFab
             label={isAudit ? 'Add purchases' : 'Add to BOQ'}

@@ -171,6 +171,15 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
             {history.length > 0 && <FilterChips categories={categoryNames} categoryFilter={categoryFilter} onCategory={setCategoryFilter} addresses={addresses.length > 1 ? addresses : []} addressFilter={addressFilter} onAddress={setAddressFilter} addressLabel="Filter by site" />}
           </View>
         }
+        ListFooterComponent={
+          history.length > 1 ? (
+            <View style={{ alignItems: 'center', paddingTop: 16 }}>
+              <Button variant="dangerOutline" size="sm" icon="delete-outline" onPress={deleteAllSaved}>
+                Delete all saved lists
+              </Button>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <EmptyState title={history.length ? 'No saved lists match.' : 'Nothing saved yet.'} icon={require('../../assets/tabs/saved.png')}>
             {history.length ? 'Check the filters or search.' : 'Lists you save in this project from Purchases or BOQ (the Save button) appear here.'}

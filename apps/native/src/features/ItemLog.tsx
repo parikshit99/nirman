@@ -28,10 +28,12 @@ interface Props {
   /** Items picked with a long press, for actions on several at once (the list's selection bar). */
   selected: ReadonlySet<string>;
   onToggleSelect(id: string): void;
+  /** Clears the open list (after confirming); not offered while a saved list is open or while searching. */
+  onClear?(): void;
 }
 
 /** The current Purchases or BOQ list: one card per item. */
-export function ItemLog({ kind, items: allItems, searching, onAdd, header, onScroll, selected, onToggleSelect }: Props) {
+export function ItemLog({ kind, items: allItems, searching, onAdd, header, onScroll, selected, onToggleSelect, onClear }: Props) {
   const c = useColors();
   const { actions, itemDatabase, pendingDeletes, projectId, projects } = useAppState();
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? '';
@@ -99,6 +101,11 @@ export function ItemLog({ kind, items: allItems, searching, onAdd, header, onScr
               {undelivered.length > 0 && (
                 <Button block icon="check" onPress={() => actions.setDelivered(undelivered.map((i) => i.id), todayISO())}>
                   Mark all delivered
+                </Button>
+              )}
+              {onClear && !searching && (
+                <Button variant="dangerOutline" size="sm" icon="delete-outline" onPress={onClear}>
+                  Clear all
                 </Button>
               )}
             </View>

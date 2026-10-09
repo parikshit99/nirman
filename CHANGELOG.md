@@ -4,9 +4,12 @@ Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major 
 
 ## 7.4 — The new buttons on every tab
 
+**Purchases and BOQ**
+- **Clear all** is back on show, at the end of the list under *Mark all delivered* (it is also in the small button at the bottom right).
+
 **Saved**
 - Every saved list has a **Share** button: PDF, Excel or JPG (a BOQ also as an order slip), without opening it first.
-- The round button at the bottom right starts a **new BOQ**; the small one above it has *Site report*, *New purchase list* and *Delete all saved lists*.
+- The round button at the bottom right starts a **new BOQ**; the small one above it has *Site report*, *New purchase list* and *Delete all saved lists* (still also at the end of the list).
 - **Swipe** a saved list to the left to delete it, with Undo.
 
 **Labour**
