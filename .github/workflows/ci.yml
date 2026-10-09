@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
+    # A PR that only changes these doesn't run CI (no APK build). Not CHANGELOG.md: it is built into the app.
+    # Pushes to main always run, since every merge publishes.
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'CLAUDE.md'
   workflow_dispatch:
 
 # One run per branch or PR at a time. A new push to a PR cancels its older run (saves Actions minutes); on main the
