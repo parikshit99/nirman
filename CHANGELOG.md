@@ -2,6 +2,17 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 7.2 — Choose the app's colour
+
+**Settings → Appearance**
+- Pick the app's colour from twelve: orange (as before), red, pink, purple, indigo, blue, teal, green, lime, amber, brown or grey. Buttons, tabs, highlights and charts all change together, in light and dark.
+- **Wallpaper** takes the colour from the phone's wallpaper, and changes with it.
+- **Pure black** makes dark mode black instead of dark grey, which saves battery on most phones.
+- Red, green and blue still mean the same things: a problem, done, information.
+
+**App icon**
+- With *Themed icons* turned on in the phone's wallpaper settings, the Nirman icon takes the wallpaper's colour like other apps.
+
 ## 7.1 — One name per material
 
 **Bills now match what is already in Rates**

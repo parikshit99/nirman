@@ -221,8 +221,8 @@ export function ListScreen({
             }}
             style={({ pressed }) => ({ position: 'absolute', right: 16, bottom: 16, height: 56, paddingLeft: 16, paddingRight: 20, borderRadius: 28, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: pressed ? c.orange600 : c.brandPrimary, elevation: 6 })}
           >
-            <Icon name="add" size={24} color={c.white} />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: c.white }}>Add</Text>
+            <Icon name="add" size={24} color={c.onPrimary} />
+            <Text style={{ fontSize: 16, fontWeight: '700', color: c.onPrimary }}>Add</Text>
           </Pressable>
         )}
       </View>

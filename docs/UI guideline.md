@@ -26,15 +26,16 @@ Use these; don't hand-build them again. They have the same names and props as th
 
 ## Colour
 
-- Only the colours from `useColors()` (`apps/native/src/theme.ts`). No other hex, `rgb()` or named colours in components. When a screen needs a shade that isn't there, add it to **both** `light` and `dark`.
+- Only the colours from `useColors()` (`apps/native/src/theme.ts`). No other hex, `rgb()` or named colours in components (the colour circles in *Settings → Appearance* show their own colours). When a screen needs a shade that isn't there, add it to **both** `light` and `dark`.
+- **The accent can be any colour.** The `orange…` shades and `brandPrimary` are Nirman's orange by default, but are worked out again from the colour picked in *Settings → Appearance* or the wallpaper's (`packages/shared/src/palette.ts`). So use them for their role (the main action, a highlight), never because something must look orange. *Pure black* turns dark mode's `white`, `brandGray` and `gray50` black.
 - **Meanings never change:**
-  - **orange:** the main action and the brand
+  - **orange (the accent):** the main action and the brand, in whatever colour is chosen
   - **red:** delete, errors, prices higher than last time
   - **green:** delivered, saved, prices lower
   - **grey:** everything else.
-- **Text on a coloured background** uses `white` (it turns dark in dark mode, which is intended). Only text on red buttons and the page images in `DocumentPreview` stay white in both modes.
+- **Text on a coloured background** uses `white` (it turns dark in dark mode, which is intended); on the accent (`brandPrimary`, `orange500`: buttons, the Add button, picked chips) it uses `onPrimary`, which is white or near-black, whichever reads on the chosen colour. Only text on red buttons and the page images in `DocumentPreview` stay white in both modes.
 - **The PDF preview stays light** (paper), in dark mode too.
-- **Check every screen in dark mode** (*Settings → Appearance → Dark*).
+- **Check every screen in dark mode** (*Settings → Appearance → Dark*), and with a light colour (amber) and a dark one (indigo).
 
 ## Text
 

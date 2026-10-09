@@ -27,6 +27,8 @@ const config: ExpoConfig = {
     adaptiveIcon: {
       foregroundImage: './assets/icon-foreground.png',
       backgroundImage: './assets/icon-background.png',
+      // Themed icons (Android 13+, Samsung One UI 6+): the phone tints this one-colour shape to match the wallpaper.
+      monochromeImage: './assets/icon-foreground.png',
     },
     permissions: ['android.permission.CAMERA', 'android.permission.RECORD_AUDIO', 'android.permission.ACCESS_NETWORK_STATE'],
     // Expo adds these by default; the app never needed them (haptics use touch feedback, not vibrate).

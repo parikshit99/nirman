@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import {
   BackupError,
@@ -20,7 +20,7 @@ import {
   type ModelOption,
   type ReadingMode,
 } from '@nirman/core';
-import { parseSize, sizeLabel, type SheetSize } from '@nirman/shared';
+import { ACCENTS, contrast, parseSize, sizeLabel, type SheetSize } from '@nirman/shared';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { Field, Label, NumberField } from '../components/ui/fields';
@@ -33,7 +33,7 @@ import { latestNotes } from '../lib/changelog';
 import { APP_VERSION } from '../lib/coreSetup';
 import { shareBytes, shareFile, textToBase64 } from '../lib/files';
 import { plural } from '../lib/format';
-import { setThemeChoice, themeChoice, type ThemeChoice } from '../lib/theme';
+import { look, onLookChange, setAccent, setThemeChoice, setThemeStyle, themeChoice, type ThemeChoice, type ThemeStyle } from '../lib/theme';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 
@@ -207,7 +207,10 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
 }
 
 function AppearanceSection() {
+  const c = useColors();
   const [choice, setChoice] = useState<ThemeChoice>(themeChoice);
+  const { accent, style, wallpaper } = useSyncExternalStore(onLookChange, look);
+  const fromWallpaper = style === 'wallpaper' && !!wallpaper;
   return (
     <View style={{ gap: 8 }}>
       <SectionTitle>Appearance</SectionTitle>
@@ -225,6 +228,48 @@ function AppearanceSection() {
         ]}
       />
       <Hint>Dark is easier on the eyes at night; Phone follows the phone's setting.</Hint>
+      <Tabs<ThemeStyle>
+        label="Colours"
+        value={style}
+        onChange={setThemeStyle}
+        options={[
+          { id: 'standard', label: 'Standard' },
+          { id: 'wallpaper', label: 'Wallpaper' },
+          { id: 'black', label: 'Pure black' },
+        ]}
+      />
+      <Hint>
+        {style === 'wallpaper'
+          ? wallpaper
+            ? "The app takes its colour from the phone's wallpaper. Pick a colour below to choose your own."
+            : "This phone doesn't share its wallpaper colour (it needs Android 12 or newer), so the colour below is used."
+          : style === 'black'
+            ? 'Dark mode uses pure black, which saves battery on most phones (OLED screens).'
+            : 'Pick the colour of buttons, tabs and highlights.'}
+      </Hint>
+      <View accessibilityRole="radiogroup" accessibilityLabel="App colour" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: 4 }}>
+        {ACCENTS.map((a) => {
+          const on = !fromWallpaper && a.hex === accent;
+          // The tick is white or black, whichever shows on that colour.
+          const tick = contrast('#ffffff', a.hex) >= 3 ? '#ffffff' : '#121212';
+          return (
+            <Pressable
+              key={a.id}
+              accessibilityRole="radio"
+              accessibilityLabel={a.label}
+              accessibilityState={{ checked: on }}
+              onPress={() => {
+                setAccent(a.hex);
+                if (style === 'wallpaper') setThemeStyle('standard');
+              }}
+              style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: a.hex, borderWidth: on ? 3 : 0, borderColor: c.brandDark, opacity: fromWallpaper ? 0.5 : 1 }}
+            >
+              {on && <Icon name="check" size={22} color={tick} />}
+            </Pressable>
+          );
+        })}
+      </View>
+      <Hint>Red, green and blue keep their meaning (problems, done, information) whatever colour is chosen. For the app icon to match the wallpaper, turn on Themed icons in the phone's wallpaper settings.</Hint>
     </View>
   );
 }

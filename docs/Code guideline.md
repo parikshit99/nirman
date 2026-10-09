@@ -13,7 +13,7 @@ How to change Nirman's code without breaking anyone's data. For screens, also re
 Where new code goes:
 - **Rules and data** (anything a test can check without a screen) go in `packages/core` or `packages/shared`, never in an app. Sync and the web version will use them too.
 - **Screens** go in `apps/native/src/features/`, parts used by several screens in `src/components/`, and the shared UI pieces in `src/components/ui/`.
-- **Android code** goes in the local Expo module `apps/native/modules/nirman-native` (Kotlin). Never edit `apps/native/android/`: prebuild generates it and it isn't committed. The module has `readText` (ML Kit), `haptic`, `takeShared` and the `shared` event (WhatsApp shares), `databasePath` and the first-launch file helpers (`databaseInfo`, `copyDatabase`, `setDatabaseAside`, `deleteDatabase`), `renderPdf` (PDF pages as JPG) and `shareFiles`.
+- **Android code** goes in the local Expo module `apps/native/modules/nirman-native` (Kotlin). Never edit `apps/native/android/`: prebuild generates it and it isn't committed. The module has `readText` (ML Kit), `haptic`, `takeShared` and the `shared` event (WhatsApp shares), `databasePath` and the first-launch file helpers (`databaseInfo`, `copyDatabase`, `setDatabaseAside`, `deleteDatabase`), `renderPdf` (PDF pages as JPG), `shareFiles` and `systemAccent` (the wallpaper colour, Android 12+).
 - **Data** in `apps/native` opens the database through `src/data/db.ts` (the 6.x file, in place); everything else comes from `@nirman/core`.
 
 ## Before every push
