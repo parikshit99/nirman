@@ -51,6 +51,9 @@ const config: ExpoConfig = {
     'expo-sqlite',
     'expo-secure-store',
     'expo-font',
+    // The launch screen: the app icon on the app's own background (brandGray in src/theme.ts), light or dark as the
+    // phone is. It stays until the data is open (src/App.tsx), so opening goes straight from it to the lists.
+    ['expo-splash-screen', { image: './assets/icon-only.png', imageWidth: 160, backgroundColor: '#f5f5f5', dark: { image: './assets/icon-only.png', backgroundColor: '#0c0d10' } }],
     ['expo-image-picker', { cameraPermission: 'Nirman uses the camera to photograph bills.' }],
     ['expo-speech-recognition', { microphonePermission: 'Nirman uses the microphone to type what you say.', speechRecognitionPermission: 'Nirman uses speech recognition to type what you say.' }],
   ],

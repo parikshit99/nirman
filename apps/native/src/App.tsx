@@ -1,6 +1,7 @@
 import { createNativeBottomTabNavigator } from '@bottom-tabs/react-navigation';
 import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View, useColorScheme } from 'react-native';
@@ -62,7 +63,14 @@ function SavedTab() {
 function Tabs() {
   const c = useColors();
   return (
-    <Tab.Navigator tabBarActiveTintColor={c.brandPrimary} tabBarInactiveTintColor={c.gray500} tabBarStyle={{ backgroundColor: c.white }}>
+    <Tab.Navigator
+      tabBarActiveTintColor={c.brandPrimary}
+      tabBarInactiveTintColor={c.gray500}
+      tabBarStyle={{ backgroundColor: c.white }}
+      // The pill behind the picked tab: Material's own is lavender whatever the app's colour.
+      activeIndicatorColor={c.orange100}
+      rippleColor={c.orange100}
+    >
       <Tab.Screen name="Purchases" options={{ tabBarIcon: () => ICONS.Purchases }}>
         {() => <ListScreen kind="audit" about={ABOUT.Purchases} />}
       </Tab.Screen>
@@ -91,6 +99,10 @@ function Boot() {
     void startApp(opts).then(setResult);
   };
   useEffect(() => start(), []);
+  // The launch screen (index.ts) stays until the data is open or has a problem to show: no blank or spinner screen between.
+  useEffect(() => {
+    if (result) void SplashScreen.hideAsync();
+  }, [result]);
   if (!result) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.brandGray }}>
