@@ -7,13 +7,13 @@ import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 import { StatusChip } from './StatusChip';
 import { Icon } from './ui/Icon';
-import { OverflowMenu, type MenuItem } from './ui/OverflowMenu';
 
 /**
- * The top of every tab: the open project (everything below belongs to it), the status, and a ⋮ menu (ending with
- * Settings). `children` is a second row, e.g. the total and Save.
+ * The top of every tab: the open project (everything below belongs to it), the status, and Settings (a page of its
+ * own). A tab's own actions are on the tab itself (Purchases and BOQ: the buttons at the bottom right). `children` is
+ * a second row, e.g. the total.
  */
-export function ScreenHeader({ onStatus, menu, children }: { onStatus?(): void; menu: MenuItem[]; children?: ReactNode }) {
+export function ScreenHeader({ onStatus, children }: { onStatus?(): void; children?: ReactNode }) {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const { project } = useAppState();
@@ -32,7 +32,9 @@ export function ScreenHeader({ onStatus, menu, children }: { onStatus?(): void; 
           <Icon name="arrow-drop-down" size={22} color={c.gray500} />
         </Pressable>
         <StatusChip onPress={onStatus ?? settings.open} />
-        <OverflowMenu items={[...menu, { icon: 'settings', label: 'Settings', about: 'Gemini key, backup, appearance', onPress: settings.open }]} />
+        <Pressable accessibilityRole="button" accessibilityLabel="Settings" onPress={settings.open} style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: pressed ? c.gray100 : 'transparent' })}>
+          <Icon name="settings" size={22} color={c.gray600} />
+        </Pressable>
       </View>
       {children ? <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>{children}</View> : null}
     </View>

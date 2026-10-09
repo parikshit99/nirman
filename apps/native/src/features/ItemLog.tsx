@@ -22,10 +22,12 @@ interface Props {
   onAdd?(): void;
   /** Above the first card: the editing banner, readings in progress. */
   header?: ReactElement | null;
+  /** How far the list is scrolled (the Add button hides while scrolling down). */
+  onScroll?(y: number): void;
 }
 
 /** The current Purchases or BOQ list: one card per item. */
-export function ItemLog({ kind, items, searching, onAdd, header }: Props) {
+export function ItemLog({ kind, items, searching, onAdd, header, onScroll }: Props) {
   const c = useColors();
   const { actions, itemDatabase, pendingDeletes, projectId, projects } = useAppState();
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? '';
@@ -48,6 +50,8 @@ export function ItemLog({ kind, items, searching, onAdd, header }: Props) {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: 96 }}
         ListHeaderComponent={header}
+        onScroll={onScroll && ((e) => onScroll(e.nativeEvent.contentOffset.y))}
+        scrollEventThrottle={32}
         ListEmptyComponent={
           <EmptyState
             title={searching ? 'No items match.' : 'No items yet.'}

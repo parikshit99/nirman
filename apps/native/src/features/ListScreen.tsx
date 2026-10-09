@@ -1,8 +1,9 @@
 import Fuse from 'fuse.js';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { guessCategory, todayISO } from '@nirman/shared';
 import { buildPdf, listSheet, logStep, pdfFile, prefs, workTypeKey, type ExportFormat, type ListKind, type ListMeta } from '@nirman/core';
+import { ActionFab, type FabAction } from '../components/ActionFab';
 import { DocumentPreview } from '../components/DocumentPreview';
 import { SaveModal } from '../components/SaveModal';
 import { ShareSheet } from '../components/ShareSheet';
@@ -14,7 +15,6 @@ import type { MenuItem } from '../components/ui/OverflowMenu';
 import { Sheet, SheetHeader } from '../components/ui/Sheet';
 import { pdfToJpegs, sheetToXlsx } from '../lib/exportFiles';
 import { shareFiles } from '../lib/files';
-import { haptic } from '../lib/haptics';
 import { rupeesWhole } from '../lib/format';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
@@ -149,11 +149,21 @@ export function ListScreen({
     }
   };
   const has = activeItems.length > 0;
-  const menu: MenuItem[] = [
-    ...(has ? [{ icon: 'visibility' as const, label: 'Preview', about: 'See the PDF before sharing it', onPress: () => setPreviewOpen(true) }, { icon: 'share' as const, label: 'Share', about: isAudit ? 'PDF, Excel or pictures' : 'For quotes, or as an order slip', onPress: openShare }] : []),
-    ...extraMenu,
-    ...(canClear ? [{ icon: 'delete-outline' as const, label: 'Clear the list', about: 'Remove every item in the open list', onPress: clearCurrent }] : []),
+  // Above the Add button (ActionFab), nearest first.
+  const fabActions: FabAction[] = [
+    ...(canClear ? [{ icon: 'delete-outline' as const, label: 'Clear the list', tone: 'danger' as const, onPress: clearCurrent }] : []),
+    ...extraMenu.map((m) => ({ icon: m.icon, label: m.label, onPress: m.onPress })),
+    ...(has ? [{ icon: 'visibility' as const, label: 'Preview', onPress: () => setPreviewOpen(true) }, { icon: 'share' as const, label: 'Share', onPress: openShare }, { icon: 'save' as const, label: 'Save', tone: 'primary' as const, onPress: openSave }] : []),
   ];
+  // The buttons slide away while the list is scrolled down, and come back on the way up.
+  const [fabHidden, setFabHidden] = useState(false);
+  const lastY = useRef(0);
+  const onListScroll = useCallback((y: number) => {
+    const dy = y - lastY.current;
+    if (Math.abs(dy) < 8) return;
+    lastY.current = y;
+    setFabHidden(dy > 0 && y > 48);
+  }, []);
 
   const closeAdd = useCallback(() => setAddOpen(false), []);
   // Photos or text shared from another app (e.g. WhatsApp) for this list open the entry form with them.
@@ -183,17 +193,10 @@ export function ListScreen({
 
   return (
     <View style={{ flex: 1, backgroundColor: c.brandGray }}>
-      <ScreenHeader menu={menu}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <View style={{ flexShrink: 1 }}>
-            <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>{isAudit ? 'Spent' : 'Items'}</Text>
-            <Text style={{ fontSize: 14, fontFamily: 'monospace', fontWeight: '700', color: c.brandDark }}>{isAudit ? rupeesWhole(total) : String(filteredItems.length)}</Text>
-          </View>
-          {activeItems.length > 0 && (
-            <Button variant="primary" size="sm" icon="save" onPress={openSave}>
-              Save
-            </Button>
-          )}
+      <ScreenHeader>
+        <View style={{ flexShrink: 1 }}>
+          <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>{isAudit ? 'Spent' : 'Items'}</Text>
+          <Text style={{ fontSize: 14, fontFamily: 'monospace', fontWeight: '700', color: c.brandDark }}>{isAudit ? rupeesWhole(total) : String(filteredItems.length)}</Text>
         </View>
       </ScreenHeader>
 
@@ -210,20 +213,16 @@ export function ListScreen({
       </View>
 
       <View style={{ flex: 1 }}>
-        <ItemLog kind={kind} items={filteredItems} searching={!!query} onAdd={() => setAddOpen(true)} header={banner} />
-        {listedItems.length > 0 && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={isAudit ? 'Add purchases' : 'Add to BOQ'}
-            onPress={() => {
-              haptic('tap');
-              setAddOpen(true);
-            }}
-            style={({ pressed }) => ({ position: 'absolute', right: 16, bottom: 16, height: 56, paddingLeft: 16, paddingRight: 20, borderRadius: 28, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: pressed ? c.orange600 : c.brandPrimary, elevation: 6 })}
-          >
-            <Icon name="add" size={24} color={c.onPrimary} />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: c.onPrimary }}>Add</Text>
-          </Pressable>
+        <ItemLog kind={kind} items={filteredItems} searching={!!query} onAdd={() => setAddOpen(true)} header={banner} onScroll={onListScroll} />
+        {(listedItems.length > 0 || fabActions.length > 0) && (
+          <ActionFab
+            label={isAudit ? 'Add purchases' : 'Add to BOQ'}
+            onPress={() => setAddOpen(true)}
+            showMain={listedItems.length > 0}
+            actions={fabActions}
+            actionsLabel="Save, share or preview"
+            hidden={fabHidden}
+          />
         )}
       </View>
 

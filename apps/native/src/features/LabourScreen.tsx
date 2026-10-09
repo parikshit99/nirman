@@ -11,7 +11,6 @@ import { UndoButton } from '../components/UndoButton';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Icon } from '../components/ui/Icon';
-import type { MenuItem } from '../components/ui/OverflowMenu';
 import { Tabs } from '../components/ui/Tabs';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
@@ -73,8 +72,6 @@ export function LabourScreen({ about }: { about: string }) {
   };
 
   const hasSites = all.length > 0 || uniqueAddresses.length > 0;
-  const menu: MenuItem[] = [{ icon: 'add', label: 'New contract', about: 'A contractor, the job, and the rate or lump sum', onPress: () => setContractForm({}) }, ...(hasSites ? [{ icon: 'assignment' as const, label: 'Site report', about: 'Everything bought and paid for this project', onPress: siteReport.open }] : [])];
-
   const box = { flex: 1, padding: 8, alignItems: 'center' as const, borderRadius: 8, borderWidth: 1, borderColor: c.gray100, backgroundColor: c.gray50 };
   const header = (
     <View style={{ gap: 12, paddingTop: 12 }}>
@@ -119,7 +116,7 @@ export function LabourScreen({ about }: { about: string }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.brandGray }}>
-      <ScreenHeader menu={menu}>
+      <ScreenHeader>
         <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: c.brandConcrete, borderRadius: 22, backgroundColor: c.white }}>
           <Icon name="search" size={18} color={c.gray500} />
           <TextInput accessibilityLabel="Search" value={search} onChangeText={setSearch} placeholder="Search contractors…" placeholderTextColor={c.gray500} style={{ flex: 1, fontSize: 14, color: c.brandDark, paddingVertical: 8 }} />

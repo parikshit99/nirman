@@ -16,13 +16,14 @@ Use these; don't hand-build them again. They have the same names and props as th
 | `EmptyState` | Every empty list (texts: see the UX guideline). |
 | `Field`, `NumberField`, `SuggestInput` (`fields.tsx`) | Every text and number input. `NumberField` opens the number keyboard. |
 | `Select`, `DateField` | Pick from a list (Android's list sheet) and dates (Android's date picker). Never a home-made dropdown or calendar. |
-| `OverflowMenu` | The ⋮ in the header, for secondary actions that don't fit. |
+| `OverflowMenu` | A ⋮ inside a screen, for its secondary actions that don't fit (Rates: Export, Delete). Not in the header. |
+| `ActionFab` (`components/`) | Purchases and BOQ, bottom right above the tabs, as in Telegram: the round Add button and, above it, a small one that pops up Save, Share, Preview and Clear. Both slide away while scrolling down. |
 | `Icon` | Material icon names only. |
 | `PriceChart`, `Sparkline` | Price history (`react-native-svg`). |
 | `useDialogs()` | `confirm` and `alert` are Android's own dialog, `prompt` a small sheet, `toast` a Snackbar. Never React Native's `Alert` directly. |
 | `LineEditor` (`components/`) | Editing a material line anywhere: purchase and BOQ lines, prices in Rates. Extend it; don't add another line form. |
 | `DocumentPreview` (`components/`) | Before sharing any PDF (list, site report, quote comparison, order slip, statement): show the file as it will be shared, then Share. |
-| `ScreenHeader` (`components/`) | The header of every tab: title, the total, the main action and the ⋮ menu. |
+| `ScreenHeader` (`components/`) | The header of every tab: the project, the status, the Settings gear (a page of its own) and a second row such as the total. Tab actions are on the tab, not here. |
 
 ## Colour
 
@@ -48,7 +49,7 @@ Use these; don't hand-build them again. They have the same names and props as th
 ## Layout
 
 - **Phones first:** bottom tab bar (native), a slim header with the total, the list first, the orange **Add** button opens the entry form in a sheet.
-- **Must fit 320 dp wide without sideways scrolling.** Secondary header actions go into the ⋮ menu rather than shrinking. **Never cut off a money amount**; make room instead (wrap the label, not the number).
+- **Must fit 320 dp wide without sideways scrolling.** The header holds only the project, the status and Settings; a screen's actions go on the screen (ActionFab, buttons, or a ⋮ inside it) rather than shrinking. **Never cut off a money amount**; make room instead (wrap the label, not the number).
 - **Status and gesture bars:** use `useSafeAreaInsets()` (`react-native-safe-area-context`). `Sheet`, `ScreenHeader`, the tab bar and the Add button already do. The app is edge to edge (SDK 36).
 - **Lists** scroll on their own; content leaves room at the bottom for the tab bar and, on Purchases and BOQ, the Add button.
 - **Touch targets at least 40 dp.** Icon-only buttons have a 16–20 dp icon with padding to reach 40 dp (or `hitSlop`), and an `accessibilityLabel`.

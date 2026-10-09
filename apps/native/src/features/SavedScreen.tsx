@@ -13,7 +13,6 @@ import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Icon } from '../components/ui/Icon';
-import type { MenuItem } from '../components/ui/OverflowMenu';
 import { plural } from '../lib/format';
 import { useAppState, type HistoryRecord } from '../state/AppState';
 import { useColors } from '../theme';
@@ -33,7 +32,7 @@ interface SaveState {
 }
 
 /** The Saved tab: the saved purchase lists and BOQs of the open project. */
-export function SavedScreen({ about, extraMenu = [], onQuotes, onSiteReport }: { about: string; extraMenu?: MenuItem[]; onQuotes?(boqId: string): void; onSiteReport?(): void }) {
+export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; onQuotes?(boqId: string): void; onSiteReport?(): void }) {
   const c = useColors();
   const dialogs = useDialogs();
   const navigation = useNavigation<{ navigate(name: string): void }>();
@@ -119,15 +118,9 @@ export function SavedScreen({ about, extraMenu = [], onQuotes, onSiteReport }: {
     if (ok) await actions.deleteAllHistory(projectId);
   };
 
-  const menu: MenuItem[] = [
-    { icon: 'add', label: 'New BOQ', about: 'Start a BOQ to send vendors', onPress: () => navigation.navigate('BOQ') },
-    ...(onSiteReport ? [{ icon: 'assignment' as const, label: 'Site report', about: 'Everything bought and paid for this project', onPress: onSiteReport }] : []),
-    ...extraMenu,
-  ];
-
   return (
     <View style={{ flex: 1, backgroundColor: c.brandGray }}>
-      <ScreenHeader menu={menu}>
+      <ScreenHeader>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View>
             <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>In this project</Text>
