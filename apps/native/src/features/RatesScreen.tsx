@@ -26,7 +26,7 @@ import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Icon, type IconName } from '../components/ui/Icon';
-import type { MenuItem } from '../components/ui/OverflowMenu';
+import { OverflowMenu, type MenuItem } from '../components/ui/OverflowMenu';
 import { Field, NumberField } from '../components/ui/fields';
 import { Sheet, SheetHeader, SheetLabel, SheetOption } from '../components/ui/Sheet';
 import { Tabs } from '../components/ui/Tabs';
@@ -171,6 +171,8 @@ export function RatesScreen() {
             >
               {selectMode ? 'Cancel' : 'Select'}
             </Button>
+            {/* Export and Delete, for the materials shown (they were in the header's ⋮ before Settings took its place). */}
+            <OverflowMenu items={menu} />
           </View>
           {filterChips.length > 0 && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
@@ -228,7 +230,7 @@ export function RatesScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.brandGray }}>
-      <ScreenHeader menu={menu}>
+      <ScreenHeader>
         <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: c.brandConcrete, borderRadius: 22, backgroundColor: c.white }}>
           <Icon name="search" size={18} color={c.gray500} />
           <TextInput accessibilityLabel="Search" value={search} onChangeText={setSearch} placeholder="Search materials…" placeholderTextColor={c.gray500} style={{ flex: 1, fontSize: 14, color: c.brandDark, paddingVertical: 8 }} />

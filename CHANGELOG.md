@@ -2,6 +2,26 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 7.3 — Smoother, Telegram-style
+
+**Purchases and BOQ**
+- A round **+** at the bottom right adds items. The small button above it opens **Save, Share, Preview** and **Clear the list**. Both slide away while you scroll down the list and come back when you scroll up.
+- **Swipe** a line to the right to mark it delivered (or not delivered), or all the way to the left to delete it.
+- **Long press** a line to pick several, then mark them delivered or delete them together. *Pick all* picks every line shown.
+- A deleted line leaves the list at once. A strip at the bottom says what was deleted, with **Undo** and a countdown.
+
+**Everywhere**
+- Settings is the ⚙ at the top right and opens as its own page. Rates' *Export CSV* and *Delete* are in the ⋮ beside *Select*.
+- Screens slide in from the right. Swipe from the left edge, or press Back, to slide them away.
+- Buttons shrink a little when pressed, tabs slide, new lines slide into place, and totals roll to their new value.
+- Switching between Light and Dark spreads the new colours from your finger.
+- The app opens with its icon and goes straight to your lists, with no blank screen or spinner.
+- The highlight behind the picked tab is now in the app's colour.
+
+**Projects**
+- **Long press** a project to pin it to the top.
+- Closed projects are folded into one row at the end. Tap it to see them.
+
 ## 7.2 — Choose the app's colour
 
 **Settings → Appearance**

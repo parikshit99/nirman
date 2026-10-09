@@ -1,5 +1,5 @@
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Switch, Text, TextInput, View, useColorScheme } from 'react-native';
 import {
   BackupError,
   DEFAULT_MODEL,
@@ -35,7 +35,8 @@ import { shareBytes, shareFile, textToBase64 } from '../lib/files';
 import { plural } from '../lib/format';
 import { look, onLookChange, setAccent, setThemeChoice, setThemeStyle, themeChoice, type ThemeChoice, type ThemeStyle } from '../lib/theme';
 import { useAppState } from '../state/AppState';
-import { useColors } from '../theme';
+import { paletteFor, useColors } from '../theme';
+import { useCircleReveal } from '../components/CircleReveal';
 
 /**
  * Gemini key, how bills are read, appearance, backup, and what is on this phone. On first launch it is a short
@@ -210,23 +211,32 @@ function AppearanceSection() {
   const c = useColors();
   const [choice, setChoice] = useState<ThemeChoice>(themeChoice);
   const { accent, style, wallpaper } = useSyncExternalStore(onLookChange, look);
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const reveal = useCircleReveal();
+  const touch = useRef({ x: 0, y: 0 });
+  // Light or Dark spreads from the finger as a circle (Phone may already match, so it just switches).
+  const pickMode = (next: ThemeChoice) => {
+    setChoice(next);
+    if (next !== 'system' && next !== scheme) reveal.start(touch.current.x, touch.current.y, paletteFor(next, look()).white, () => setThemeChoice(next));
+    else setThemeChoice(next);
+  };
   const fromWallpaper = style === 'wallpaper' && !!wallpaper;
   return (
     <View style={{ gap: 8 }}>
       <SectionTitle>Appearance</SectionTitle>
-      <Tabs<ThemeChoice>
-        label="Appearance"
-        value={choice}
-        onChange={(next) => {
-          setChoice(next);
-          setThemeChoice(next);
-        }}
-        options={[
-          { id: 'system', label: 'Phone' },
-          { id: 'light', label: 'Light' },
-          { id: 'dark', label: 'Dark' },
-        ]}
-      />
+      {reveal.overlay}
+      <View onTouchStart={(e) => (touch.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}>
+        <Tabs<ThemeChoice>
+          label="Appearance"
+          value={choice}
+          onChange={pickMode}
+          options={[
+            { id: 'system', label: 'Phone' },
+            { id: 'light', label: 'Light' },
+            { id: 'dark', label: 'Dark' },
+          ]}
+        />
+      </View>
       <Hint>Dark is easier on the eyes at night; Phone follows the phone's setting.</Hint>
       <Tabs<ThemeStyle>
         label="Colours"

@@ -1,7 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Alert, Animated, StyleSheet, Text, TextInput, View } from 'react-native';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { Easing, runOnJS, useAnimatedProps, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Svg, { Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptic } from '../../lib/haptics';
+import { DURATION, EASE_IN, EASE_OUT } from '../../lib/motion';
 import { useColors } from '../../theme';
 import { Button } from './Button';
 import { Sheet } from './Sheet';
@@ -10,8 +13,10 @@ export interface Dialogs {
   alert(title: string, message?: string): Promise<void>;
   confirm(title: string, opts?: { message?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }): Promise<boolean>;
   prompt(title: string, defaultValue?: string): Promise<string | null>;
-  /** A short note that something worked: a Snackbar that goes by itself (nothing to choose). */
+  /** A short note that something worked: a strip at the bottom that goes by itself (nothing to choose). */
   toast(message: string): void;
+  /** The same strip with **Undo** and a countdown ring, as Telegram's: `undo` runs if tapped before `ms` is up. */
+  undoable(message: string, undo: () => void, ms?: number): void;
 }
 
 const DialogContext = createContext<Dialogs | null>(null);
@@ -24,10 +29,17 @@ export function useDialogs(): Dialogs {
 
 const TOAST_MS = 2500;
 
+export interface Bulletin {
+  id: number;
+  message: string;
+  undo?: () => void;
+  ms: number;
+}
+
 /** `confirm` and `alert` are Android's own dialog; `prompt` is a small sheet; `toast` is a Snackbar above the tab bar. */
 export function DialogProvider({ children }: { children: ReactNode }) {
   const [prompting, setPrompting] = useState<{ title: string; value: string; resolve(v: string | null): void } | null>(null);
-  const [toast, setToast] = useState<{ id: number; message: string } | null>(null);
+  const [toast, setToast] = useState<Bulletin | null>(null);
 
   const api = useMemo<Dialogs>(
     () => ({
@@ -50,7 +62,11 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       prompt: (title, defaultValue = '') => new Promise<string | null>((resolve) => setPrompting({ title, value: defaultValue, resolve })),
       toast: (message) => {
         haptic('confirm');
-        setToast({ id: Date.now(), message });
+        setToast({ id: Date.now(), message, ms: TOAST_MS });
+      },
+      undoable: (message, undo, ms = 10_000) => {
+        haptic('confirm');
+        setToast({ id: Date.now(), message, undo, ms });
       },
     }),
     [],
@@ -99,30 +115,74 @@ function PromptBody({ title, initial, onDone }: { title: string; initial: string
   );
 }
 
-/** Slides up from above the tab bar and fades by itself. */
-function Snackbar({ toast, onDone }: { toast: { id: number; message: string } | null; onDone(): void }) {
+/**
+ * Slides up above the tab bar, as Telegram's bulletins do, and slides away by itself. With `undo`, it has an Undo
+ * button and a ring counting the seconds left; a new strip replaces the one showing.
+ */
+function Snackbar({ toast, onDone }: { toast: Bulletin | null; onDone(): void }) {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const opacity = useRef(new Animated.Value(0)).current;
+  const y = useSharedValue(1);
+  const left = useSharedValue(1);
+  const [seconds, setSeconds] = useState(0);
   const done = useCallback(onDone, [onDone]);
   useEffect(() => {
     if (!toast) return;
-    opacity.setValue(0);
-    Animated.timing(opacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-    const timer = setTimeout(() => Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(done), TOAST_MS);
-    return () => clearTimeout(timer);
-  }, [toast, opacity, done]);
+    y.value = 1;
+    y.value = withTiming(0, { duration: DURATION.normal, easing: EASE_OUT });
+    left.value = 1;
+    left.value = withTiming(0, { duration: toast.ms, easing: Easing.linear });
+    const end = Date.now() + toast.ms;
+    setSeconds(Math.ceil(toast.ms / 1000));
+    const tick = setInterval(() => setSeconds(Math.max(0, Math.ceil((end - Date.now()) / 1000))), 250);
+    const timer = setTimeout(() => {
+      y.value = withTiming(1, { duration: DURATION.quick, easing: EASE_IN }, (finished) => {
+        if (finished) runOnJS(done)();
+      });
+    }, toast.ms);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(tick);
+    };
+  }, [toast, y, left, done]);
+  const slide = useAnimatedStyle(() => ({ opacity: 1 - y.value, transform: [{ translateY: 24 * y.value }] }));
+  const ring = useAnimatedProps(() => ({ strokeDashoffset: RING * (1 - left.value) }));
   if (!toast) return null;
+  const undo = toast.undo;
   return (
-    <Animated.View pointerEvents="none" accessibilityLiveRegion="polite" style={[styles.snackWrap, { bottom: 88 + insets.bottom, opacity }]}>
+    <Animated.View pointerEvents="box-none" accessibilityLiveRegion="polite" style={[styles.snackWrap, { bottom: 88 + insets.bottom }, slide]}>
       <View style={[styles.snack, { backgroundColor: c.gray900 }]}>
-        <Text style={{ color: c.white, fontSize: 14, fontWeight: '600' }}>{toast.message}</Text>
+        {undo && (
+          <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+            <Svg width={24} height={24} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
+              <AnimatedCircle cx={12} cy={12} r={10} stroke={c.white} strokeWidth={2} fill="none" strokeDasharray={RING} animatedProps={ring} strokeLinecap="round" />
+            </Svg>
+            <Text style={{ color: c.white, fontSize: 11, fontWeight: '700' }}>{seconds}</Text>
+          </View>
+        )}
+        <Text style={{ flexShrink: 1, color: c.white, fontSize: 14, fontWeight: '600' }}>{toast.message}</Text>
+        {undo && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Undo: ${toast.message}`}
+            onPress={() => {
+              undo();
+              done();
+            }}
+            style={{ minHeight: 40, justifyContent: 'center', paddingHorizontal: 8, marginRight: -8 }}
+          >
+            <Text style={{ color: c.orange300, fontSize: 14, fontWeight: '700', textTransform: 'uppercase' }}>Undo</Text>
+          </Pressable>
+        )}
       </View>
     </Animated.View>
   );
 }
 
+const RING = 2 * Math.PI * 10;
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
 const styles = StyleSheet.create({
   snackWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', paddingHorizontal: 16 },
-  snack: { maxWidth: 420, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
+  snack: { maxWidth: 420, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
 });

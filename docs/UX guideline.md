@@ -9,7 +9,7 @@ Site supervisors and owners, on a phone, on site: in sunlight, with gloves, with
 ## Principles
 
 1. **Lists first.** Each tab opens on its list. Adding is one tap away (the orange **Add** button).
-2. **One main action per screen or sheet** (the orange button). Everything else is secondary or in the ⋮ menu.
+2. **One main action per screen or sheet** (the orange button). Everything else is secondary, or behind the small button above Add (Purchases and BOQ).
 3. **Everything is saved as it is made.** Each line is written the moment it is added or changed. *Save list* only moves the open list into Saved.
 4. **Works offline.** Every screen works without internet. Entries made offline are queued and read once the phone is online, and the app says so ("Waiting for internet", "Being read").
 5. **The phone first, Gemini when needed.** Bills are read on the phone where possible. The user picks this in *Settings → How bills are read*.
@@ -52,11 +52,12 @@ Never an alert for something that just worked. Never a silent failure: if someth
 ## Deleting
 
 Deleting is never silent:
-- **Use Undo** where possible (the `…Later` actions show *Undo* in a Snackbar).
+- **Use Undo** where possible: the `…Later` actions take the row away and show `dialogs.undoable` (the strip with *Undo* and a countdown).
 - **Otherwise ask first** with a `danger` confirm: a saved list, a contract, clearing a draft, delete all.
 
 Where Delete lives:
-- **Lines, prices and saved lists** are deleted from their edit view (`LineEditor`'s Delete, the saved list's Edit sheet). Not with a bin on every row or card (it was tapped by mistake), and not with swipe-to-delete.
+- **Lines, prices and saved lists** are deleted from their edit view (`LineEditor`'s Delete, the saved list's Edit sheet). Not with a bin on every row or card (it was tapped by mistake).
+- **Purchase and BOQ lines** can also be swiped left to delete (since 7.3), but only past half the row's width, and always with Undo. Swiping right marks them delivered. A long press picks several lines for Delivered or Delete.
 - **"Delete all"** is a labelled button at the end of its list, not a bare icon.
 - **Small rows that undo** (contract entries, queued readings, photos in an entry) may keep an icon button.
 

@@ -11,6 +11,8 @@ export const light = {
   ...ORANGE.light,
   /** Text and icons on brandPrimary and orange500 (buttons, the Add button, picked chips). */
   onPrimary: '#ffffff',
+  /** Dims the screen behind a menu (always black, at reduced opacity). */
+  scrim: '#000000',
   white: '#ffffff',
   brandDark: '#121212',
   brandGray: '#f5f5f5',

@@ -1,5 +1,6 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { useColors } from '../theme';
+import { PressScale } from './ui/PressScale';
 
 interface Props {
   categories: string[];
@@ -20,9 +21,9 @@ export function FilterChips({ categories, categoryFilter, onCategory, addresses,
         {['All', ...categories].map((cat) => {
           const on = categoryFilter === cat;
           return (
-            <Pressable key={cat} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => onCategory(cat)} style={{ minHeight: 40, paddingHorizontal: 16, justifyContent: 'center', borderRadius: 20, borderWidth: 1, borderColor: on ? c.orange500 : c.gray200, backgroundColor: on ? c.orange500 : c.white }}>
+            <PressScale key={cat} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => onCategory(cat)} style={{ minHeight: 40, paddingHorizontal: 16, justifyContent: 'center', borderRadius: 20, borderWidth: 1, borderColor: on ? c.orange500 : c.gray200, backgroundColor: on ? c.orange500 : c.white }}>
               <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', color: on ? c.onPrimary : c.gray500 }}>{cat}</Text>
-            </Pressable>
+            </PressScale>
           );
         })}
       </ScrollView>
@@ -33,11 +34,11 @@ export function FilterChips({ categories, categoryFilter, onCategory, addresses,
             {['All', ...addresses].map((addr) => {
               const on = addressFilter === addr;
               return (
-                <Pressable key={addr} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => onAddress(addr)} style={{ minHeight: 40, maxWidth: 200, paddingHorizontal: 12, justifyContent: 'center', borderRadius: 20, backgroundColor: on ? c.gray800 : c.gray100 }}>
+                <PressScale key={addr} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => onAddress(addr)} style={{ minHeight: 40, maxWidth: 200, paddingHorizontal: 12, justifyContent: 'center', borderRadius: 20, backgroundColor: on ? c.gray800 : c.gray100 }}>
                   <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: on ? c.onPrimary : c.gray500 }}>
                     {addr === 'All' ? 'All sites' : addr}
                   </Text>
-                </Pressable>
+                </PressScale>
               );
             })}
           </ScrollView>

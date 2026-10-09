@@ -1,23 +1,41 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
+import { prefs } from '@nirman/core';
 import { Pressable, Text, View } from 'react-native';
 import type { ProjectRow } from '@nirman/shared';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { Icon } from '../components/ui/Icon';
 import { Field, SuggestInput } from '../components/ui/fields';
-import { Sheet, SheetHeader, SheetLabel } from '../components/ui/Sheet';
+import { Sheet, SheetHeader } from '../components/ui/Sheet';
 import { plural } from '../lib/format';
+import { haptic } from '../lib/haptics';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 
 const rupees = (n: number) => `₹${Math.round(n || 0).toLocaleString('en-IN')}`;
 
+/** Projects pinned to the top of the list, newest pin first. Kept on this phone (like the theme), not in backups. */
+const PINNED_PREF = 'nirmaan_pinned_projects';
+
 /** Pick the project to work on, start a new one, or open one's details. */
 export function ProjectsSheet({ onClose, onNew, onEdit, backEnabled = true }: { onClose(): void; onNew(): void; onEdit(project: ProjectRow): void; backEnabled?: boolean }) {
   const c = useColors();
   const { projects, projectId, projectSummary, actions } = useAppState();
-  const ongoing = projects.filter((p) => p.status === 'active');
+  const dialogs = useDialogs();
+  const [pinned, setPinned] = useState<string[]>(() => prefs.get<string[]>(PINNED_PREF, []));
+  // Pinned projects first (as pinned chats in Telegram), then the rest as before.
+  const pinRank = (id: string) => (pinned.includes(id) ? pinned.indexOf(id) : Infinity);
+  const ongoing = projects.filter((p) => p.status === 'active').sort((a, b) => pinRank(a.id) - pinRank(b.id));
   const closed = projects.filter((p) => p.status === 'closed');
+  // Closed projects fold into one row, as Telegram's archive does, unless the open project is one of them.
+  const [showClosed, setShowClosed] = useState(() => closed.some((p) => p.id === projectId));
+  const togglePin = (p: ProjectRow) => {
+    haptic('confirm');
+    const next = pinned.includes(p.id) ? pinned.filter((id) => id !== p.id) : [p.id, ...pinned];
+    prefs.set(PINNED_PREF, next);
+    setPinned(next);
+    dialogs.toast(next.includes(p.id) ? `Pinned “${p.name}” to the top` : `Unpinned “${p.name}”`);
+  };
 
   const pick = (id: string) => {
     actions.openProject(id);
@@ -29,12 +47,15 @@ export function ProjectsSheet({ onClose, onNew, onEdit, backEnabled = true }: { 
     const current = p.id === projectId;
     return (
       <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: current ? c.orange400 : c.gray200, backgroundColor: current ? c.orange50 : c.gray50 }}>
-        <Pressable accessibilityRole="button" accessibilityState={{ selected: current }} onPress={() => pick(p.id)} style={{ flex: 1, minWidth: 0, minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 12 }}>
+        <Pressable accessibilityRole="button" accessibilityState={{ selected: current }} accessibilityHint={p.status === 'active' ? 'Long press to pin or unpin' : undefined} onPress={() => pick(p.id)} onLongPress={p.status === 'active' ? () => togglePin(p) : undefined} style={{ flex: 1, minWidth: 0, minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 12 }}>
           <Icon name={current ? 'check' : 'apartment'} size={20} color={current ? c.orange600 : c.gray400} />
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '700', color: c.gray900 }}>
-              {p.name}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 14, fontWeight: '700', color: c.gray900 }}>
+                {p.name}
+              </Text>
+              {pinned.includes(p.id) && p.status === 'active' && <Icon name="push-pin" size={14} color={c.gray500} />}
+            </View>
             {p.address && p.address !== p.name ? (
               <Text numberOfLines={1} style={{ fontSize: 12, color: c.gray500 }}>
                 {p.address}
@@ -56,12 +77,16 @@ export function ProjectsSheet({ onClose, onNew, onEdit, backEnabled = true }: { 
 
   return (
     <Sheet label="Projects" onClose={onClose} backEnabled={backEnabled} closeOnBackdrop>
-      <SheetHeader title="Projects" subtitle="Each project keeps its own purchases, BOQs, labour contracts and saved lists. Rates are shared by all projects." onClose={onClose} />
+      <SheetHeader title="Projects" subtitle="Each project keeps its own purchases, BOQs, labour contracts and saved lists. Rates are shared by all projects. Long press a project to pin it to the top." onClose={onClose} />
       <View style={{ gap: 8 }}>{ongoing.map(row)}</View>
       {closed.length > 0 && (
         <View style={{ gap: 8 }}>
-          <SheetLabel>Closed</SheetLabel>
-          {closed.map(row)}
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: showClosed }} onPress={() => setShowClosed(!showClosed)} style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, borderRadius: 12, backgroundColor: c.gray50 }}>
+            <Icon name="archive" size={20} color={c.gray500} />
+            <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: c.gray700 }}>Closed projects ({closed.length})</Text>
+            <Icon name={showClosed ? 'expand-less' : 'expand-more'} size={22} color={c.gray500} />
+          </Pressable>
+          {showClosed && closed.map(row)}
         </View>
       )}
       <Button variant="primary" block icon="add" onPress={onNew}>
