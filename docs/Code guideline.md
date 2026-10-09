@@ -22,7 +22,9 @@ Where new code goes:
 2. `npm test`: unit tests for core and shared (including that the version and the newest CHANGELOG section match).
 3. `npm run build`: bundles the app (`expo export --platform android`) without the Android SDK; catches import and Metro errors.
 
-Push once everything passes. CI then builds and signs the APK (the `native` job) and publishes it from `main`. There is no test on a device since the 6.x upgrade test went with `apps/mobile`: check screens on a phone or emulator (UI guideline).
+Push once everything passes. CI then builds and signs the APK (the `native` job) and publishes it from `main`.
+
+**CI is billed by the minute**, and the APK build is most of it. On a pull request it runs only when the Android build itself changes (Kotlin module, `app.config.ts`, icons, dependencies, CI: `.github/scripts/changed-parts.sh`), or with the label `build-apk` for an APK to try on a phone; never while the PR is a draft. A PR that only changes `docs/`, `README.md` or `CLAUDE.md` runs no CI at all. A new push stops the PR's run still going. `main` always builds and publishes. The build runs on GitHub's machines, or on the owner's PC when the repository variable `NATIVE_RUNNER` is `self-hosted` ([self-hosted-runner.md](self-hosted-runner.md)). There is no test on a device since the 6.x upgrade test went with `apps/mobile`: check screens on a phone or emulator (UI guideline).
 
 ## Versions
 
@@ -87,6 +89,7 @@ These rules protect installed phones. Breaking one can lose someone's work.
 
 ## Git and pull requests
 
+- Open a PR as a draft while it is still changing (only `test` runs); mark it ready once the local checks pass.
 - One topic per PR, titled like the existing ones ("Nirman 7.1: …" for a release, "CI: …" or "Fix: …" otherwise).
 - **Features:** the CHANGELOG section is written for site supervisors (see the words list in the UX guideline), not for developers.
 - **The README** describes the app as it is. Update it in the same PR as the change.
