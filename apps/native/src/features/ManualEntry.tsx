@@ -43,7 +43,8 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
       await dialogs.alert('Check the number', `“${quantity === null ? draft.quantity : draft.unit_price}” is not a number. Use digits, e.g. 1500 or 1,500.`);
       return;
     }
-    await actions.addItems(openIds[kind], [
+    // Matched like a read bill: typed "Mount air" joins "Mountair" in Rates (the line shows Undo).
+    const [stored] = await actions.addTypedItems(openIds[kind], [
       {
         item_name: name,
         quantity,
@@ -56,7 +57,8 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
         ...Object.fromEntries(VARIANT_FIELDS.map((f) => [f, draft[f].trim()])),
       },
     ]);
-    setAdded((list) => [...list, `${name} · ${quantity} ${draft.unit.trim() || 'unit'}${unitPrice ? ` · ₹${(quantity * unitPrice).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : ''}`]);
+    const matched = stored.item_name !== name ? ` (matched from “${name}”)` : '';
+    setAdded((list) => [...list, `${stored.item_name} · ${stored.quantity} ${stored.unit || 'unit'}${unitPrice ? ` · ₹${(quantity * unitPrice).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : ''}${matched}`]);
     // Keep the vendor for the next line from the same bill.
     setDraft({ ...EMPTY, vendor: draft.vendor });
   };

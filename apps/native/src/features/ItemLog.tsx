@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { useEffect, useState, type ReactElement } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { lastPaidFor, materialKey, todayISO, variantLabel, type ItemRow, type LastPaid, type MaterialEntry } from '@nirman/shared';
+import { lastPaidFor, materialKey, todayISO, variantLabel, type ItemRow, type LastPaid, type MaterialEntry, type ReadAs } from '@nirman/shared';
 import type { ListKind } from '@nirman/core';
 import { BillPhotosSheet } from '../components/BillPhotos';
 import { DeliveredToggle } from '../components/DeliveredToggle';
@@ -102,6 +102,7 @@ export function ItemLog({ kind, items, searching, onAdd, header }: Props) {
                 onDelivered={(date) => actions.setDelivered([item.id], date)}
                 pendingDelete={pendingDeletes.has(item.id)}
                 onUndo={() => actions.undoDelete(item.id)}
+                onUnmatch={() => actions.undoMatch(item.id)}
               />
             )}
           </View>
@@ -123,9 +124,23 @@ interface CardProps {
   onDelivered(date: string): void;
   pendingDelete: boolean;
   onUndo(): void;
+  /** Put the line back as it was read, before it was matched to a material in Rates. */
+  onUnmatch(): void;
 }
 
-function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onPhotos, onDelivered, pendingDelete, onUndo }: CardProps) {
+/** What a matched line was read as ("Mount air", or "Saria, 2 MT" when the unit was converted), or null. */
+function readAsLabel(item: ItemRow): string | null {
+  if (!item.read_as) return null;
+  try {
+    const read = JSON.parse(item.read_as) as Partial<ReadAs>;
+    const unitChanged = read.unit && read.unit.toLowerCase() !== item.unit.toLowerCase();
+    return `${read.item_name ?? ''}${unitChanged ? `, ${read.quantity} ${read.unit}` : ''}`;
+  } catch {
+    return null;
+  }
+}
+
+function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onPhotos, onDelivered, pendingDelete, onUndo, onUnmatch }: CardProps) {
   const c = useColors();
   const strike = { textDecorationLine: 'line-through' as const };
   if (pendingDelete) {
@@ -152,6 +167,7 @@ function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onPhotos, onDe
   const isHigher = diffPercent > 2;
   const isLower = diffPercent < -2;
   const chip = { minHeight: 40, flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: c.gray200 };
+  const readAs = readAsLabel(item);
 
   return (
     <View>
@@ -167,6 +183,17 @@ function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onPhotos, onDe
         </View>
         {variantLabel(item) ? <Text style={{ fontSize: 12, fontWeight: '700', color: c.gray700, marginTop: 2 }}>{variantLabel(item)}</Text> : null}
         {item.ordered_as ? <Text style={{ fontSize: 12, color: c.orange800, marginTop: 2 }}>Ordered: {item.ordered_as}</Text> : null}
+        {readAs !== null && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+            <Icon name="call-merge" size={12} color={c.gray500} />
+            <Text style={{ flexShrink: 1, fontSize: 12, color: c.gray600 }}>Matched to Rates; read as “{readAs}”</Text>
+            {/* Looks like UndoButton; a line wrongly matched goes back to its own name and unit. */}
+            <Pressable accessibilityRole="button" accessibilityLabel={`Undo the match, keep ${readAs}`} onPress={onUnmatch} style={{ minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, borderRadius: 12, backgroundColor: c.blue50 }}>
+              <Icon name="undo" size={16} color={c.blue600} />
+              <Text style={{ fontSize: 12, fontWeight: '700', color: c.blue600 }}>Undo</Text>
+            </Pressable>
+          </View>
+        )}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, rowGap: 2, marginTop: 2 }}>
           <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500 }}>
             {item.quantity} {item.unit}

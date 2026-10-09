@@ -237,6 +237,10 @@ const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS lists_project_idx ON lists (project_id);
   CREATE INDEX IF NOT EXISTS contracts_project_idx ON contracts (project_id);
   `,
+  // 7.1: a line matched to a material in Rates keeps what it was read as, so the match can be undone.
+  `
+  ALTER TABLE items ADD COLUMN read_as TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 /** Default categories sort before anything the user adds. */

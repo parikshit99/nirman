@@ -37,6 +37,8 @@ export const extractedMaterialSchema = z.object({
   ...readVariant,
   /** How it was ordered when billed in another unit, e.g. "3 bundles of 12 mm". */
   ordered_as: z.string().catch(''),
+  /** Set when reading matched it to a material in Rates: the line as read (JSON of ReadAs). */
+  read_as: z.string().optional().catch(undefined),
 });
 export type ExtractedMaterial = z.infer<typeof extractedMaterialSchema>;
 /** A material to add: like ExtractedMaterial, but optional fields (e.g. brand) may be left out. */
@@ -105,6 +107,8 @@ export const itemRowSchema = z.object({
   photo_id: z.string().max(100).default(''),
   /** 1: its price was cleared from Rates for good (Settings → Deleted from Rates → Clear); the line itself stays. */
   rates_excluded: z.number().int().min(0).max(1).default(0),
+  /** The line as read (JSON: name, unit, quantity, rate, brand, spec, ordered as) when it was matched to a material in Rates; blank otherwise. */
+  read_as: z.string().max(2000).default(''),
   created_at: isoTimestamp,
   updated_at: isoTimestamp,
 });
@@ -303,6 +307,8 @@ export interface ExtractionRequest {
   /** YYYY-MM-DD, used when the source has no date. */
   capture_date: string;
   learning: LearningMap;
+  /** Material names already in Rates (and the catalog's), to be reused for the same things. */
+  materials?: { name: string; unit: string }[];
 }
 
 /** One line of a vendor quote as read by the AI. boq_sr is the matched BOQ Sr. number (1-based) or null. */

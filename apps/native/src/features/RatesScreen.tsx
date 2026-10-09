@@ -10,6 +10,7 @@ import {
   materialKey,
   parseAmount,
   similarMaterials,
+  unitFactor,
   todayISO,
   variantLabel,
   type MaterialEntry,
@@ -668,13 +669,19 @@ function MaterialEditor({ material, onClose }: { material: MaterialEntry; onClos
   };
 
   const mergeInto = async (target: MaterialEntry) => {
-    const sameUnit = target.unit.toLowerCase() === material.unit.toLowerCase();
+    const factor = unitFactor(material.unit, target.unit);
+    const units =
+      factor === 1
+        ? ''
+        : factor
+          ? `\nPrices are converted from per ${material.unit} to per ${target.unit} (1 ${material.unit} = ${Number(factor.toFixed(4))} ${target.unit}).`
+          : `\nThe units differ (${material.unit} vs ${target.unit}); the prices are not converted.`;
     const ok = await dialogs.confirm(`Merge into “${target.name}”?`, {
-      message: `“${material.name}” (${plural(material.priceHistory.length, 'price')}) becomes “${target.name}” per ${target.unit}, combining both price histories. Future readings of the same words use the new name.${sameUnit ? '' : `\nThe units differ (${material.unit} vs ${target.unit}); the prices are not converted.`}`,
+      message: `“${material.name}” (${plural(material.priceHistory.length, 'price')}) becomes “${target.name}” per ${target.unit}, combining both price histories. Future readings of the same words use the new name.${units}`,
       confirmLabel: 'Merge',
     });
     if (!ok) return false;
-    await actions.renameMaterial(material.key, { item_name: target.name, unit: target.unit });
+    await actions.renameMaterial(material.key, { item_name: target.name, unit: target.unit }, true);
     return true;
   };
 

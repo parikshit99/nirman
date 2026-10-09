@@ -33,7 +33,7 @@ interface SaveState {
 }
 
 /** The Saved tab: the saved purchase lists and BOQs of the open project. */
-export function SavedScreen({ about, extraMenu = [], onQuotes }: { about: string; extraMenu?: MenuItem[]; onQuotes?(boqId: string): void }) {
+export function SavedScreen({ about, extraMenu = [], onQuotes, onSiteReport }: { about: string; extraMenu?: MenuItem[]; onQuotes?(boqId: string): void; onSiteReport?(): void }) {
   const c = useColors();
   const dialogs = useDialogs();
   const navigation = useNavigation<{ navigate(name: string): void }>();
@@ -119,7 +119,11 @@ export function SavedScreen({ about, extraMenu = [], onQuotes }: { about: string
     if (ok) await actions.deleteAllHistory(projectId);
   };
 
-  const menu: MenuItem[] = [{ icon: 'add', label: 'New BOQ', about: 'Start a BOQ to send vendors', onPress: () => navigation.navigate('BOQ') }, ...extraMenu];
+  const menu: MenuItem[] = [
+    { icon: 'add', label: 'New BOQ', about: 'Start a BOQ to send vendors', onPress: () => navigation.navigate('BOQ') },
+    ...(onSiteReport ? [{ icon: 'assignment' as const, label: 'Site report', about: 'Everything bought and paid for this project', onPress: onSiteReport }] : []),
+    ...extraMenu,
+  ];
 
   return (
     <View style={{ flex: 1, backgroundColor: c.brandGray }}>
@@ -129,6 +133,12 @@ export function SavedScreen({ about, extraMenu = [], onQuotes }: { about: string
             <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>In this project</Text>
             <Text style={{ fontSize: 14, fontWeight: '700', color: c.brandDark }}>{plural(history.length, 'list')}</Text>
           </View>
+          {/* On show, as in 6.x, not only in the ⋮ menu (#91). */}
+          {onSiteReport && (
+            <Button variant="secondary" size="sm" icon="assignment" onPress={onSiteReport}>
+              Site report
+            </Button>
+          )}
         </View>
       </ScreenHeader>
       <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>

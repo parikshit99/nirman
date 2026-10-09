@@ -160,6 +160,18 @@ describe('backup', () => {
     expect((await loadSnapshot(target)).items.length).toBe((await loadSnapshot(db)).items.length);
   });
 
+  it('still restores version 13 backups, whose lines have no read_as, and keeps it from version 14', async () => {
+    const db = await populated();
+    const backup = await exportBackup(db);
+    expect(backup.version).toBe(14);
+    const v13 = { ...backup, version: 13, items: backup.items.map(({ read_as: _r, ...rest }) => rest) };
+    const parsed = parseBackup(JSON.stringify(v13));
+    expect(parsed.items.every((i) => i.read_as === '')).toBe(true);
+    const target = await freshDb();
+    await restoreBackup(target, parseBackup(JSON.stringify({ ...backup, items: backup.items.map((i) => ({ ...i, read_as: '{"item_name":"Cemnt"}' })) })));
+    expect((await loadSnapshot(target)).items.every((i) => i.read_as === '{"item_name":"Cemnt"}')).toBe(true);
+  });
+
   it('still restores version 2 backups, which have no hidden materials', async () => {
     const db = await populated();
     const { hidden_materials: _h, ...v2 } = await exportBackup(db);

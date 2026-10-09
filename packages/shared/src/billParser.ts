@@ -39,7 +39,7 @@ export function boxesToRows(boxes: TextBox[]): string[] {
 }
 
 /** Units as written on bills, and the unit they are stored as. */
-const UNITS: Record<string, string> = {
+export const UNITS: Record<string, string> = {
   bag: 'Bag', bags: 'Bag', bori: 'Bag', katta: 'Bag', kattas: 'Bag',
   kg: 'kg', kgs: 'kg', kilo: 'kg',
   mt: 'MT', ton: 'MT', tons: 'MT', tonne: 'MT', qtl: 'Quintal', quintal: 'Quintal',
