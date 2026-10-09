@@ -6,29 +6,23 @@ How to change Nirman's code without breaking anyone's data. For screens, also re
 
 | Folder | What | Status |
 |---|---|---|
-| `apps/native` | The app that ships (React Native, Expo) | Main app since 7.0 |
-| `apps/mobile` | The old Capacitor app | Fixes only; it is the fallback until Phase 8 of [react-native-plan.md](react-native-plan.md), then deleted |
-| `packages/core` | Database schema, migrations, repository, backup, Gemini, the queue worker, PDF and Excel, diagnostics | Shared by both apps |
-| `packages/shared` | Types, validation, the Gemini prompt and parsing, price, quote and labour rules | Shared by both apps |
+| `apps/native` | The app (React Native, Expo) | Since 7.0; the Capacitor app (`apps/mobile`) was removed in 7.x |
+| `packages/core` | Database schema, migrations, repository, backup, Gemini, the queue worker, PDF and Excel, diagnostics | Shared with sync and the web version later |
+| `packages/shared` | Types, validation, the Gemini prompt and parsing, price, quote and labour rules | Shared with sync and the web version later |
 
 Where new code goes:
 - **Rules and data** (anything a test can check without a screen) go in `packages/core` or `packages/shared`, never in an app. Sync and the web version will use them too.
 - **Screens** go in `apps/native/src/features/`, parts used by several screens in `src/components/`, and the shared UI pieces in `src/components/ui/`.
-- **Android code** goes in the local Expo module `apps/native/modules/nirman-native` (Kotlin). Never edit `apps/native/android/`: prebuild generates it and it isn't committed. The module has `readText` (ML Kit), `haptic`, `takeShared` and the `shared` event (WhatsApp shares), `databasePath` and the first-launch file helpers (`databaseInfo`, `copyDatabase`, `setDatabaseAside`), `renderPdf` (PDF pages as JPG) and `shareFiles`.
+- **Android code** goes in the local Expo module `apps/native/modules/nirman-native` (Kotlin). Never edit `apps/native/android/`: prebuild generates it and it isn't committed. The module has `readText` (ML Kit), `haptic`, `takeShared` and the `shared` event (WhatsApp shares), `databasePath` and the first-launch file helpers (`databaseInfo`, `copyDatabase`, `setDatabaseAside`, `deleteDatabase`), `renderPdf` (PDF pages as JPG) and `shareFiles`.
 - **Data** in `apps/native` opens the database through `src/data/db.ts` (the 6.x file, in place); everything else comes from `@nirman/core`.
 
 ## Before every push
 
 1. `npm run lint`: type-checks every package, including `apps/native`.
-2. `npm test`: unit tests for core, shared and apps/mobile.
-3. `npm run build`: the old app still builds (rule: it stays buildable until Phase 8).
-4. After a change in `apps/native`, run `npx expo export --platform android` in `apps/native`. It bundles the app without the Android SDK and catches import and Metro errors.
-5. After a UI change in `apps/mobile` (fixes only), also run `npm run test:e2e -w apps/mobile`.
+2. `npm test`: unit tests for core and shared (including that the version and the newest CHANGELOG section match).
+3. `npm run build`: bundles the app (`expo export --platform android`) without the Android SDK; catches import and Metro errors.
 
-Push once everything passes. CI then:
-- builds the APK (the `native` job);
-- installs it over 6.x with data on an emulator and checks lists and totals with Maestro (the `upgrade` job, `apps/native/e2e/upgrade.yaml`);
-- publishes from `main`.
+Push once everything passes. CI then builds and signs the APK (the `native` job) and publishes it from `main`. There is no test on a device since the 6.x upgrade test went with `apps/mobile`: check screens on a phone or emulator (UI guideline).
 
 ## Versions
 
@@ -40,7 +34,7 @@ Versions are `MAJOR.MINOR.PATCH`. MAJOR.MINOR is set by hand in `apps/native/pac
 | **New feature** → MINOR (7.0 → 7.1) | a new button, screen, report, calculator, share option or setting; a new kind of data saved (a database migration) | Bump the minor number in `apps/native/package.json` (patch stays 0) and add a `## 7.1 — <title>` section at the top of CHANGELOG.md. It becomes the release notes and the in-app *What's new* screen. |
 | **Major release** → MAJOR (7.x → 8.0) | a redesign or new main tab; several features released together; a change in how the app is used every day; anything that needs a reinstall or makes old backups unreadable | Bump the major number (8.0.0) and add a `## 8.0 — <title>` section listing everything since the previous major. |
 
-When unsure between two sizes, pick the smaller one. A test (`apps/mobile/test/whatsNew.test.ts`) fails if the version and the newest CHANGELOG section don't match.
+When unsure between two sizes, pick the smaller one. A test (`packages/core/test/changelog.test.ts`) fails if the version and the newest CHANGELOG section don't match.
 
 ## Keeping users' data safe
 
@@ -51,11 +45,11 @@ These rules protect installed phones. Breaking one can lose someone's work.
   - Append a migration to `MIGRATIONS` in `packages/core/src/data/schema.ts`. Never edit a shipped one.
   - Bump the backup `VERSION` in `backup.ts`, keeping older versions readable.
   - Update [data-format.md](data-format.md).
-  - Until Phase 8, the change must work in both apps (they share the schema).
   - A migration is a MINOR release.
 - **Never start empty silently.** If data can't be opened or checked, show *Restore from backup* (`features/StartProblem.tsx`). Never create a new database over a problem.
 - **Backups** from any version must keep restoring. Add a sample file to the tests when the format changes.
-- **Rolling back:** the manual *Build 6.x fallback* workflow (`.github/workflows/fallback.yml`) builds the old app with a new run number. Keep it working until Phase 8.
+- **Going back to an older version** needs a backup, uninstall, install of the older APK and restore (README). The 6.x fallback build was removed with `apps/mobile`.
+- **First launch over 6.x** (`apps/native/src/data/startup.ts`) stays for phones that update late: it opens 6.x's database in place and keeps a copy (`nirmaan-before-7.db`) for 6 weeks.
 
 ## Security and privacy
 
@@ -76,13 +70,10 @@ These rules protect installed phones. Breaking one can lose someone's work.
 
 - **TypeScript, strict.** Format new code like the existing code: Prettier, `--print-width 180 --single-quote`. Don't reformat lines you didn't change.
 - **Match the surrounding code:** naming, comment density, idioms. Comments say *why*, in plain sentences.
-- **`packages/core` has no browser, Capacitor or React Native code.** Its type check has no DOM. Each app hands it storage and device details with `configureCore`:
-  - `apps/native/src/lib/coreSetup.ts`
-  - `apps/mobile/src/lib/coreSetup.ts`
+- **`packages/core` has no browser, Capacitor or React Native code.** Its type check has no DOM. The app hands it storage and device details with `configureCore` (`apps/native/src/lib/coreSetup.ts`).
 - **React in `apps/native`** is pinned to the version Expo asks for. `metro.config.js` makes every package use that copy. Upgrade Expo with `npx expo install --fix`, never by hand-editing versions.
-- **`src/state/AppState.tsx`** exists in both apps; keep the two the same until Phase 8.
 - **Times shown to the user are in IST.** When talking to the owner (CI runs, schedules), Claude also gives times in IST.
-- **Tests:** a new rule or repository function gets a unit test in its package. A new screen or flow that could lose data gets a step in the Maestro flow.
+- **Tests:** a new rule or repository function gets a unit test in its package. A new screen or flow that could lose data is checked by hand on a phone before merging (there is no device test in CI).
 - **Dependencies:** prefer one that already exists in the repo. For Android features, prefer an Expo or well-kept React Native library to native code; when native code is needed, add it to `modules/nirman-native`.
 
 ## Working with Claude sessions (keeping token use low)

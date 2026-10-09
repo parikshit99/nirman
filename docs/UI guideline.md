@@ -2,7 +2,7 @@
 
 How Nirman's screens look. Users are on site, on a phone, often in sunlight, sometimes with gloves. Keep every screen consistent. When a rule doesn't fit, change the shared piece rather than working around it in one screen. What the app says and how it behaves is in the [UX guideline](UX%20guideline.md).
 
-These rules are for `apps/native`. The old Capacitor app has its own section at the end, until it is deleted in Phase 8.
+These rules are for the app, `apps/native`.
 
 ## Shared pieces (`apps/native/src/components/ui/`)
 
@@ -62,19 +62,5 @@ Use these; don't hand-build them again. They have the same names and props as th
 
 ## Checking a UI change
 
-- **Run** `npm run lint` and `npx expo export --platform android` (in `apps/native`).
+- **Run** `npm run lint` and `npm run build`.
 - **Look at the screen on a phone or emulator** in light and dark, at the normal font size and at 1.3× (*Settings → Display → Font size*). Check the narrowest phone you have, or an emulator at 320 dp.
-- **A new screen or sheet** that holds data gets a step in `apps/native/e2e/upgrade.yaml` when it shows lists or totals.
-
-## The old app (`apps/mobile`, until Phase 8)
-
-Fixes only. Its rules, in short:
-- **Same shared pieces** as above, in `apps/mobile/src/components/ui/`. Overlays only through `Sheet`, never a new `fixed inset-0`.
-- **Colours:** only Tailwind palette classes (`gray`, `orange`, `red`, `green`, `blue`, `white`) and `--color-brand-*`.
-  - A new shade gets its dark value under `:root.dark` in `index.css`.
-  - The only literal colour allowed is `[#fff]`.
-- **Text:** `text-xs` at the smallest, no `text-[10px]`/`text-[11px]`, hints `text-gray-500`.
-- **Insets:** `var(--inset-top)` / `var(--inset-bottom)`, never `env(safe-area-inset-*)`.
-- **Narrow headers:** below 480 px, secondary header buttons are icon-only (keep the `aria-label`); below 360 px, Save too.
-- **Icon buttons:** `p-2.5` around a 16–20 px icon.
-- **Check** with `npm run build`, then `npm run test:e2e -w apps/mobile` (320, 360 and 412 px, sheets, dark mode).

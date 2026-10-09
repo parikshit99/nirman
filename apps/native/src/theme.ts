@@ -1,6 +1,6 @@
 import { useColorScheme } from 'react-native';
 
-// The colours of apps/mobile/src/index.css (Tailwind's palette and the brand), as hex: React Native has no oklch.
+// The colours of the 6.x app's index.css (Tailwind's palette and the brand), as hex: React Native has no oklch.
 // Dark mode redefines the same names, as `:root.dark` does there; shades it doesn't list keep their light value.
 // Generated once from those files; when a dark shade is added there, add it here too.
 

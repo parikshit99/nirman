@@ -19,6 +19,8 @@ declare class NirmanNativeModule extends NativeModule<{ shared: () => void }> {
   /** Renames a database file and its companions within the databases folder. */
   setDatabaseAside(from: string, to: string): void;
   databaseExists(name: string): boolean;
+  /** Deletes a database file and its companions within the databases folder; false if there was none. */
+  deleteDatabase(name: string): boolean;
   /** Reads the text on a photo (base64 or data URL) on the phone, with no internet. */
   readText(image: string): Promise<{ lines: TextBox[]; text: string }>;
   /** Each page of a PDF file as a JPG (base64), drawn at `scale` times the PDF's size with Android's PdfRenderer. */
