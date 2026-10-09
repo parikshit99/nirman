@@ -69,6 +69,9 @@ runs:
         CCACHE_BASEDIR: ${{ github.workspace }}
         CCACHE_NOHASHDIR: 'true'
         CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
+        # Gradle downloads the NDK afresh on every run, so its compiler always has a new date; by default ccache
+        # takes that as a new compiler and misses every file (2 hits in 144). Compare the compiler's version instead.
+        CCACHE_COMPILERCHECK: '%compiler% --version'
     - name: Sign the APK
       run: .github/scripts/sign-apk.sh apps/native/android/app/build/outputs/apk/release/app-release.apk ${{ inputs.apk }}
       shell: bash
