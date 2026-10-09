@@ -794,6 +794,11 @@ export function nameSimilarity(a: string, b: string): number {
   if (!wa.length || !wb.length) return 0;
   const codes = (ws: string[]) => ws.filter(hasDigit).sort().join(' ');
   if (codes(wa) !== codes(wb)) return 0;
+  // The same letters spaced or joined differently ("Mount air" / "Mountair"), or one letter off.
+  const joinedA = wa.join('');
+  const joinedB = wb.join('');
+  if (joinedA === joinedB) return 1;
+  if (joinedA.length >= 6 && sameWord(joinedA, joinedB)) return 0.9;
   const shared = wa.filter((w) => wb.some((v) => sameWord(w, v))).length;
   return shared / (wa.length + wb.length - shared);
 }

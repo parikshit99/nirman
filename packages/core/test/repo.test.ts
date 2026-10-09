@@ -52,8 +52,9 @@ import { DRAFT_IDS, freshDb, projectOf } from './helpers.ts';
 
 const cement = { item_name: 'Cement', original_term: 'bori', quantity: 15, unit: 'Bag', unit_price: 500, total_amount: 0, vendor: 'Sharma', date: '2026-09-30' };
 const sand = { item_name: 'Sand', original_term: 'reti', quantity: 2, unit: 'MT', unit_price: 1500, total_amount: 3000, vendor: '', date: '' };
-/** Undo migration 13's columns, so earlier migrations can be run again. */
+/** Undo the columns of migrations 13 and 14, so earlier migrations can be run again. */
 async function dropProjectColumns(db: Awaited<ReturnType<typeof freshDb>>) {
+  await db.run('ALTER TABLE items DROP COLUMN read_as');
   await db.run('DROP INDEX lists_project_idx');
   await db.run('DROP INDEX contracts_project_idx');
   for (const table of ['lists', 'contracts', 'indexed_rates']) await db.run(`ALTER TABLE ${table} DROP COLUMN project_id`);

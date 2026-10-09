@@ -25,7 +25,7 @@ The `nirmaan` names are the original internal ids. They stay unchanged so existi
 |---|---|---|
 | `projects` | project (one building job or site) | `name`, `address` (its site address, offered when saving lists and adding contracts); `status`: `active` or `closed` |
 | `lists` | purchase list or BOQ | `project_id` (a `projects` id); `kind`: `audit` (Purchases) or `boq`; `status`: `draft` or `saved`; `title`, `address`, `category`, `site_date`, `notes` |
-| `items` | line in a list | `list_id`; `item_name` (standard English name); `original_term` (word as written or spoken, e.g. "bori"); `quantity`, `unit`, `unit_price`, `total_amount`, `vendor`, `date`; `delivered_at`, the date a purchase line reached the site (blank = not marked); `ordered_as`, how it was ordered when billed in another unit (e.g. "3 bundles of 12 mm" for a line in kg); `photo_id`, the `bill_photos` row it was read from (blank for typed or spoken lines); `rates_excluded`, 1 when its price is kept out of Rates and price checks: ticked *Leave out of Rates* on the line (e.g. transport included in the rate), or cleared from Rates for good in Settings (the line stays in its list, its totals and site reports) |
+| `items` | line in a list | `list_id`; `item_name` (standard English name); `original_term` (word as written or spoken, e.g. "bori"); `quantity`, `unit`, `unit_price`, `total_amount`, `vendor`, `date`; `delivered_at`, the date a purchase line reached the site (blank = not marked); `ordered_as`, how it was ordered when billed in another unit (e.g. "3 bundles of 12 mm" for a line in kg); `photo_id`, the `bill_photos` row it was read from (blank for typed or spoken lines); `rates_excluded`, 1 when its price is kept out of Rates and price checks: ticked *Leave out of Rates* on the line (e.g. transport included in the rate), or cleared from Rates for good in Settings (the line stays in its list, its totals and site reports); `read_as`, set when reading matched the line to a material (see *One name per material*): JSON of the line as read (`item_name`, `unit`, `quantity`, `unit_price`, `brand`, `spec`, `ordered_as`), so *Undo* can put it back; blank otherwise (since 7.1) |
 | `indexed_rates` | single price added on its own (a confirmed vendor quote; versions up to 3.0.0 also stored "Index rate" here, which now saves the purchase list to History instead) | `item_name`, `unit`, `date`, `price`, `vendor`, `indexed_at`; `category` and `address`: the BOQ's for a confirmed quote; for "Index rate", the site picked when indexing, or the purchase list's once it is saved with the same line; `project_id`: the BOQ's project for a confirmed quote, else blank (Rates covers all projects) |
 | `learned_terms` | correction the app remembers | `id` is the original word, lower-cased; it maps to the `item_name` and `unit` to use instead |
 | `categories` | type of work (Civil, Electrical, …) | `name`; the built-in ones use the lower-cased name as `id` |
@@ -54,7 +54,16 @@ There is no separate price table. The Rates tab is computed on the fly (`buildIt
 
 Each material's work categories and sites come from its saved lists and from its rates' `category` and `address`; a material with none gets a category guessed from its name. Names and units are first passed through `learned_terms`, and for materials listed in `hidden_materials`, rows recorded up to `hidden_at` are left out (saved-list items by the list's `created_at`, open purchase list items by their own `created_at`, rates by `indexed_at`). Within a material, prices are also grouped by variant (the four variant fields, compared lower-cased). A price check for a line that names a brand, model, spec or colour only uses past prices with the same values for the fields it names; blank fields match anything. Price checks are site first (`lastPaidFor`, and `compareQuotes` with the BOQ's project): the last price paid for the same project is used, and only when that project has none, the latest price from any project, shown with its site address.
 
-Renaming a material in the app rewrites `item_name` and `unit` on all of its items and rates, and records each original word in `learned_terms`. Renaming to the name and unit of another material therefore merges the two.
+Renaming a material in the app rewrites `item_name` and `unit` on all of its items and rates, and records each original word in `learned_terms`. Renaming to the name and unit of another material therefore merges the two. A merge in the Rates tab (since 7.1) also converts between units of one kind: quantities are multiplied and rates divided by the factor (`unitFactor` in `packages/shared/src/catalog.ts`; e.g. 1 MT = 1000 kg, 1 brass = 100 cft, 1 cum = 35.3147 cft, 1 sqm = 10.7639 sqft), totals are kept, and `ordered_as` notes the unit billed ("2 MT"). Correcting only the unit keeps the numbers.
+
+### One name per material (since 7.1)
+
+When an entry is read, or a line is typed with *Add item manually* (`standardizeLine` in `packages/shared/src/catalog.ts`, through `matchMaterials` in `repo.ts`, before the lines are stored), each line gets one name:
+1. A word already in `learned_terms` is left to it.
+2. Otherwise the closest material in Rates (`knownMaterials`: names after `learned_terms`, without deleted materials and BOQ-only lines) is used when the names are the same apart from case, spacing, punctuation or one letter (`nameSimilarity` ≥ 0.8; numbers and codes must agree), and the units are the same kind.
+3. Otherwise the built-in starter catalog (`CATALOG`: cement, TMT bar, sand, aggregate, bricks, pipes…) by the words on the bill, including brand short forms ("UT" → UltraTech cement).
+
+Brands and grades found in the name fill `brand` and `spec` when blank. A unit of the same kind is converted as for merges. The word as read goes to `original_term` (if blank) and the whole line as read to `read_as`. Units as written are tidied ("Bags" → Bag, "KGS" → kg, `cleanUnit`). Gemini is also given the names in Rates (most used first, then the catalog's; at most 150) to reuse.
 
 ### Site report
 
@@ -71,7 +80,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
 ```json
 {
   "app": "nirmaan-auditor",
-  "version": 13,
+  "version": 14,
   "exported_at": "2026-10-03T19:13:38.586Z",
   "projects": [], "lists": [], "items": [], "indexed_rates": [], "learned_terms": [],
   "categories": [], "quotes": [], "quote_lines": [], "hidden_materials": [],
@@ -96,6 +105,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
   - version 9 (before clearing deleted rates) has `items` rows without `rates_excluded`;
   - version 10 (before projects) has no `projects`, and `lists`, `contracts` and `indexed_rates` rows without `project_id`; they are sorted into projects as described above;
   - version 11 (before bill photos in backups) is a plain `.json` file with no `bill_photos`;
-  - version 12 (before advances) has no `contract_entries` of kind `advance`.
+  - version 12 (before advances) has no `contract_entries` of kind `advance`;
+  - version 13 (before matching on reading) has `items` rows without `read_as`.
 - Restoring replaces everything on the phone.
 - Any reimplementation should read this format, so old backups keep working.

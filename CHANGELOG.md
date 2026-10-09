@@ -2,6 +2,22 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 7.1 — One name per material
+
+**Bills now match what is already in Rates**
+- A line read from a bill, or typed with *Add item manually*, that is a material you already have under a slightly different name ("Mount air" for "Mountair", "Cemnt" for "Cement") gets the name in Rates as it is read, so its price goes into the same material.
+- Common materials are named the same way every time: "Ultratech PPC 50kg" and "Cement - UT" both become **Cement**, brand UltraTech. Saria, reti, gitti, eent, conduit and other everyday words are covered, with brand short forms.
+- Units are converted where they can be: 2 MT of TMT becomes 2,000 kg at the rate per kg, a brass of sand becomes 100 cft. The bill total stays as billed, and the line says how it was billed.
+- A matched line shows **Matched to Rates; read as “…”**. Tap **Undo** if it is a different material, and it goes back to the name and unit on the bill.
+
+**Merging in Rates**
+- Rates now offers to merge names spaced differently ("Mount air" and "Mountair").
+- Merging two materials in different units of the same kind (MT and kg, brass and cft, sqm and sqft) converts the prices, so they compare.
+
+**Also**
+- *Site report* is back as a button on Saved and Labour.
+- The ⋮ menu opens without stuttering.
+
 ## 7.0 — A real Android app
 
 Nirman is rebuilt with Android's own controls. It is the same app, updated in place: everything you saved is here as before.

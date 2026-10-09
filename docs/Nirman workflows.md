@@ -64,13 +64,14 @@ Every photo, voice note or text becomes a queued entry. The worker runs on app s
 flowchart LR
   E[Entry queued<br/>pending] --> PH[Read on phone<br/>ML Kit, offline]
   PH --> S{At least 75% sure?}
-  S -- yes --> OK[Lines added to the open list,<br/>photo kept with them]
+  S -- yes --> MA[One name per material<br/>matched to Rates or the catalog,<br/>units converted]
+  MA --> OK[Lines added to the open list,<br/>photo kept with them]
   S -- no --> GA{Gemini allowed<br/>and a key?}
   GA -- no --> F1[Failed: type the items]
   GA -- yes --> ON{Online?}
   ON -- no --> WT[Waits for a connection]
   ON -- yes --> GM[Gemini reads<br/>processing] --> ANY{Any items?}
-  ANY -- yes --> OK
+  ANY -- yes --> MA
   ANY -- no --> F2[Failed: retry or type it]
   E -. Gemini always: skip the phone .-> GA
   WT -. runs again on start, resume, reconnect .-> E
@@ -78,6 +79,7 @@ flowchart LR
 
 Notes:
 - The 75% threshold is `PHONE_CONFIDENCE` in `worker.ts`.
+- **One name per material** (since 7.1, `standardizeLine`; lines typed with *Add item manually* too): a line whose name is a material already in Rates with a different spacing, punctuation or one letter off ("Mount air" / "Mountair") gets that name; otherwise one in the starter catalog ("Cement - UT" → Cement, brand UltraTech). A unit of the same kind is converted (2 MT → 2000 kg; the total stays). The line shows *Matched to Rates* with *Undo*. Words the owner already merged keep their learned name.
 - Temporary errors back off; 3 time-outs in a row stop the queue.
 - **Vendor quotes** follow the same path (since 5.3): read on the phone and each line matched to the BOQ there, so they work offline. Gemini is asked only when the phone is unsure and the phone is online. In phone-only mode a quote the phone can't read fails with "Use *Type rates*".
 
@@ -96,10 +98,12 @@ flowchart LR
   DB --> RT[Rates tab<br/>trend, range, vendors, filters, edit]
   DB --> QC[Quote comparison<br/>vendor rate vs last paid]
   DB -. edits in Rates write back to the line .-> B
+  DB -. merge: one name, prices converted between units .-> B
 ```
 
 - **Last paid** and the quote comparison check this project's last price first. Only when this site has none is another site's price shown, with its address ("Last paid at Dwarka"). Since 5.1.
 - A price check never compares a line with itself.
+- **Merging** two materials in Rates (since 7.1) converts quantities and rates between units of one kind (MT, quintal, kg; brass, cft, cum; sqm, sqft), keeping totals. Units that don't convert (Bag and kg) are merged without converting, and the dialog says so.
 
 ## A-04 BOQ and vendor quotes
 
@@ -143,7 +147,7 @@ Nirman has no server or account yet (until the sync phases of [react-native-plan
 
 | Path | What goes | When | Where to |
 |---|---|---|---|
-| Gemini reading | The photo or text of one entry, learned names, the BOQ lines for a quote | Automatically, for entries the phone can't read with confidence (or always, if chosen) | Google Gemini, with the user's own key |
+| Gemini reading | The photo or text of one entry, learned names, material names in Rates (up to 150, since 7.1), the BOQ lines for a quote | Automatically, for entries the phone can't read with confidence (or always, if chosen) | Google Gemini, with the user's own key |
 | Share | A PDF, Excel sheet or JPG the user previewed | On Share | Any app from the share sheet |
 | Backup | Everything as one `.zip`, bill photos included; not entries waiting to be read | On *Save backup*; a reminder after a week | Wherever the user saves it |
 | Report a problem | The on-phone log: steps, item names, rates, vendors; never photos or the key | On *Report a problem* or *Share log* | A GitHub issue, or any app |
