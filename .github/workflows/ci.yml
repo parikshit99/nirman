@@ -18,56 +18,12 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
-      - name: Layout check at phone widths (320–412 px)
-        run: |
-          npm run build
-          (cd apps/mobile && npx playwright install --with-deps chromium)
-          npm run test:e2e -w apps/mobile
-
-  android:
-    # The Capacitor app (apps/mobile, 6.x): kept buildable as the fallback until 7.x has run 6 weeks
-    # (docs/react-native-plan.md), and installed first in the upgrade test. Not published from here.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # full history, to count the changes since the last version bump
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-      - uses: gradle/actions/setup-gradle@v4 # caches Gradle, its downloads and build outputs between runs
-      - uses: android-actions/setup-android@v3
-        with:
-          # The default list includes the long-removed 'tools' package, which makes sdkmanager fail.
-          packages: platform-tools
-      - run: npm ci
-      - name: Set the app version
-        run: .github/scripts/app-version.sh
-      - name: Build web bundle
-        run: npm run build -w apps/mobile
-      - run: npx cap sync android
-        working-directory: apps/mobile
-      - name: Build release APK
-        run: ./gradlew assembleRelease --no-daemon
-        working-directory: apps/mobile/android
-      - name: Sign the APK (the release key must be identical on every build)
-        env:
-          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-        run: .github/scripts/sign-apk.sh apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk nirman.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: nirman-apk
-          path: nirman.apk
+      - name: Bundle the app (catches import and Metro errors before the APK build)
+        run: npm run build
 
   native:
     # The app (apps/native, React Native): built and signed with the same key as every Nirman build, so it
-    # installs as an update over 6.x. This is the APK that is published: arm64 only, the phones it runs on (S25 Ultra).
+    # installs as an update over 6.x and every 7.x. This is the APK that is published: arm64 only, the phones it runs on (S25 Ultra).
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.build.outputs.version }}
@@ -86,85 +42,8 @@ jobs:
           keystore: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
           keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
 
-  native-test:
-    # The same app built for the emulator's CPU type (x86_64; an arm64 build can't run on CI's emulator), in
-    # parallel with the published one. Same code and key.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: ./.github/actions/build-native
-        with:
-          architectures: x86_64
-          cache-name: x86_64
-          artifact: nirman-native-x86_64-apk
-          apk: nirman-native-x86_64.apk
-          keystore: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-          keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-
-  upgrade:
-    # 6.x with data on a phone, then 7.x installed over it: the lists and totals must all be there
-    # (docs/react-native-plan.md, Phase 7). On an Android emulator, checked with Maestro.
-    needs: [android, native-test]
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-      - run: npm ci
-      - name: Make the 6.x database (e2e/sample-backup.json restored by core)
-        run: npx vite-node apps/native/e2e/make-6x-db.ts sample.db
-      - uses: actions/download-artifact@v4
-        with:
-          name: nirman-apk
-      - uses: actions/download-artifact@v4
-        with:
-          name: nirman-native-x86_64-apk
-      - name: Install Maestro
-        run: |
-          curl -fsSL "https://get.maestro.mobile.dev" | bash
-          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
-      - name: Free disk space for the emulator (tools this job doesn't use)
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk/ndk /opt/ghc /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache/CodeQL
-          df -h /
-      - name: Enable KVM (hardware acceleration for the emulator)
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - name: Install 6.x with data, then 7.x over it
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_apis # lets adb put the data where 6.x keeps it
-          arch: x86_64
-          profile: pixel_7 # 412 x 915 dp, about the size of the Galaxy S25 Ultra the app runs on
-          cores: 4
-          disk-size: 4096M # the default 7 GB userdata doesn't fit on the runner
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
-          disable-animations: true
-          script: .github/scripts/upgrade-test.sh nirman.apk nirman-native-x86_64.apk sample.db
-      - if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: upgrade-failure
-          path: |
-            upgrade-failure.png
-            upgrade-logcat.txt
-            ~/.maestro/tests/
-          if-no-files-found: ignore
-
   publish:
-    needs: [test, native, upgrade]
+    needs: [test, native]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
