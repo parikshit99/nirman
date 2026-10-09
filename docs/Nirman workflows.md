@@ -171,6 +171,7 @@ How the build is signed and released:
 - **Signing:** every APK is signed with the same release key, with its rotation lineage (`.github/scripts/sign-apk.sh`). The build fails if the APK contains anything that looks like an API key.
 - **Version:** MAJOR.MINOR comes from `apps/native/package.json`; PATCH is the number of commits since it changed (`app-version.sh`). `versionCode` is the CI run number.
 - **Release notes** are the newest CHANGELOG section, the same text as *What's new* in the app.
+- **One run at a time:** a new push to a PR cancels that PR's older CI run; runs on `main` wait for the one before, so every publish finishes.
 - **Going back** to an older 7.x: backup, uninstall, install it from the releases, restore (the last 5 builds are kept). The 6.x fallback build was removed in Phase 8.
 
 ## A-08 Points to analyse

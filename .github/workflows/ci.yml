@@ -6,6 +6,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# One run per branch or PR at a time. A new push to a PR cancels its older run (saves Actions minutes); on main the
+# newer run waits instead, so a publish is never cut off halfway.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
