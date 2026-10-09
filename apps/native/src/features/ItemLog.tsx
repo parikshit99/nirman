@@ -1,16 +1,18 @@
-import { FlashList } from '@shopify/flash-list';
-import { useEffect, useState, type ReactElement } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { LayoutAnimation, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import Swipeable, { SwipeDirection, type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { lastPaidFor, materialKey, todayISO, variantLabel, type ItemRow, type LastPaid, type MaterialEntry, type ReadAs } from '@nirman/shared';
 import type { ListKind } from '@nirman/core';
 import { BillPhotosSheet } from '../components/BillPhotos';
 import { DeliveredToggle } from '../components/DeliveredToggle';
 import { LineEditor } from '../components/LineEditor';
-import { UndoButton } from '../components/UndoButton';
 import { Button } from '../components/ui/Button';
+import { useDialogs } from '../components/ui/Dialogs';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Icon } from '../components/ui/Icon';
 import { rupees } from '../lib/format';
+import { haptic } from '../lib/haptics';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 
@@ -24,16 +26,40 @@ interface Props {
   header?: ReactElement | null;
   /** How far the list is scrolled (the Add button hides while scrolling down). */
   onScroll?(y: number): void;
+  /** Items picked with a long press, for actions on several at once (the list's selection bar). */
+  selected: ReadonlySet<string>;
+  onToggleSelect(id: string): void;
 }
 
 /** The current Purchases or BOQ list: one card per item. */
-export function ItemLog({ kind, items, searching, onAdd, header, onScroll }: Props) {
+export function ItemLog({ kind, items: allItems, searching, onAdd, header, onScroll, selected, onToggleSelect }: Props) {
   const c = useColors();
   const { actions, itemDatabase, pendingDeletes, projectId, projects } = useAppState();
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? '';
   const [editingId, setEditingId] = useState<string | null>(null);
   const [photosOf, setPhotosOf] = useState<ItemRow | null>(null);
+  const dialogs = useDialogs();
   const isAudit = kind === 'audit';
+  const selecting = selected.size > 0;
+  // A deleted line leaves the list at once; the strip at the bottom offers Undo until it is really deleted.
+  const items = allItems.filter((i) => !pendingDeletes.has(i.id));
+  const deleteWithUndo = (item: ItemRow) => {
+    actions.deleteItemLater(item.id);
+    dialogs.undoable(`Deleted “${item.item_name}”`, () => actions.undoDelete(item.id));
+  };
+
+  // Lines coming and going slide into place (one bill read, a delete, an undo); not a whole new list or a search.
+  const listRef = useRef<FlashListRef<ItemRow>>(null);
+  const shownIds = useRef(items.map((i) => i.id).join());
+  const ids = items.map((i) => i.id).join();
+  if (ids !== shownIds.current) {
+    const change = Math.abs(items.length - shownIds.current.split(',').filter(Boolean).length);
+    if (!searching && change >= 1 && change <= 5) {
+      listRef.current?.prepareForLayoutAnimationRender();
+      LayoutAnimation.configureNext(LayoutAnimation.create(250, LayoutAnimation.Types.easeOut, LayoutAnimation.Properties.opacity));
+    }
+    shownIds.current = ids;
+  }
   const byKey = new Map<string, MaterialEntry>(itemDatabase.map((e) => [e.key, e]));
 
   // Leaving the list carries out any delete still waiting for undo.
@@ -44,9 +70,10 @@ export function ItemLog({ kind, items, searching, onAdd, header, onScroll }: Pro
   return (
     <>
       <FlashList
+        ref={listRef}
         data={items}
         keyExtractor={(item) => item.id}
-        extraData={{ editingId, pendingDeletes, byKey }}
+        extraData={{ editingId, byKey, selected }}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: 96 }}
         ListHeaderComponent={header}
@@ -78,39 +105,50 @@ export function ItemLog({ kind, items, searching, onAdd, header, onScroll }: Pro
             </View>
           ) : null
         }
-        renderItem={({ item }) => (
-          <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.gray100, backgroundColor: editingId === item.id ? c.orange50 : pendingDeletes.has(item.id) ? c.red50 : c.white }}>
-            {editingId === item.id ? (
-              <LineEditor
-                initial={item}
-                showPrice={isAudit}
-                excludable={isAudit}
-                onSave={async (values) => {
-                  await actions.updateItem(item.id, values);
-                  setEditingId(null);
-                }}
-                onCancel={() => setEditingId(null)}
-                onDelete={() => {
-                  setEditingId(null);
-                  actions.deleteItemLater(item.id);
-                }}
-              />
-            ) : (
-              <ItemCard
-                item={item}
-                isAudit={isAudit}
-                lastPaid={lastPaidFor(byKey.get(materialKey(item.item_name, item.unit)), item, projectId, todayISO())}
-                projectName={projectName}
-                onEdit={() => setEditingId(item.id)}
-                onPhotos={() => setPhotosOf(item)}
-                onDelivered={(date) => actions.setDelivered([item.id], date)}
-                pendingDelete={pendingDeletes.has(item.id)}
-                onUndo={() => actions.undoDelete(item.id)}
-                onUnmatch={() => actions.undoMatch(item.id)}
-              />
-            )}
-          </View>
-        )}
+        renderItem={({ item }) => {
+          const picked = selected.has(item.id);
+          const row = (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.gray100, backgroundColor: editingId === item.id || picked ? c.orange50 : c.white }}>
+              {selecting && (
+                <View style={{ width: 22, height: 22, marginTop: 2, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center', borderColor: picked ? c.brandPrimary : c.gray300, backgroundColor: picked ? c.brandPrimary : 'transparent' }}>
+                  {picked && <Icon name="check" size={14} color={c.onPrimary} />}
+                </View>
+              )}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                {editingId === item.id ? (
+                  <LineEditor
+                    initial={item}
+                    showPrice={isAudit}
+                    excludable={isAudit}
+                    onSave={async (values) => {
+                      await actions.updateItem(item.id, values);
+                      setEditingId(null);
+                    }}
+                    onCancel={() => setEditingId(null)}
+                    onDelete={() => {
+                      setEditingId(null);
+                      deleteWithUndo(item);
+                    }}
+                  />
+                ) : (
+                  <ItemCard
+                    item={item}
+                    isAudit={isAudit}
+                    lastPaid={lastPaidFor(byKey.get(materialKey(item.item_name, item.unit)), item, projectId, todayISO())}
+                    projectName={projectName}
+                    onEdit={() => (selecting ? onToggleSelect(item.id) : setEditingId(item.id))}
+                    onLongPress={() => onToggleSelect(item.id)}
+                    onPhotos={() => setPhotosOf(item)}
+                    onDelivered={(date) => actions.setDelivered([item.id], date)}
+                    onUnmatch={() => actions.undoMatch(item.id)}
+                  />
+                )}
+              </View>
+            </View>
+          );
+          // Swipe right: delivered (or not); swipe left past half the row: delete, with Undo. Not while editing or picking.
+          return editingId === item.id || selecting ? row : <SwipeRow item={item} onDelivered={(date) => actions.setDelivered([item.id], date)} onDelete={() => deleteWithUndo(item)}>{row}</SwipeRow>;
+        }}
       />
       {photosOf && <BillPhotosSheet photoIds={[photosOf.photo_id]} title={photosOf.item_name} onClose={() => setPhotosOf(null)} />}
     </>
@@ -126,8 +164,8 @@ interface CardProps {
   /** Shows the bill photo the line was read from. */
   onPhotos(): void;
   onDelivered(date: string): void;
-  pendingDelete: boolean;
-  onUndo(): void;
+  /** Starts picking several lines. */
+  onLongPress(): void;
   /** Put the line back as it was read, before it was matched to a material in Rates. */
   onUnmatch(): void;
 }
@@ -144,27 +182,8 @@ function readAsLabel(item: ItemRow): string | null {
   }
 }
 
-function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onPhotos, onDelivered, pendingDelete, onUndo, onUnmatch }: CardProps) {
+function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onLongPress, onPhotos, onDelivered, onUnmatch }: CardProps) {
   const c = useColors();
-  const strike = { textDecorationLine: 'line-through' as const };
-  if (pendingDelete) {
-    return (
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44 }}>
-        <View style={{ flex: 1, minWidth: 0, opacity: 0.6 }}>
-          <Text numberOfLines={1} style={[{ fontSize: 14, fontWeight: '700', color: c.brandDark }, strike]}>
-            {item.item_name}
-          </Text>
-          <Text style={[{ fontSize: 12, fontFamily: 'monospace', color: c.gray600 }, strike]}>
-            {item.quantity} {item.unit}
-            {isAudit && ` · ${rupees(item.total_amount)}`}
-          </Text>
-        </View>
-        <Text style={{ fontSize: 12, color: c.red600 }}>Deleted</Text>
-        <UndoButton onUndo={onUndo} label={item.item_name} />
-      </View>
-    );
-  }
-
   const diffPercent = lastPaid && item.unit_price && lastPaid.price > 0 ? ((item.unit_price - lastPaid.price) / lastPaid.price) * 100 : 0;
   // Another site's price can differ for transport alone: say where it is from.
   const where = lastPaid?.scope === 'elsewhere' ? ` at ${lastPaid.site || projectName(lastPaid.projectId) || 'another site'}` : '';
@@ -175,7 +194,7 @@ function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onPhotos, onDe
 
   return (
     <View>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Edit ${item.item_name}`} onPress={onEdit}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Edit ${item.item_name}`} accessibilityHint="Long press to pick several" onPress={onEdit} onLongPress={onLongPress} delayLongPress={350}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text numberOfLines={2} style={{ flexShrink: 1, fontSize: 14, fontWeight: '700', color: c.brandDark }}>
@@ -234,5 +253,44 @@ function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onPhotos, onDe
         )}
       </View>
     </View>
+  );
+}
+
+/**
+ * A line that can be swiped, as chats are in Telegram: to the right marks it delivered (or not delivered, if it was);
+ * to the left, past half its width, deletes it (the strip at the bottom offers Undo).
+ */
+function SwipeRow({ item, onDelivered, onDelete, children }: { item: ItemRow; onDelivered(date: string): void; onDelete(): void; children: ReactElement }) {
+  const c = useColors();
+  const { width } = useWindowDimensions();
+  const ref = useRef<SwipeableMethods>(null);
+  const delivered = !!item.delivered_at;
+  const panel = (bg: string, icon: 'check' | 'undo' | 'delete-outline', label: string, side: 'left' | 'right') => (
+    <View style={{ width, flexDirection: 'row', alignItems: 'center', justifyContent: side === 'left' ? 'flex-start' : 'flex-end', gap: 8, paddingHorizontal: 24, backgroundColor: bg }}>
+      <Icon name={icon} size={22} color="#fff" />
+      <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>{label}</Text>
+    </View>
+  );
+  return (
+    <Swipeable
+      ref={ref}
+      friction={1.5}
+      overshootFriction={8}
+      leftThreshold={96}
+      rightThreshold={width / 2}
+      renderLeftActions={() => panel(delivered ? c.gray600 : c.green600, delivered ? 'undo' : 'check', delivered ? 'Not delivered' : 'Delivered', 'left')}
+      renderRightActions={() => panel(c.red600, 'delete-outline', 'Delete', 'right')}
+      onSwipeableOpen={(direction) => {
+        haptic('confirm');
+        if (direction === SwipeDirection.RIGHT) {
+          onDelivered(delivered ? '' : todayISO());
+          ref.current?.close();
+        } else {
+          onDelete();
+        }
+      }}
+    >
+      {children}
+    </Swipeable>
   );
 }

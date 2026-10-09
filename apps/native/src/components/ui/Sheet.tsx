@@ -1,9 +1,13 @@
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DURATION, EASE_IN, EASE_OUT, SPRING } from '../../lib/motion';
 import { useColors } from '../../theme';
 import { Icon, type IconName } from './Icon';
+import { PressScale } from './PressScale';
 
 /**
  * - `sheet`: Android's own bottom sheet (draggable). For choices and short forms.
@@ -48,6 +52,7 @@ export function Sheet({ kind = 'sheet', onClose, onBack, backEnabled = true, bus
   const handleBack = busy ? undefined : (onBack ?? onClose);
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
+  const screenBack = useRef<() => void>(undefined);
   const body = (maxHeight?: number) => {
     // Without its own scrolling the content shrinks to the box, so a list inside it can scroll under a fixed button.
     const inner = <View style={{ padding, gap, paddingBottom: padding + (kind === 'sheet' ? insets.bottom : 0), flexShrink: scroll ? undefined : 1 }}>{children}</View>;
@@ -67,20 +72,97 @@ export function Sheet({ kind = 'sheet', onClose, onBack, backEnabled = true, bus
       </BottomSheet>
     );
   }
+  const back = () => backEnabled && handleBack?.();
   return (
-    <Modal visible={open} transparent={kind === 'dialog'} animationType={kind === 'dialog' ? 'fade' : 'slide'} statusBarTranslucent navigationBarTranslucent onRequestClose={() => backEnabled && handleBack?.()}>
-      <SafeAreaProvider>
-        {kind === 'dialog' ? (
-          <Pressable style={[styles.backdrop, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]} onPress={closeOnBackdrop && !busy ? onClose : undefined} accessibilityLabel={label}>
-            <Pressable style={[styles.dialog, { backgroundColor: c.white, maxHeight: height * 0.9 }]}>{body(height * 0.8)}</Pressable>
-          </Pressable>
-        ) : (
-          <View style={{ flex: 1, backgroundColor: c.white, paddingTop: insets.top, paddingBottom: insets.bottom }} accessibilityLabel={label}>
-            {body()}
-          </View>
-        )}
-      </SafeAreaProvider>
+    // Android sends Back to the Modal (not to BackHandler): a screen hands it to SlideScreen, which slides out first.
+    <Modal visible={open} transparent animationType={kind === 'dialog' ? 'fade' : 'none'} statusBarTranslucent navigationBarTranslucent onRequestClose={() => (kind === 'screen' ? screenBack.current?.() : back())}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          {kind === 'dialog' ? (
+            <Pressable style={[styles.backdrop, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]} onPress={closeOnBackdrop && !busy ? onClose : undefined} accessibilityLabel={label}>
+              <PopIn>
+                <Pressable style={[styles.dialog, { backgroundColor: c.white, maxHeight: height * 0.9 }]}>{body(height * 0.8)}</Pressable>
+              </PopIn>
+            </Pressable>
+          ) : (
+            <SlideScreen backRef={screenBack} open={open} onBack={backEnabled ? handleBack : undefined} closes={!onBack} background={c.white} scrim={c.scrim} label={label}>
+              <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>{body()}</View>
+            </SlideScreen>
+          )}
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
     </Modal>
+  );
+}
+
+/** Lets SheetHeader's close button play the screen's slide-out before it closes. */
+const SheetMotion = createContext<{ leave(then: () => void): void } | null>(null);
+
+/** A dialog's box: grows from slightly smaller as it fades in (Telegram's alerts). */
+function PopIn({ children }: { children: ReactNode }) {
+  const v = useSharedValue(0);
+  useEffect(() => {
+    v.value = withSpring(1, SPRING);
+  }, [v]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: 0.9 + 0.1 * v.value }] }));
+  return <Animated.View style={style}>{children}</Animated.View>;
+}
+
+/**
+ * A full screen, as Telegram opens one: it slides in from the right over the dimmed app, Back or the close button
+ * slides it out, and a swipe from the left edge drags it away (let go past a third, or flick, to close).
+ */
+function SlideScreen({ backRef, open, onBack, closes, background, scrim, label, children }: { backRef: { current?: () => void }; open: boolean; onBack?: () => void; closes: boolean; background: string; scrim: string; label?: string; children: ReactNode }) {
+  const { width } = useWindowDimensions();
+  const x = useSharedValue(width);
+  useEffect(() => {
+    if (open) x.value = withTiming(0, { duration: DURATION.screen, easing: EASE_OUT });
+    else x.value = width;
+  }, [open, width, x]);
+
+  // Out to the right, then close. Going back a step inside the screen (onBack) has no slide.
+  const leave = (then: () => void) => {
+    x.value = withTiming(width, { duration: DURATION.normal, easing: EASE_IN }, (done) => {
+      if (done) runOnJS(then)();
+    });
+  };
+  const back = () => {
+    if (!onBack) return;
+    if (closes) leave(onBack);
+    else onBack();
+  };
+  backRef.current = back;
+
+  const swipe = Gesture.Pan()
+    .enabled(!!onBack && closes)
+    .activeOffsetX(12)
+    .failOffsetY([-12, 12])
+    .onUpdate((e) => {
+      x.value = Math.max(0, e.translationX);
+    })
+    .onEnd((e) => {
+      if (x.value > width / 3 || e.velocityX > 800) {
+        x.value = withTiming(width, { duration: DURATION.quick, easing: EASE_IN }, (done) => {
+          if (done && onBack) runOnJS(onBack)();
+        });
+      } else {
+        x.value = withSpring(0, SPRING);
+      }
+    });
+
+  const screen = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
+  const dim = useAnimatedStyle(() => ({ opacity: 0.4 * (1 - x.value / width) }));
+  return (
+    <SheetMotion.Provider value={closes ? { leave } : null}>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: scrim }, dim]} />
+      <Animated.View accessibilityLabel={label} style={[{ flex: 1, backgroundColor: background, elevation: 16 }, screen]}>
+        {children}
+        {/* The edge to swipe from, so swiping inside lists and sliders still works. */}
+        <GestureDetector gesture={swipe}>
+          <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 24 }} />
+        </GestureDetector>
+      </Animated.View>
+    </SheetMotion.Provider>
   );
 }
 
@@ -142,6 +224,8 @@ export function SheetHeader({
   children?: ReactNode;
 }) {
   const c = useColors();
+  const motion = useContext(SheetMotion);
+  const close = onClose && (motion ? () => motion.leave(onClose) : onClose);
   return (
     <View style={styles.header}>
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -156,7 +240,7 @@ export function SheetHeader({
       <View style={styles.headerButtons}>
         {children}
         {onClose && (
-          <Pressable accessibilityRole="button" accessibilityLabel="Close" disabled={closeDisabled} onPress={onClose} hitSlop={4} style={[styles.close, closeDisabled && { opacity: 0.4 }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close" disabled={closeDisabled} onPress={close} hitSlop={4} style={[styles.close, closeDisabled && { opacity: 0.4 }]}>
             <Icon name="close" size={22} color={c.gray500} />
           </Pressable>
         )}
@@ -175,7 +259,8 @@ export function SheetLabel({ children }: { children: ReactNode }) {
 export function SheetOption({ icon, label, about, busy, onPress, disabled }: { icon: IconName; label: ReactNode; about?: ReactNode; busy?: boolean; onPress?(): void; disabled?: boolean }) {
   const c = useColors();
   return (
-    <Pressable
+    <PressScale
+      scaleTo={0.98}
       accessibilityRole="button"
       disabled={disabled || busy}
       onPress={onPress}
@@ -186,7 +271,7 @@ export function SheetOption({ icon, label, about, busy, onPress, disabled }: { i
         <Text style={{ fontSize: 14, fontWeight: '700', color: c.gray800 }}>{label}</Text>
         {about ? <Text style={{ fontSize: 12, color: c.gray500 }}>{about}</Text> : null}
       </View>
-    </Pressable>
+    </PressScale>
   );
 }
 

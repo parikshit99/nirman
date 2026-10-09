@@ -52,11 +52,12 @@ Never an alert for something that just worked. Never a silent failure: if someth
 ## Deleting
 
 Deleting is never silent:
-- **Use Undo** where possible (the `…Later` actions show *Undo* in a Snackbar).
+- **Use Undo** where possible: the `…Later` actions take the row away and show `dialogs.undoable` (the strip with *Undo* and a countdown).
 - **Otherwise ask first** with a `danger` confirm: a saved list, a contract, clearing a draft, delete all.
 
 Where Delete lives:
-- **Lines, prices and saved lists** are deleted from their edit view (`LineEditor`'s Delete, the saved list's Edit sheet). Not with a bin on every row or card (it was tapped by mistake), and not with swipe-to-delete.
+- **Lines, prices and saved lists** are deleted from their edit view (`LineEditor`'s Delete, the saved list's Edit sheet). Not with a bin on every row or card (it was tapped by mistake).
+- **Purchase and BOQ lines** can also be swiped left to delete (since 7.3), but only past half the row's width, and always with Undo. Swiping right marks them delivered. A long press picks several lines for Delivered or Delete.
 - **"Delete all"** is a labelled button at the end of its list, not a bare icon.
 - **Small rows that undo** (contract entries, queued readings, photos in an entry) may keep an icon button.
 

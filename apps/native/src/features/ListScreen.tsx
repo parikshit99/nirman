@@ -1,6 +1,6 @@
 import Fuse from 'fuse.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { BackHandler, Pressable, Text, TextInput, View } from 'react-native';
 import { guessCategory, todayISO } from '@nirman/shared';
 import { buildPdf, listSheet, logStep, pdfFile, prefs, workTypeKey, type ExportFormat, type ListKind, type ListMeta } from '@nirman/core';
 import { ActionFab, type FabAction } from '../components/ActionFab';
@@ -11,9 +11,11 @@ import { ScreenHeader } from '../components/ScreenHeader';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { Icon } from '../components/ui/Icon';
+import { RollingText } from '../components/ui/RollingText';
 import type { MenuItem } from '../components/ui/OverflowMenu';
 import { Sheet, SheetHeader } from '../components/ui/Sheet';
 import { pdfToJpegs, sheetToXlsx } from '../lib/exportFiles';
+import { haptic } from '../lib/haptics';
 import { shareFiles } from '../lib/files';
 import { rupeesWhole } from '../lib/format';
 import { useAppState } from '../state/AppState';
@@ -155,6 +157,40 @@ export function ListScreen({
     ...extraMenu.map((m) => ({ icon: m.icon, label: m.label, onPress: m.onPress })),
     ...(has ? [{ icon: 'visibility' as const, label: 'Preview', onPress: () => setPreviewOpen(true) }, { icon: 'share' as const, label: 'Share', onPress: openShare }, { icon: 'save' as const, label: 'Save', tone: 'primary' as const, onPress: openSave }] : []),
   ];
+  // Lines picked with a long press, for Delivered or Delete on all of them at once.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const toggleSelect = useCallback((id: string) => {
+    haptic('tick');
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }, []);
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
+  useEffect(() => {
+    if (!selected.size) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      clearSelection();
+      return true;
+    });
+    return () => sub.remove();
+  }, [selected.size, clearSelection]);
+  // A new project, list or search starts with nothing picked.
+  useEffect(clearSelection, [projectId, kind, query, clearSelection]);
+  const pickedItems = filteredItems.filter((i) => selected.has(i.id));
+  const markPickedDelivered = () => {
+    const allDelivered = pickedItems.every((i) => i.delivered_at);
+    void actions.setDelivered(pickedItems.map((i) => i.id), allDelivered ? '' : todayISO());
+    clearSelection();
+  };
+  const deletePicked = () => {
+    const ids = pickedItems.map((i) => i.id);
+    ids.forEach((id) => actions.deleteItemLater(id));
+    dialogs.undoable(ids.length === 1 ? `Deleted “${pickedItems[0].item_name}”` : `Deleted ${ids.length} items`, () => ids.forEach((id) => actions.undoDelete(id)));
+    clearSelection();
+  };
+
   // The buttons slide away while the list is scrolled down, and come back on the way up.
   const [fabHidden, setFabHidden] = useState(false);
   const lastY = useRef(0);
@@ -194,10 +230,27 @@ export function ListScreen({
   return (
     <View style={{ flex: 1, backgroundColor: c.brandGray }}>
       <ScreenHeader>
-        <View style={{ flexShrink: 1 }}>
-          <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>{isAudit ? 'Spent' : 'Items'}</Text>
-          <Text style={{ fontSize: 14, fontFamily: 'monospace', fontWeight: '700', color: c.brandDark }}>{isAudit ? rupeesWhole(total) : String(filteredItems.length)}</Text>
-        </View>
+        {selected.size > 0 ? (
+          <View accessibilityLiveRegion="polite" style={{ minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Stop picking" onPress={clearSelection} style={{ minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center', marginLeft: -8 }}>
+              <Icon name="close" size={22} color={c.gray600} />
+            </Pressable>
+            <RollingText lineHeight={20} style={{ fontSize: 14, fontWeight: '700', color: c.brandDark }}>{String(selected.size)}</RollingText>
+            <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: c.brandDark }}> selected</Text>
+            {pickedItems.length < filteredItems.length && (
+              <Button size="sm" variant="ghost" icon="select-all" label="Pick all" onPress={() => setSelected(new Set(filteredItems.map((i) => i.id)))} />
+            )}
+            <Button size="sm" variant="ghost" icon="local-shipping" label={pickedItems.every((i) => i.delivered_at) ? 'Mark not delivered' : 'Mark delivered'} onPress={markPickedDelivered} />
+            <Button size="sm" variant="ghost" icon="delete-outline" label="Delete" onPress={deletePicked} />
+          </View>
+        ) : (
+          <View style={{ flexShrink: 1 }}>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>{isAudit ? 'Spent' : 'Items'}</Text>
+            <RollingText lineHeight={20} style={{ fontSize: 14, fontFamily: 'monospace', fontWeight: '700', color: c.brandDark }}>
+              {isAudit ? rupeesWhole(total) : String(filteredItems.length)}
+            </RollingText>
+          </View>
+        )}
       </ScreenHeader>
 
       <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
@@ -213,8 +266,8 @@ export function ListScreen({
       </View>
 
       <View style={{ flex: 1 }}>
-        <ItemLog kind={kind} items={filteredItems} searching={!!query} onAdd={() => setAddOpen(true)} header={banner} onScroll={onListScroll} />
-        {(listedItems.length > 0 || fabActions.length > 0) && (
+        <ItemLog kind={kind} items={filteredItems} searching={!!query} onAdd={() => setAddOpen(true)} header={banner} onScroll={onListScroll} selected={selected} onToggleSelect={toggleSelect} />
+        {selected.size === 0 && (listedItems.length > 0 || fabActions.length > 0) && (
           <ActionFab
             label={isAudit ? 'Add purchases' : 'Add to BOQ'}
             onPress={() => setAddOpen(true)}

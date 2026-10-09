@@ -5,6 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View, useColorScheme } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DialogProvider } from './components/ui/Dialogs';
@@ -151,15 +152,17 @@ export default function App() {
     colors: { ...base.colors, primary: colors.brandPrimary, background: colors.brandGray, card: colors.white, text: colors.brandDark, border: colors.gray200 },
   };
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <DialogProvider>
-          <NavigationContainer ref={navigationRef} theme={theme}>
-            <Boot />
-          </NavigationContainer>
-        </DialogProvider>
-      </ErrorBoundary>
-      <StatusBar style="auto" />
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ErrorBoundary>
+          <DialogProvider>
+            <NavigationContainer ref={navigationRef} theme={theme}>
+              <Boot />
+            </NavigationContainer>
+          </DialogProvider>
+        </ErrorBoundary>
+        <StatusBar style="auto" />
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

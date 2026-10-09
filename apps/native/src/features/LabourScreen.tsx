@@ -11,6 +11,7 @@ import { UndoButton } from '../components/UndoButton';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Icon } from '../components/ui/Icon';
+import { RollingText } from '../components/ui/RollingText';
 import { Tabs } from '../components/ui/Tabs';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
@@ -80,11 +81,11 @@ export function LabourScreen({ about }: { about: string }) {
         <View accessibilityLabel="Totals for the contracts shown" style={{ flexDirection: 'row', gap: 8, marginHorizontal: 16 }}>
           <View style={box}>
             <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>Work done</Text>
-            <Text style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: '700', color: c.brandDark }}>{rupees(totals.workDone)}</Text>
+            <RollingText lineHeight={17} style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: '700', color: c.brandDark }}>{rupees(totals.workDone)}</RollingText>
           </View>
           <View style={box}>
             <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>Paid</Text>
-            <Text style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: '700', color: c.brandDark }}>{rupees(totals.paid)}</Text>
+            <RollingText lineHeight={17} style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: '700', color: c.brandDark }}>{rupees(totals.paid)}</RollingText>
           </View>
           <View style={box}>
             <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>Balance</Text>

@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { haptic } from '../../lib/haptics';
 import { useColors } from '../../theme';
 import { Icon, type IconName } from './Icon';
+import { PressScale } from './PressScale';
 
 /**
  * - `primary` (orange): the one main action on a screen or sheet.
@@ -47,7 +48,7 @@ export function Button({
   }[variant];
   const pressed = { primary: c.orange600, secondary: c.gray100, danger: c.red700, dangerOutline: c.red50, ghost: c.gray100 }[variant];
   return (
-    <Pressable
+    <PressScale
       accessibilityRole="button"
       accessibilityLabel={label ?? children}
       accessibilityState={{ disabled: !!disabled }}
@@ -73,7 +74,7 @@ export function Button({
           </Text>
         </View>
       ) : null}
-    </Pressable>
+    </PressScale>
   );
 }
 
