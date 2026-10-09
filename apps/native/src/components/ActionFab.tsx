@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, BackHandler, Easing, Pressable, StyleSheet, Text } from 'react-native';
 import { haptic } from '../lib/haptics';
 import { useColors } from '../theme';
@@ -122,4 +122,17 @@ export function ActionFab({ label, icon = 'add', onPress, showMain = true, actio
       </Animated.View>
     </>
   );
+}
+
+/** The bottom-right buttons (ActionFab) slide away while a list is scrolled down, and come back on the way up. */
+export function useHideOnScroll(): [boolean, (y: number) => void] {
+  const [hidden, setHidden] = useState(false);
+  const lastY = useRef(0);
+  const onScroll = useCallback((y: number) => {
+    const dy = y - lastY.current;
+    if (Math.abs(dy) < 8) return;
+    lastY.current = y;
+    setHidden(dy > 0 && y > 48);
+  }, []);
+  return [hidden, onScroll];
 }

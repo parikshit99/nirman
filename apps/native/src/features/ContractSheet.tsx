@@ -60,6 +60,7 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
     });
     if (!ok) return;
     actions.deleteContractLater(contract.id);
+    dialogs.undoable(`Deleted the contract with ${contract.contractor}`, () => actions.undoDelete(contract.id));
     onClose();
   };
 

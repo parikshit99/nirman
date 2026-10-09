@@ -1,12 +1,11 @@
 import Fuse from 'fuse.js';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BackHandler, Pressable, Text, TextInput, View } from 'react-native';
 import { guessCategory, todayISO } from '@nirman/shared';
-import { buildPdf, listSheet, logStep, pdfFile, prefs, workTypeKey, type ExportFormat, type ListKind, type ListMeta } from '@nirman/core';
-import { ActionFab, type FabAction } from '../components/ActionFab';
+import { buildPdf, logStep, prefs, workTypeKey, type ListKind, type ListMeta } from '@nirman/core';
+import { ActionFab, useHideOnScroll, type FabAction } from '../components/ActionFab';
 import { DocumentPreview } from '../components/DocumentPreview';
 import { SaveModal } from '../components/SaveModal';
-import { ShareSheet } from '../components/ShareSheet';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
@@ -14,16 +13,14 @@ import { Icon } from '../components/ui/Icon';
 import { RollingText } from '../components/ui/RollingText';
 import type { MenuItem } from '../components/ui/OverflowMenu';
 import { Sheet, SheetHeader } from '../components/ui/Sheet';
-import { pdfToJpegs, sheetToXlsx } from '../lib/exportFiles';
 import { haptic } from '../lib/haptics';
-import { shareFiles } from '../lib/files';
 import { rupeesWhole } from '../lib/format';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 import { CapturePanel, QueuedReadings } from './CapturePanel';
 import { ItemLog } from './ItemLog';
 import { useIncomingShare } from './ShareHost';
-import { BoqShareChoice, OrderSlipSheet } from './OrderSlipSheet';
+import { ListShare } from './ListShare';
 
 /** One vendor on every line, or several. */
 function vendorOf(items: { vendor: string }[]): { initial: string; mixed: boolean } {
@@ -63,8 +60,6 @@ export function ListScreen({
   const [saveState, setSaveState] = useState<SaveState | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const [boqChoiceOpen, setBoqChoiceOpen] = useState(false);
-  const [orderSlipOpen, setOrderSlipOpen] = useState(false);
   const isAudit = kind === 'audit';
 
   // The list as listed (rows waiting for undo still show, struck through) and as it counts (totals and saving leave them out).
@@ -134,28 +129,12 @@ export function ListScreen({
   };
 
   const notes = kind === 'boq' ? boqNotes : '';
-  // A BOQ can go out for quotes or as an order slip; a purchase list goes straight to the formats.
-  const openShare = () => (kind === 'boq' ? setBoqChoiceOpen(true) : setShareOpen(true));
-  const shareList = async (format: ExportFormat) => {
-    logStep('share', { what: kind, format, lines: activeItems.length });
-    const name = `${titlePrefix(kind)}_${todayISO()}_${Date.now() % 100000}`;
-    try {
-      if (format === 'xlsx') {
-        await shareFiles([await sheetToXlsx(listSheet(kind, activeItems, notes), `${name}.xlsx`, isAudit ? 'Purchases' : 'BOQ', [5, 30, 14, 14, 14, 10, 8, 8, 26, 12, 14, 20, 12])]);
-      } else {
-        const doc = buildPdf(kind, activeItems, notes);
-        await shareFiles(format === 'pdf' ? [pdfFile(doc, name)] : await pdfToJpegs(doc, name));
-      }
-    } catch (err) {
-      await dialogs.alert('Could not create the file', (err as Error).message);
-    }
-  };
   const has = activeItems.length > 0;
   // Above the Add button (ActionFab), nearest first.
   const fabActions: FabAction[] = [
     ...(canClear ? [{ icon: 'delete-outline' as const, label: 'Clear the list', tone: 'danger' as const, onPress: clearCurrent }] : []),
     ...extraMenu.map((m) => ({ icon: m.icon, label: m.label, onPress: m.onPress })),
-    ...(has ? [{ icon: 'visibility' as const, label: 'Preview', onPress: () => setPreviewOpen(true) }, { icon: 'share' as const, label: 'Share', onPress: openShare }, { icon: 'save' as const, label: 'Save', tone: 'primary' as const, onPress: openSave }] : []),
+    ...(has ? [{ icon: 'visibility' as const, label: 'Preview', onPress: () => setPreviewOpen(true) }, { icon: 'share' as const, label: 'Share', onPress: () => setShareOpen(true) }, { icon: 'save' as const, label: 'Save', tone: 'primary' as const, onPress: openSave }] : []),
   ];
   // Lines picked with a long press, for Delivered or Delete on all of them at once.
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -191,15 +170,7 @@ export function ListScreen({
     clearSelection();
   };
 
-  // The buttons slide away while the list is scrolled down, and come back on the way up.
-  const [fabHidden, setFabHidden] = useState(false);
-  const lastY = useRef(0);
-  const onListScroll = useCallback((y: number) => {
-    const dy = y - lastY.current;
-    if (Math.abs(dy) < 8) return;
-    lastY.current = y;
-    setFabHidden(dy > 0 && y > 48);
-  }, []);
+  const [fabHidden, onListScroll] = useHideOnScroll();
 
   const closeAdd = useCallback(() => setAddOpen(false), []);
   // Photos or text shared from another app (e.g. WhatsApp) for this list open the entry form with them.
@@ -266,7 +237,7 @@ export function ListScreen({
       </View>
 
       <View style={{ flex: 1 }}>
-        <ItemLog kind={kind} items={filteredItems} searching={!!query} onAdd={() => setAddOpen(true)} header={banner} onScroll={onListScroll} selected={selected} onToggleSelect={toggleSelect} />
+        <ItemLog kind={kind} items={filteredItems} searching={!!query} onAdd={() => setAddOpen(true)} header={banner} onScroll={onListScroll} selected={selected} onToggleSelect={toggleSelect} onClear={canClear ? clearCurrent : undefined} />
         {selected.size === 0 && (listedItems.length > 0 || fabActions.length > 0) && (
           <ActionFab
             label={isAudit ? 'Add purchases' : 'Add to BOQ'}
@@ -301,19 +272,8 @@ export function ListScreen({
         />
       </Sheet>
 
-      {previewOpen && <DocumentPreview title={isAudit ? 'Purchase list' : 'BOQ'} build={() => buildPdf(kind, activeItems, notes)} onShare={() => { setPreviewOpen(false); openShare(); }} onClose={() => setPreviewOpen(false)} />}
-      {boqChoiceOpen && (
-        <BoqShareChoice
-          onClose={() => setBoqChoiceOpen(false)}
-          onPick={(choice) => {
-            setBoqChoiceOpen(false);
-            if (choice === 'order') setOrderSlipOpen(true);
-            else setShareOpen(true);
-          }}
-        />
-      )}
-      {orderSlipOpen && kind === 'boq' && <OrderSlipSheet items={activeItems} notes={notes} address={open?.address || project?.address || ''} addresses={uniqueAddresses} onClose={() => setOrderSlipOpen(false)} />}
-      {shareOpen && <ShareSheet title={isAudit ? 'purchase list' : 'BOQ'} onShare={shareList} onClose={() => setShareOpen(false)} />}
+      {previewOpen && <DocumentPreview title={isAudit ? 'Purchase list' : 'BOQ'} build={() => buildPdf(kind, activeItems, notes)} onShare={() => { setPreviewOpen(false); setShareOpen(true); }} onClose={() => setPreviewOpen(false)} />}
+      {shareOpen && <ListShare kind={kind} items={activeItems} notes={notes} address={open?.address || project?.address || ''} onClose={() => setShareOpen(false)} />}
       {saveState && (
         <SaveModal
           initial={saveState.initial}

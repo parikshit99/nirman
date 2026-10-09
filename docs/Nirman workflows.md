@@ -46,10 +46,10 @@ flowchart LR
   SL --> RT
   SL --> Q -- confirmed --> RT
   RT -. Last paid check .-> OL
-  SL & LC --> OUT --> SH
+  OL & OB & SL & LC --> OUT --> SH
 ```
 
-Saving **moves** the open list into Saved, and an empty one is ready for the next bill (since 6.0). *Open* on a saved list edits that list itself; nothing is copied.
+Saving **moves** the open list into Saved, and an empty one is ready for the next bill (since 6.0). *Open* on a saved list edits that list itself; nothing is copied. The open lists and each saved list (its *Share* button, since 7.4) go out as PDF, Excel or JPG; a BOQ also as an order slip.
 
 Also on the phone:
 - **Backup** (`.zip`, by hand): everything, bill photos included, except entries not yet read.
