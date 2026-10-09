@@ -148,7 +148,7 @@ jobs:
           target: google_apis # lets adb put the data where 6.x keeps it
           arch: x86_64
           profile: pixel_7 # 412 x 915 dp, about the size of the Galaxy S25 Ultra the app runs on
-          cores: 4
+          cores: 2 # the runner has 2; with 4, System UI and the launcher stopped responding over the app
           disk-size: 4096M # the default 7 GB userdata doesn't fit on the runner
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
           disable-animations: true
