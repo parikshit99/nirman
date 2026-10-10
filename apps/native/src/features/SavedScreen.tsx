@@ -132,12 +132,9 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
     dialogs.undoable(`Deleted “${record.title}”`, () => actions.undoDelete(record.id));
   };
 
-  // The bottom-right buttons, as on Purchases and BOQ: + starts a BOQ, the small one holds the rest.
-  const fabActions: FabAction[] = [
-    ...(history.length > 1 ? [{ icon: 'delete-outline' as const, label: 'Delete all saved lists', tone: 'danger' as const, onPress: deleteAllSaved }] : []),
-    { icon: 'shopping-cart', label: 'New purchase list', onPress: () => navigation.navigate('Purchases') },
-    ...(onSiteReport ? [{ icon: 'assignment' as const, label: 'Site report', tone: 'primary' as const, onPress: onSiteReport }] : []),
-  ];
+  // The bottom-right buttons: + starts a BOQ, the small one a purchase list. Site report is in the header and
+  // Delete all at the end of the list, so neither is repeated here.
+  const fabActions: FabAction[] = [{ icon: 'shopping-cart', label: 'New purchase list', onPress: () => navigation.navigate('Purchases') }];
 
   return (
     <View style={{ flex: 1, backgroundColor: c.brandGray }}>
@@ -267,7 +264,7 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
           );
         }}
       />
-      <ActionFab label="New BOQ" icon="playlist-add" onPress={() => navigation.navigate('BOQ')} actions={fabActions} actionsLabel="Site report and more" hidden={fabHidden} />
+      <ActionFab label="New BOQ" icon="playlist-add" onPress={() => navigation.navigate('BOQ')} actions={fabActions} actionsLabel="New purchase list" hidden={fabHidden} />
       {sharing && <ListShare kind={sharing.kind} items={sharing.items} notes={sharing.notes} address={sharing.address || project?.address || ''} onClose={() => setSharing(null)} />}
       {photosOf && <BillPhotosSheet photoIds={photoIdsOf(photosOf.items)} title={photosOf.title} onClose={() => setPhotosOf(null)} />}
       {deliveriesFor && <DeliveriesSheet recordId={deliveriesFor} onClose={() => setDeliveriesFor(null)} />}
