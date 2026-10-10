@@ -2,12 +2,12 @@ import { useNavigation } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
 import Fuse from 'fuse.js';
 import { useMemo, useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
 import { todayISO } from '@nirman/shared';
 import type { ListMeta } from '@nirman/core';
 import { ActionFab, useHideOnScroll, type FabAction } from '../components/ActionFab';
-import { BillPhotosSheet, photoIdsOf } from '../components/BillPhotos';
+import { BillPhotosSheet, BillThumbs, photoIdsOf } from '../components/BillPhotos';
 import { FilterChips } from '../components/FilterChips';
 import { SaveModal } from '../components/SaveModal';
 import { ScreenHeader } from '../components/ScreenHeader';
@@ -38,6 +38,7 @@ interface SaveState {
 /** The Saved tab: the saved purchase lists and BOQs of the open project. */
 export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; onQuotes?(boqId: string): void; onSiteReport?(): void }) {
   const c = useColors();
+  const { width } = useWindowDimensions();
   const dialogs = useDialogs();
   const navigation = useNavigation<{ navigate(name: string): void }>();
   const state = useAppState();
@@ -188,7 +189,7 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
         }
         renderItem={({ item: record }) => {
           const delivered = record.items.filter((i) => i.delivered_at).length;
-          const bills = photoIdsOf(record.items).length;
+          const bills = photoIdsOf(record.items);
           return (
             <View style={{ marginHorizontal: 16, marginTop: 12, borderRadius: 16, overflow: 'hidden' }}>
               <SwipeRow onDelete={() => swipeDelete(record)}>
@@ -207,6 +208,7 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
                         {record.items.length > 0 && <Text style={{ color: delivered === record.items.length ? c.green700 : c.gray500 }}>{` · ${delivered} of ${record.items.length} delivered`}</Text>}
                       </Text>
                     </Pressable>
+                    {bills.length > 0 && <BillThumbs photoIds={bills} max={width >= 400 ? 2 : 1} title={record.title} onPress={() => setPhotosOf(record)} />}
                     {/* Delete is in the details sheet, next to Update, so it isn't tapped by accident. */}
                     <Pressable accessibilityRole="button" accessibilityLabel={`Edit details of ${record.title}`} onPress={() => editDetails(record)} style={{ minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8 }}>
                       <Icon name="edit" size={14} color={c.gray500} />
@@ -251,11 +253,6 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
                     {record.kind === 'audit' && record.items.length > 0 && (
                       <Button size="sm" icon="replay" label={`Buy again: ${record.title}`} onPress={() => buyAgain(record)}>
                         Again
-                      </Button>
-                    )}
-                    {bills > 0 && (
-                      <Button size="sm" icon="photo-camera" label={`Bill photos of ${record.title}`} onPress={() => setPhotosOf(record)}>
-                        {`Bills (${bills})`}
                       </Button>
                     )}
                     {record.items.length > 0 && (

@@ -212,6 +212,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       updateRate: write(repo.updateRate),
       setListVendor: write(repo.setListVendor),
       getBillPhotos: (photoId: string) => repo.getBillPhotos(db, photoId),
+      getBillPhotoCovers: (photoIds: string[]) => repo.getBillPhotoCovers(db, photoIds),
       countBillPhotos: () => repo.countBillPhotos(db),
       clearBillPhotos: write(repo.clearBillPhotos),
       setPrice: write(repo.setPrice),
@@ -281,7 +282,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
         await restoreBackup(db, backup, photos);
         await refresh();
       },
-    }, ['flushDeletes', 'processQueue', 'parseBackup', 'getBillPhotos']),
+    }, ['flushDeletes', 'processQueue', 'parseBackup', 'getBillPhotos', 'getBillPhotoCovers']),
     [db, worker, settingsRef, refresh, write, deleteLater, finishDelete, syncPending, openProject],
   );
 

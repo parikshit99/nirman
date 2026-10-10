@@ -865,6 +865,17 @@ export async function getBillPhotos(db: Db, photoId: string): Promise<string[]> 
   return row ? (JSON.parse(row.images) as string[]) : [];
 }
 
+/** The first page and the page count of each bill photo, for thumbnails (the other pages stay in the database). */
+export async function getBillPhotoCovers(db: Db, photoIds: string[]): Promise<{ id: string; cover: string; pages: number }[]> {
+  if (!photoIds.length) return [];
+  const rows = await db.all<{ id: string; cover: string | null; pages: number }>(
+    `SELECT id, json_extract(images, '$[0]') AS cover, json_array_length(images) AS pages FROM bill_photos WHERE id IN (${photoIds.map(() => '?').join(', ')})`,
+    photoIds,
+  );
+  const byId = new Map(rows.filter((r) => r.cover).map((r) => [r.id, { id: r.id, cover: r.cover as string, pages: r.pages }]));
+  return photoIds.flatMap((id) => byId.get(id) ?? []);
+}
+
 /** Bill photos no line points to any more (their lines and lists were deleted). */
 async function pruneBillPhotos(tx: SqlExecutor) {
   await tx.run(`DELETE FROM bill_photos WHERE id NOT IN (SELECT photo_id FROM items WHERE photo_id != '')`);

@@ -15,8 +15,9 @@ export interface FabAction {
 
 /**
  * The bottom-right buttons of a list, as in Telegram: the main one (Add) and, stacked above it, a small one that pops
- * up the list's other actions (Save, Share, Preview, Clear) one after another. Both slide away while the list is
- * scrolled down and come back when it is scrolled up (`hidden`).
+ * up the list's other actions (Save, Share, Preview, Clear) one after another, with Android's ⋮ for "more". A
+ * single action is shown with its own icon and runs at once. Both slide away while the list is scrolled down and come
+ * back when it is scrolled up (`hidden`).
  */
 export function ActionFab({ label, icon = 'add', onPress, showMain = true, actions, actionsLabel, hidden }: { label: string; icon?: IconName; onPress(): void; showMain?: boolean; actions: FabAction[]; actionsLabel: string; hidden: boolean }) {
   const c = useColors();
@@ -57,6 +58,8 @@ export function ActionFab({ label, icon = 'add', onPress, showMain = true, actio
   }, [actions.length]);
 
   const away = { transform: [{ translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [0, 160] }) }], opacity: slide.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) };
+  // One action needs no menu: the small button is that action.
+  const single = actions.length === 1 ? actions[0] : null;
   const run = (action: FabAction) => {
     setOpen(false);
     action.onPress();
@@ -94,16 +97,17 @@ export function ActionFab({ label, icon = 'add', onPress, showMain = true, actio
         {actions.length > 0 && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={open ? 'Close' : actionsLabel}
-            accessibilityState={{ expanded: open }}
+            accessibilityLabel={single ? single.label : open ? 'Close' : actionsLabel}
+            accessibilityState={single ? undefined : { expanded: open }}
             onPress={() => {
               haptic('tick');
-              setOpen((o) => !o);
+              if (single) single.onPress();
+              else setOpen((o) => !o);
             }}
             style={{ width: 48, height: 48, marginRight: 4, borderRadius: 24, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: c.white, elevation: 4 }}
           >
             <Animated.View style={{ transform: [{ rotate: scrim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '90deg'] }) }] }}>
-              <Icon name={open ? 'close' : 'ios-share'} size={22} color={c.gray700} />
+              <Icon name={single ? single.icon : open ? 'close' : 'more-vert'} size={22} color={c.gray700} />
             </Animated.View>
           </Pressable>
         )}

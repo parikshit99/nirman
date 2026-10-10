@@ -26,7 +26,7 @@ Everything is stored **only on your phone**. There is no server or account. The 
 - **Share into the app.** In WhatsApp (or any app), share a bill photo or a text message to *Nirman* and choose Purchases, BOQ or a vendor quote for a saved BOQ; the photos are put into that entry, ready to read.
 - **Labour contracts.** The *Labour* tab keeps each contractor's job, site and terms (rate per unit or lump sum, optional retention), with work measured, payments and deductions. It shows the balance due and shares a statement (PDF, Excel or JPG); site reports include labour.
 - **Deliveries and site reports.** Tick each purchase or BOQ line when it reaches the site, on the open list or later with *Delivered* on a saved list. *Saved → Site report* lists everything bought for the open project, for all time or any dates, for some or all work types, and optionally only what was delivered, as a PDF, Excel sheet or JPG.
-- **Bill photos.** Photographed bills are kept with the lines read from them: *Bill* on a line or *Bills* on a saved list shows them, to check the reading.
+- **Bill photos.** Photographed bills are kept with the lines read from them: *Bill* on a line, or the small pictures of the bills on a saved list, shows them, to check the reading.
 - **Backup.** *Settings → Save backup* shares one `.zip` file with everything, bill photos included; save it to Google Drive, WhatsApp or email. The app reminds you after a week without one. *Restore* on any phone brings it all back (older `.json` backups still restore, without photos). Queued, unread entries are not included.
 
 ## Using the app
