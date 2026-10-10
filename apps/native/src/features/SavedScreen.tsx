@@ -2,16 +2,16 @@ import { useNavigation } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
 import Fuse from 'fuse.js';
 import { useMemo, useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
 import { todayISO } from '@nirman/shared';
 import type { ListMeta } from '@nirman/core';
 import { ActionFab, useHideOnScroll, type FabAction } from '../components/ActionFab';
-import { BillPhotosSheet, photoIdsOf } from '../components/BillPhotos';
+import { BillPhotosSheet, BillThumbs, photoIdsOf } from '../components/BillPhotos';
 import { FilterChips } from '../components/FilterChips';
 import { SaveModal } from '../components/SaveModal';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { SwipeRow } from '../components/SwipeRow';
+import { TrashButton } from '../components/TrashButton';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -38,6 +38,7 @@ interface SaveState {
 /** The Saved tab: the saved purchase lists and BOQs of the open project. */
 export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; onQuotes?(boqId: string): void; onSiteReport?(): void }) {
   const c = useColors();
+  const { width } = useWindowDimensions();
   const dialogs = useDialogs();
   const navigation = useNavigation<{ navigate(name: string): void }>();
   const state = useAppState();
@@ -126,17 +127,14 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
     if (ok) await actions.deleteAllHistory(projectId);
   };
 
-  const swipeDelete = (record: HistoryRecord) => {
+  const deleteWithUndo = (record: HistoryRecord) => {
     actions.deleteListLater(record.id);
     dialogs.undoable(`Deleted “${record.title}”`, () => actions.undoDelete(record.id));
   };
 
-  // The bottom-right buttons, as on Purchases and BOQ: + starts a BOQ, the small one holds the rest.
-  const fabActions: FabAction[] = [
-    ...(history.length > 1 ? [{ icon: 'delete-outline' as const, label: 'Delete all saved lists', tone: 'danger' as const, onPress: deleteAllSaved }] : []),
-    { icon: 'shopping-cart', label: 'New purchase list', onPress: () => navigation.navigate('Purchases') },
-    ...(onSiteReport ? [{ icon: 'assignment' as const, label: 'Site report', tone: 'primary' as const, onPress: onSiteReport }] : []),
-  ];
+  // The bottom-right buttons: + starts a BOQ, the small one a purchase list. Site report is in the header and
+  // Delete all at the end of the list, so neither is repeated here.
+  const fabActions: FabAction[] = [{ icon: 'shopping-cart', label: 'New purchase list', onPress: () => navigation.navigate('Purchases') }];
 
   return (
     <View style={{ flex: 1, backgroundColor: c.brandGray }}>
@@ -188,10 +186,9 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
         }
         renderItem={({ item: record }) => {
           const delivered = record.items.filter((i) => i.delivered_at).length;
-          const bills = photoIdsOf(record.items).length;
+          const bills = photoIdsOf(record.items);
           return (
             <View style={{ marginHorizontal: 16, marginTop: 12, borderRadius: 16, overflow: 'hidden' }}>
-              <SwipeRow onDelete={() => swipeDelete(record)}>
                 <View style={{ padding: 16, gap: 12, borderRadius: 16, borderWidth: 1, borderColor: c.gray200, backgroundColor: c.white }}>
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
                     <Pressable accessibilityRole="button" onPress={() => editDetails(record)} style={{ flex: 1, minWidth: 0 }}>
@@ -207,6 +204,7 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
                         {record.items.length > 0 && <Text style={{ color: delivered === record.items.length ? c.green700 : c.gray500 }}>{` · ${delivered} of ${record.items.length} delivered`}</Text>}
                       </Text>
                     </Pressable>
+                    {bills.length > 0 && <BillThumbs photoIds={bills} max={width >= 400 ? 2 : 1} title={record.title} onPress={() => setPhotosOf(record)} />}
                     {/* Delete is in the details sheet, next to Update, so it isn't tapped by accident. */}
                     <Pressable accessibilityRole="button" accessibilityLabel={`Edit details of ${record.title}`} onPress={() => editDetails(record)} style={{ minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8 }}>
                       <Icon name="edit" size={14} color={c.gray500} />
@@ -253,24 +251,21 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
                         Again
                       </Button>
                     )}
-                    {bills > 0 && (
-                      <Button size="sm" icon="photo-camera" label={`Bill photos of ${record.title}`} onPress={() => setPhotosOf(record)}>
-                        {`Bills (${bills})`}
-                      </Button>
-                    )}
                     {record.items.length > 0 && (
                       <Button size="sm" icon="share" label={`Share ${record.title}`} onPress={() => setSharing(record)}>
                         Share
                       </Button>
                     )}
+                    <View style={{ marginLeft: 'auto' }}>
+                      <TrashButton name={record.title} onPress={() => deleteWithUndo(record)} />
+                    </View>
                   </View>
                 </View>
-              </SwipeRow>
             </View>
           );
         }}
       />
-      <ActionFab label="New BOQ" icon="playlist-add" onPress={() => navigation.navigate('BOQ')} actions={fabActions} actionsLabel="Site report and more" hidden={fabHidden} />
+      <ActionFab label="New BOQ" icon="playlist-add" onPress={() => navigation.navigate('BOQ')} actions={fabActions} actionsLabel="New purchase list" hidden={fabHidden} />
       {sharing && <ListShare kind={sharing.kind} items={sharing.items} notes={sharing.notes} address={sharing.address || project?.address || ''} onClose={() => setSharing(null)} />}
       {photosOf && <BillPhotosSheet photoIds={photoIdsOf(photosOf.items)} title={photosOf.title} onClose={() => setPhotosOf(null)} />}
       {deliveriesFor && <DeliveriesSheet recordId={deliveriesFor} onClose={() => setDeliveriesFor(null)} />}

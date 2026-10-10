@@ -23,7 +23,7 @@ import { LineEditor, type LineValues } from '../components/LineEditor';
 import { MATERIAL_FILTER_FIELDS, MaterialFilters } from '../components/MaterialFilters';
 import { PriceChart } from '../components/PriceChart';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { SwipeRow } from '../components/SwipeRow';
+import { TrashButton } from '../components/TrashButton';
 import { UndoButton } from '../components/UndoButton';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
@@ -149,7 +149,7 @@ export function RatesScreen() {
         ]
       : [];
   const [fabHidden, onListScroll] = useHideOnScroll();
-  const swipeDelete = (m: MaterialEntry) => {
+  const deleteWithUndo = (m: MaterialEntry) => {
     actions.deleteMaterialLater({ key: m.key, name: m.name, unit: m.unit });
     dialogs.undoable(`Deleted “${m.name}” from Rates`, () => actions.undoDelete(m.key));
   };
@@ -283,7 +283,7 @@ export function RatesScreen() {
             </View>
           }
           renderItem={({ item }) => {
-            const card = (
+            return (
               <MaterialCard
                 item={item}
                 selectMode={selectMode}
@@ -294,10 +294,9 @@ export function RatesScreen() {
                 onEdit={() => setEditing(item)}
                 onTogglePrices={() => setOpen(open === item.key ? null : item.key)}
                 onToggleVariants={() => setOpenVariants(openVariants === item.key ? null : item.key)}
+                onDelete={() => deleteWithUndo(item)}
               />
             );
-            // Swipe left past half the row to delete, with Undo; not while selecting.
-            return selectMode ? card : <SwipeRow onDelete={() => swipeDelete(item)}>{card}</SwipeRow>;
           }}
         />
       )}
@@ -353,6 +352,7 @@ function MaterialCard({
   onEdit,
   onTogglePrices,
   onToggleVariants,
+  onDelete,
 }: {
   item: MaterialEntry;
   selectMode: boolean;
@@ -363,6 +363,8 @@ function MaterialCard({
   onEdit(): void;
   onTogglePrices(): void;
   onToggleVariants(): void;
+  /** Deletes the material from Rates, with Undo (not while picking several). */
+  onDelete(): void;
 }) {
   const c = useColors();
   const points = item.priceHistory.filter((h) => h.price > 0);
@@ -387,6 +389,11 @@ function MaterialCard({
           </View>
           <PriceSummary item={item} />
         </Pressable>
+        {!selectMode && (
+          <View style={{ marginTop: -8, marginRight: -8 }}>
+            <TrashButton name={item.name} onPress={onDelete} />
+          </View>
+        )}
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
         {item.vendors.map((v) => (

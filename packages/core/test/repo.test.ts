@@ -23,6 +23,7 @@ import {
   enqueueJob,
   enqueueQuote,
   getBillPhotos,
+  getBillPhotoCovers,
   getJobImages,
   hideMaterial,
   indexRates,
@@ -320,6 +321,7 @@ describe('local repository', () => {
     expect(photoId).not.toBe('');
     expect(snap.items.find((i) => i.item_name === 'Typed')!.photo_id).toBe('');
     expect(await getBillPhotos(db, photoId)).toEqual(['AAA', 'BBB']);
+    expect(await getBillPhotoCovers(db, [photoId, 'gone'])).toEqual([{ id: photoId, cover: 'AAA', pages: 2 }]);
 
     // Saving copies the lines; clearing the draft keeps the photos the saved list uses.
     const listId = await saveDraftToHistory(db, DRAFT_IDS.audit, meta);

@@ -7,6 +7,7 @@ import type { ListKind } from '@nirman/core';
 import { BillPhotosSheet } from '../components/BillPhotos';
 import { DeliveredToggle } from '../components/DeliveredToggle';
 import { SwipeRow } from '../components/SwipeRow';
+import { TrashButton } from '../components/TrashButton';
 import { LineEditor } from '../components/LineEditor';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
@@ -148,15 +149,15 @@ export function ItemLog({ kind, items: allItems, searching, onAdd, header, onScr
                     onPhotos={() => setPhotosOf(item)}
                     onDelivered={(date) => actions.setDelivered([item.id], date)}
                     onUnmatch={() => actions.undoMatch(item.id)}
+                    onDelete={selecting ? undefined : () => deleteWithUndo(item)}
                   />
                 )}
               </View>
             </View>
           );
-          // Swipe right: delivered (or not); swipe left past half the row: delete, with Undo. Not while editing or picking.
+          // Swipe right: delivered (or not). Not while editing or picking. Delete is the bin on the line.
           return editingId === item.id || selecting ? row : (
             <SwipeRow
-              onDelete={() => deleteWithUndo(item)}
               left={item.delivered_at ? { icon: 'undo', label: 'Not delivered', color: c.gray600, onPress: () => actions.setDelivered([item.id], '') } : { icon: 'check', label: 'Delivered', color: c.green600, onPress: () => actions.setDelivered([item.id], todayISO()) }}
             >
               {row}
@@ -178,6 +179,8 @@ interface CardProps {
   /** Shows the bill photo the line was read from. */
   onPhotos(): void;
   onDelivered(date: string): void;
+  /** Deletes the line, with Undo (none while picking several). */
+  onDelete?(): void;
   /** Starts picking several lines. */
   onLongPress(): void;
   /** Put the line back as it was read, before it was matched to a material in Rates. */
@@ -196,7 +199,7 @@ function readAsLabel(item: ItemRow): string | null {
   }
 }
 
-function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onLongPress, onPhotos, onDelivered, onUnmatch }: CardProps) {
+function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onLongPress, onPhotos, onDelivered, onUnmatch, onDelete }: CardProps) {
   const c = useColors();
   const diffPercent = lastPaid && item.unit_price && lastPaid.price > 0 ? ((item.unit_price - lastPaid.price) / lastPaid.price) * 100 : 0;
   // Another site's price can differ for transport alone: say where it is from.
@@ -263,6 +266,11 @@ function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onLongPress, o
               Last paid{where} {rupees(lastPaid.price)}
               {isHigher ? ' (this is higher)' : isLower ? ' (this is lower)' : ''}
             </Text>
+          </View>
+        )}
+        {onDelete && (
+          <View style={{ marginLeft: 'auto' }}>
+            <TrashButton name={item.item_name} onPress={onDelete} />
           </View>
         )}
       </View>
