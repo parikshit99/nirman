@@ -8,7 +8,7 @@ Android app (React Native, Expo) for tracking construction purchases, BOQs, vend
 - [docs/UX guideline.md](docs/UX%20guideline.md): the words to use, feedback, deleting, empty lists, offline behaviour.
 - [docs/Nirman workflows.md](docs/Nirman%20workflows.md): how bills, BOQs, quotes, labour and prices move through the app, what leaves the phone, and how an update ships (with diagrams). **When a change alters one of these flows, update its section and diagram in the same PR.**
 
-**The app** is `apps/native` (React Native, Expo) since 7.0; the old Capacitor app was removed in Phase 8 of [docs/react-native-plan.md](docs/react-native-plan.md). Next: the sync phases there (Supabase and a web version on GitHub Pages).
+**The app** is `apps/native` (React Native, Expo) since 7.0; the old Capacitor app was removed in Phase 8 of [docs/react-native-plan.md](docs/react-native-plan.md). Next: the sync phases there (Supabase and a web version on GitHub Pages). ERP features (vendors, payments, orders, plan vs actual, closing stock) are planned in [docs/ERP plan.md](docs/ERP%20plan.md).
 
 Rules that always apply:
 - Run `npm run lint`, `npm test` and `npm run build` before every push.
