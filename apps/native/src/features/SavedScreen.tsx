@@ -2,10 +2,10 @@ import { useNavigation } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
 import Fuse from 'fuse.js';
 import { useMemo, useState } from 'react';
-import { Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
 import { todayISO } from '@nirman/shared';
-import type { ListMeta } from '@nirman/core';
+import { prefs, type ListMeta } from '@nirman/core';
 import { ActionFab, useHideOnScroll, type FabAction } from '../components/ActionFab';
 import { BillPhotosSheet, BillThumbs, photoIdsOf } from '../components/BillPhotos';
 import { FilterChips } from '../components/FilterChips';
@@ -16,6 +16,7 @@ import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Icon } from '../components/ui/Icon';
+import { Tabs } from '../components/ui/Tabs';
 import { plural } from '../lib/format';
 import { useAppState, type HistoryRecord } from '../state/AppState';
 import { useColors } from '../theme';
@@ -30,21 +31,40 @@ function vendorOf(items: { vendor: string }[]): { initial: string; mixed: boolea
   return { initial: vendors.length === 1 ? vendors[0] : '', mixed: vendors.length > 1 };
 }
 
+/** Saved shows the open project's lists, or every project's (remembered on this phone). */
+type Scope = 'project' | 'all';
+const SCOPE_PREF = 'nirmaan_saved_scope';
+const SCOPES = [
+  { id: 'project', label: 'This project' },
+  { id: 'all', label: 'All projects' },
+] as const;
+
 interface SaveState {
   record: HistoryRecord;
   initial: ListMeta;
 }
 
-/** The Saved tab: the saved purchase lists and BOQs of the open project. */
+/** The Saved tab: the saved purchase lists and BOQs of the open project, or of every project. */
 export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; onQuotes?(boqId: string): void; onSiteReport?(): void }) {
   const c = useColors();
   const { width } = useWindowDimensions();
   const dialogs = useDialogs();
   const navigation = useNavigation<{ navigate(name: string): void }>();
   const state = useAppState();
-  const { actions, history: allHistory, pendingDeletes, categoryNames, uniqueAddresses, knownVendors, quotesFor, projects, projectId, project, draftIds, setEditing } = state;
+  const { actions, history: projectHistory, allHistory, pendingDeletes, categoryNames, uniqueAddresses, knownVendors, quotesFor, projects, projectId, project, draftIds, setEditing } = state;
+  const [scope, setScopeState] = useState<Scope>(() => prefs.get<Scope>(SCOPE_PREF, 'project'));
+  const all = scope === 'all' && projects.length > 1;
+  const [showClosed, setShowClosed] = useState(false);
+  const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
+  const projectName = (id: string) => projectById.get(id)?.name ?? '';
+  // Closed projects' lists stay out of All projects until asked for (the open project's always show).
+  const isClosedElsewhere = (id: string) => id !== projectId && projectById.get(id)?.status === 'closed';
+  const closedCount = all ? allHistory.filter((h) => isClosedElsewhere(h.project_id) && !pendingDeletes.has(h.id)).length : 0;
   // A list swiped away leaves at once; the strip at the bottom offers Undo until it is really deleted.
-  const history = useMemo(() => allHistory.filter((h) => !pendingDeletes.has(h.id)), [allHistory, pendingDeletes]);
+  const history = useMemo(
+    () => (all ? allHistory.filter((h) => showClosed || !isClosedElsewhere(h.project_id)) : projectHistory).filter((h) => !pendingDeletes.has(h.id)),
+    [all, allHistory, projectHistory, pendingDeletes, showClosed, projectById, projectId],
+  );
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [addressFilter, setAddressFilter] = useState('All');
@@ -54,12 +74,27 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
   const [sharing, setSharing] = useState<HistoryRecord | null>(null);
   const [fabHidden, onListScroll] = useHideOnScroll();
 
-  const addresses = [...new Set(history.map((h) => h.address).filter(Boolean))];
+  const setScope = (next: Scope) => {
+    prefs.set(SCOPE_PREF, next);
+    setScopeState(next);
+    setAddressFilter('All');
+  };
+
+  // The second row of chips: sites in one project, projects in All projects.
+  const placeOf = (r: HistoryRecord) => (all ? projectName(r.project_id) : r.address);
+  const addresses = [...new Set(history.map(placeOf).filter(Boolean))];
   const q = search.trim();
   const records = useMemo(() => {
-    const base = q ? new Fuse(history, { keys: ['title', 'address', 'category'], threshold: 0.4 }).search(q).map((r) => r.item) : history;
-    return base.filter((r) => (categoryFilter === 'All' || r.category.toLowerCase() === categoryFilter.toLowerCase()) && (addressFilter === 'All' || r.address === addressFilter));
-  }, [history, q, categoryFilter, addressFilter]);
+    const searchable = history.map((h) => ({ ...h, project_name: projectName(h.project_id) }));
+    const keys = all ? ['title', 'address', 'category', 'project_name'] : ['title', 'address', 'category'];
+    const base = q ? new Fuse(searchable, { keys, threshold: 0.4 }).search(q).map((r) => r.item) : searchable;
+    return base.filter((r) => (categoryFilter === 'All' || r.category.toLowerCase() === categoryFilter.toLowerCase()) && (addressFilter === 'All' || placeOf(r) === addressFilter));
+  }, [history, q, categoryFilter, addressFilter, all, projectById]);
+
+  /** A list of another project is opened in its project: its tabs, quotes and site go with it. */
+  const goToProjectOf = (record: HistoryRecord) => {
+    if (record.project_id !== projectId) actions.openProject(record.project_id);
+  };
 
   const projectOptions = projects.map((p) => ({ id: p.id, name: p.status === 'closed' ? `${p.name} (closed)` : p.name }));
 
@@ -96,7 +131,8 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
   /** Edit a saved list in place on its tab; the open list for the next bill is kept as it is. */
   const openRecord = async (record: HistoryRecord) => {
     await actions.flushDeletes();
-    setEditing(record.kind, record.id);
+    goToProjectOf(record);
+    setEditing(record.kind, record.id, record.project_id);
     navigation.navigate(record.kind === 'audit' ? 'Purchases' : 'BOQ');
   };
 
@@ -141,7 +177,7 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
       <ScreenHeader>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View>
-            <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>In this project</Text>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>{all ? 'In all projects' : 'In this project'}</Text>
             <Text style={{ fontSize: 14, fontWeight: '700', color: c.brandDark }}>{plural(history.length, 'list')}</Text>
           </View>
           {/* On show, as in 6.x, not only in the ⋮ menu (#91). */}
@@ -166,12 +202,34 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
         scrollEventThrottle={32}
         ListHeaderComponent={
           <View style={{ gap: 12, paddingTop: 8 }}>
-            <Text style={{ marginHorizontal: 16, marginTop: 4, fontSize: 12, lineHeight: 17, color: c.gray600 }}>{about}</Text>
-            {history.length > 0 && <FilterChips categories={categoryNames} categoryFilter={categoryFilter} onCategory={setCategoryFilter} addresses={addresses.length > 1 ? addresses : []} addressFilter={addressFilter} onAddress={setAddressFilter} addressLabel="Filter by site" />}
+            {projects.length > 1 && (
+              <View style={{ marginHorizontal: 16 }}>
+                <Tabs<Scope> label="Show saved lists of" options={SCOPES} value={scope} onChange={setScope} />
+              </View>
+            )}
+            <Text style={{ marginHorizontal: 16, marginTop: 4, fontSize: 12, lineHeight: 17, color: c.gray600 }}>{all ? 'Saved lists of every project, newest first. Open one to work on it in its project.' : about}</Text>
+            {history.length > 0 && (
+              <FilterChips
+                categories={categoryNames}
+                categoryFilter={categoryFilter}
+                onCategory={setCategoryFilter}
+                addresses={addresses.length > 1 ? addresses : []}
+                addressFilter={addressFilter}
+                onAddress={setAddressFilter}
+                addressLabel={all ? 'Filter by project' : 'Filter by site'}
+                allLabel={all ? 'All projects' : 'All sites'}
+              />
+            )}
+            {closedCount > 0 && (
+              <View style={{ marginHorizontal: 16, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ flex: 1, fontSize: 14, color: c.gray800 }}>{`Show closed projects (${plural(closedCount, 'list')})`}</Text>
+                <Switch accessibilityLabel="Show closed projects" value={showClosed} onValueChange={setShowClosed} />
+              </View>
+            )}
           </View>
         }
         ListFooterComponent={
-          history.length > 1 ? (
+          !all && history.length > 1 ? (
             <View style={{ alignItems: 'center', paddingTop: 16 }}>
               <Button variant="dangerOutline" size="sm" icon="delete-outline" onPress={deleteAllSaved}>
                 Delete all saved lists
@@ -181,7 +239,7 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
         }
         ListEmptyComponent={
           <EmptyState title={history.length ? 'No saved lists match.' : 'Nothing saved yet.'} icon={require('../../assets/tabs/saved.png')}>
-            {history.length ? 'Check the filters or search.' : 'Lists you save in this project from Purchases or BOQ (the Save button) appear here.'}
+            {history.length ? 'Check the filters or search.' : all ? 'Lists you save in any project from Purchases or BOQ (the Save button) appear here.' : 'Lists you save in this project from Purchases or BOQ (the Save button) appear here.'}
           </EmptyState>
         }
         renderItem={({ item: record }) => {
@@ -194,6 +252,11 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
                     <Pressable accessibilityRole="button" onPress={() => editDetails(record)} style={{ flex: 1, minWidth: 0 }}>
                       <Text style={{ fontSize: 14, fontWeight: '700', color: c.gray900 }}>{record.title}</Text>
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                        {all && (
+                          <Text numberOfLines={1} style={{ maxWidth: 200, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontSize: 12, fontWeight: '700', color: c.onPrimary, backgroundColor: c.gray800 }}>
+                            {projectName(record.project_id) || 'No project'}
+                          </Text>
+                        )}
                         <Text style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontSize: 12, fontWeight: '700', color: c.orange700, backgroundColor: c.orange100 }}>{record.category || 'Civil'}</Text>
                         <Text style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontSize: 12, fontWeight: '700', color: c.gray500, backgroundColor: c.gray100 }}>{titlePrefix(record.kind)}</Text>
                       </View>
@@ -242,7 +305,10 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
                       </Button>
                     )}
                     {record.kind === 'boq' && onQuotes && (
-                      <Button size="sm" icon="local-shipping" style={{ flexGrow: 1 }} onPress={() => onQuotes(record.id)}>
+                      <Button size="sm" icon="local-shipping" style={{ flexGrow: 1 }} onPress={() => {
+                          goToProjectOf(record);
+                          onQuotes(record.id);
+                        }}>
                         {`Quotes (${quotesFor(record.id).length})`}
                       </Button>
                     )}
@@ -266,7 +332,7 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
         }}
       />
       <ActionFab label="New BOQ" icon="playlist-add" onPress={() => navigation.navigate('BOQ')} actions={fabActions} actionsLabel="New purchase list" hidden={fabHidden} />
-      {sharing && <ListShare kind={sharing.kind} items={sharing.items} notes={sharing.notes} address={sharing.address || project?.address || ''} onClose={() => setSharing(null)} />}
+      {sharing && <ListShare kind={sharing.kind} items={sharing.items} notes={sharing.notes} address={sharing.address || projectById.get(sharing.project_id)?.address || ''} onClose={() => setSharing(null)} />}
       {photosOf && <BillPhotosSheet photoIds={photoIdsOf(photosOf.items)} title={photosOf.title} onClose={() => setPhotosOf(null)} />}
       {deliveriesFor && <DeliveriesSheet recordId={deliveriesFor} onClose={() => setDeliveriesFor(null)} />}
       {saveState && (

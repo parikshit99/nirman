@@ -116,9 +116,10 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
   /** Per project, the saved list each tab is editing in place (none: the open list for the next bill). */
   const [editingByProject, setEditingByProject] = useState<Record<string, Partial<Record<ListKind, string | null>>>>(() => prefs.get(EDITING_PREF, {}));
   const setEditing = useCallback(
-    (kind: ListKind, id: string | null) =>
+    // `forProject`: a saved list of another project, opened from Saved's All projects view.
+    (kind: ListKind, id: string | null, forProject: string = projectId) =>
       setEditingByProject((prev) => {
-        const next = { ...prev, [projectId]: { ...prev[projectId], [kind]: id } };
+        const next = { ...prev, [forProject]: { ...prev[forProject], [kind]: id } };
         prefs.set(EDITING_PREF, next);
         return next;
       }),

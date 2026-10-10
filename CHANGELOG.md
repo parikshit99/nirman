@@ -2,6 +2,14 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 7.5 — Saved lists of every project
+
+**Saved**
+- **All projects** at the top of Saved shows the saved lists of every project together, newest first, each marked with its project. *This project* goes back to the open project's lists; the app remembers which one you used.
+- Search and the work-type filter cover every project; the second row of chips filters by project.
+- Closed projects' lists stay out until you tick **Show closed projects**.
+- *Open* or *Quotes* on another project's list switches to that project first. *Delete all saved lists* is only offered in *This project*.
+
 ## 7.4 — The new buttons on every tab
 
 **Purchases and BOQ**

@@ -10,10 +10,12 @@ interface Props {
   addressFilter: string;
   onAddress(addr: string): void;
   addressLabel: string;
+  /** The chip that clears the second row (default: All sites). */
+  allLabel?: string;
 }
 
 /** Work-type chips and, when there are several sites, site chips: sideways rows that scroll. */
-export function FilterChips({ categories, categoryFilter, onCategory, addresses, addressFilter, onAddress, addressLabel }: Props) {
+export function FilterChips({ categories, categoryFilter, onCategory, addresses, addressFilter, onAddress, addressLabel, allLabel = 'All sites' }: Props) {
   const c = useColors();
   return (
     <View style={{ gap: 12 }}>
@@ -36,7 +38,7 @@ export function FilterChips({ categories, categoryFilter, onCategory, addresses,
               return (
                 <PressScale key={addr} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => onAddress(addr)} style={{ minHeight: 40, maxWidth: 200, paddingHorizontal: 12, justifyContent: 'center', borderRadius: 20, backgroundColor: on ? c.gray800 : c.gray100 }}>
                   <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: on ? c.onPrimary : c.gray500 }}>
-                    {addr === 'All' ? 'All sites' : addr}
+                    {addr === 'All' ? allLabel : addr}
                   </Text>
                 </PressScale>
               );
