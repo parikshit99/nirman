@@ -13,8 +13,9 @@ export interface SwipeAction {
 }
 
 /**
- * A row that can be swiped, as chats are in Telegram: to the left, past half its width, deletes it (the caller shows
- * the Undo strip); to the right, `left` if given (e.g. Delivered), and the row springs back.
+ * A row that can be swiped, as chats are in Telegram: to the left, past a third of its width (or a quick flick), deletes
+ * it (the caller shows the Undo strip); to the right, `left` if given (e.g. Delivered), and the row springs back. The
+ * row follows the finger one to one, as in Gmail.
  */
 export function SwipeRow({ onDelete, left, children }: { onDelete(): void; left?: SwipeAction; children: ReactElement }) {
   const c = useColors();
@@ -29,10 +30,10 @@ export function SwipeRow({ onDelete, left, children }: { onDelete(): void; left?
   return (
     <Swipeable
       ref={ref}
-      friction={1.5}
+      friction={1}
       overshootFriction={8}
       leftThreshold={96}
-      rightThreshold={width / 2}
+      rightThreshold={width / 3}
       renderLeftActions={left ? () => panel(left.color, left.icon, left.label, 'left') : undefined}
       renderRightActions={() => panel(c.red600, 'delete-outline', 'Delete', 'right')}
       onSwipeableOpen={(direction) => {
