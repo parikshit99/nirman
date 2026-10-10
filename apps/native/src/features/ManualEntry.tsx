@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { Pressable } from '../components/ui/Pressable';
 import { VARIANT_FIELDS, parseAmount, todayISO, type MaterialEntry } from '@nirman/shared';
 import type { ListKind } from '@nirman/core';
 import { QuantityHelper } from '../components/QuantityHelper';

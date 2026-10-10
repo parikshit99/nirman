@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
+import { Pressable } from '../components/ui/Pressable';
 import { compareQuotes, normalizeTerm, parseAmount, variantDifferences, variantLabel, type QuoteLineRow, type QuoteRow, type VariantField } from '@nirman/shared';
 import type { QuoteLinePatch } from '@nirman/core';
 import { VsLastBadge, rupees } from '../components/PriceBadges';
@@ -65,7 +66,7 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
         </View>
         <View>
           <Label>Date</Label>
-          <Text style={{ minHeight: 44, textAlignVertical: 'center', fontSize: 14, fontFamily: 'monospace', color: c.brandDark }}>{quote.quote_date}</Text>
+          <Text style={{ minHeight: 44, textAlignVertical: 'center', fontSize: 14, fontVariant: ['tabular-nums'], color: c.brandDark }}>{quote.quote_date}</Text>
         </View>
       </View>
 
@@ -84,11 +85,11 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
           {summary.missing.map((item) => (
             <View key={item.id} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: c.red50 }}>
               <Text style={{ flex: 1, fontSize: 12, color: c.gray800 }}>
-                <Text style={{ fontFamily: 'monospace', color: c.gray500 }}>{itemsById.get(item.id)?.sr}. </Text>
+                <Text style={{ fontVariant: ['tabular-nums'], color: c.gray500 }}>{itemsById.get(item.id)?.sr}. </Text>
                 {item.item_name}
                 {variantLabel(item) ? <Text style={{ color: c.gray500 }}>{` · ${variantLabel(item)}`}</Text> : null}
               </Text>
-              <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500 }}>
+              <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>
                 {item.quantity} {item.unit}
               </Text>
             </View>
@@ -186,7 +187,7 @@ function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDel
           accessibilityLabel="Rate"
           placeholder="Rate"
           placeholderTextColor={c.gray500}
-          style={[input, { width: 112, fontFamily: 'monospace' }]}
+          style={[input, { width: 112, fontVariant: ['tabular-nums'] }]}
         />
         <Text style={{ fontSize: 12, color: c.gray500 }}>per</Text>
         <TextInput value={unit} editable={!readOnly} onChangeText={setUnit} onEndEditing={() => unit.trim() !== line.unit && onChange({ unit: unit.trim() || 'unit' })} accessibilityLabel="Unit" style={[input, { width: 80 }]} />

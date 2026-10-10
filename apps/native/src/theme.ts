@@ -13,6 +13,12 @@ export const light = {
   onPrimary: '#ffffff',
   /** Dims the screen behind a menu (always black, at reduced opacity). */
   scrim: '#000000',
+  /** Android's ripple on surfaces (onSurface at 12%). */
+  ripple: '#0000001f',
+  /** The ripple on the accent (onPrimary at 24%); worked out again for the chosen colour. */
+  rippleOnPrimary: '#ffffff3d',
+  /** The ripple on red buttons (white text in both modes). */
+  rippleOnDanger: '#ffffff3d',
   white: '#ffffff',
   brandDark: '#121212',
   brandGray: '#f5f5f5',
@@ -65,6 +71,8 @@ export const dark: Colors = {
   ...light,
   ...ORANGE.dark,
   onPrimary: '#16181c',
+  ripple: '#ffffff24',
+  rippleOnPrimary: '#16181c3d',
   white: '#16181c',
   brandGray: '#0c0d10',
   brandDark: '#eaebed',
@@ -109,11 +117,13 @@ export function paletteFor(mode: 'light' | 'dark', l: Look): Colors {
   if (!colors) {
     const base = mode === 'dark' ? dark : light;
     const shades: AccentShades = accentShades(seed, ORANGE[mode], base.white);
+    // Nirman's orange keeps its usual text colour; any other colour gets white or near-black, whichever reads.
+    const onPrimary = seed === DEFAULT_ACCENT ? base.onPrimary : textOn(shades);
     colors = {
       ...base,
       ...shades,
-      // Nirman's orange keeps its usual text colour; any other colour gets white or near-black, whichever reads.
-      onPrimary: seed === DEFAULT_ACCENT ? base.onPrimary : textOn(shades),
+      onPrimary,
+      rippleOnPrimary: `${onPrimary}3d`,
       ...(black && { white: '#000000', brandGray: '#000000', gray50: '#101114' }),
     };
     cache.set(key, colors);

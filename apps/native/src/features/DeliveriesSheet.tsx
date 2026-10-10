@@ -25,7 +25,7 @@ export function DeliveriesSheet({ recordId, onClose }: { recordId: string; onClo
               <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: '700', color: c.brandDark }}>
                 {item.item_name}
               </Text>
-              <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500 }}>
+              <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>
                 {item.quantity} {item.unit}
               </Text>
             </View>

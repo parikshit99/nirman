@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { prefs } from '@nirman/core';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { Pressable } from '../components/ui/Pressable';
 import type { ProjectRow } from '@nirman/shared';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';

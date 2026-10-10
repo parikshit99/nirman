@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Text, TextInput, View } from 'react-native';
+import { Pressable } from '../components/ui/Pressable';
 import { MAX_IMAGES, todayISO } from '@nirman/shared';
 import { type Job, type ListKind, prefs, workTypeKey, type ReadingProgress } from '@nirman/core';
 import { PhotoSourceSheet } from '../components/PhotoSourceSheet';
@@ -296,12 +297,12 @@ function ReadingBar({ current, photos }: { current: ReadingProgress; photos: num
           <Text style={{ fontSize: 12, fontWeight: '700', color: phone ? c.green800 : c.blue800 }}>{phone ? 'On phone' : 'Gemini'}</Text>
         </View>
         <Text style={{ fontSize: 12, color: c.gray600 }}>{current.step}</Text>
-        {!phone && <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500 }}>{seconds}s</Text>}
+        {!phone && <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>{seconds}s</Text>}
       </View>
       <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: Math.round(value * 100) }} style={{ height: 6, borderRadius: 3, backgroundColor: c.gray200, overflow: 'hidden' }}>
         <View style={{ height: '100%', width: `${Math.max(4, value * 100)}%`, backgroundColor: phone ? c.green500 : c.blue500 }} />
       </View>
-      {!phone && current.model ? <Text numberOfLines={1} style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500 }}>{current.model}</Text> : null}
+      {!phone && current.model ? <Text numberOfLines={1} style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>{current.model}</Text> : null}
     </View>
   );
 }

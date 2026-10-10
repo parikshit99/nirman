@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { Pressable } from '../components/ui/Pressable';
 import { buildLabourReport, buildSiteReport, financialYear, siteHasDeliveries, todayISO } from '@nirman/shared';
 import { pdfFile, siteReportSheet, type ExportFormat, buildSiteReportPdf, logStep } from '@nirman/core';
 import { DocumentPreview } from '../components/DocumentPreview';
@@ -61,7 +62,7 @@ export function SiteReport({ onClose }: { onClose(): void }) {
   };
 
   const chip = (on: boolean) => ({ minHeight: 40, paddingHorizontal: 12, justifyContent: 'center' as const, borderRadius: 20, borderWidth: 1, borderColor: on ? c.orange500 : c.gray200, backgroundColor: on ? c.orange500 : c.white });
-  const chipText = (on: boolean) => ({ fontSize: 12, fontWeight: '700' as const, letterSpacing: 0.4, textTransform: 'uppercase' as const, color: on ? c.onPrimary : c.gray500 });
+  const chipText = (on: boolean) => ({ fontSize: 14, fontWeight: '600' as const, color: on ? c.onPrimary : c.gray500 });
   const label = { fontSize: 12, fontWeight: '700' as const, color: c.gray600, marginBottom: 4 };
   const panel = { padding: 12, borderRadius: 12, backgroundColor: c.gray50, flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const, gap: 8 };
 
@@ -137,14 +138,14 @@ export function SiteReport({ onClose }: { onClose(): void }) {
               <Text style={{ fontSize: 14, color: c.gray600 }}>
                 {plural(report.lineCount, 'line')} · {plural(materialCount, 'material')}
               </Text>
-              <Text style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupees(report.total)}</Text>
+              <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupees(report.total)}</Text>
             </View>
             {labour.rows.length > 0 && (
               <View style={panel}>
                 <Text style={{ flex: 1, fontSize: 14, color: c.gray600 }}>
                   Labour: {plural(labour.rows.length, 'contract')} · paid {rupees(labour.paid)}
                 </Text>
-                <Text style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupees(labour.workDone)}</Text>
+                <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupees(labour.workDone)}</Text>
               </View>
             )}
 

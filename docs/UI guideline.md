@@ -28,7 +28,8 @@ Use these; don't hand-build them again. Each one should wrap Android's control w
 | `ActionFab` (`components/`) | Every list tab, bottom right above the tabs: the floating Add button (Purchases and BOQ: add items; Saved: new BOQ; Labour: new contract; Rates has none) and, above it, a small one that opens the tab's other actions (Save, Share, Preview, Clear; Site report; Export CSV, Delete). Both slide away while scrolling down (`useHideOnScroll`). Give the list `paddingBottom: 96` so its last row clears them. |
 | `SwipeRow` (`components/`) | A row or card that swipes left past half its width to delete (the caller shows `dialogs.undoable`), and optionally right for one other action (Delivered). Purchase and BOQ lines, saved lists, contracts, materials in Rates. |
 | `Icon` | Material icon names only. |
-| `PressScale` | A Pressable that shrinks a little while held, for buttons, chips and cards, together with Android's ripple (see *Catching up*). |
+| `Pressable` | Everything that can be tapped: React Native's Pressable with Android's ripple. Import it from `components/ui/Pressable`, never from `react-native`. On a coloured background pass `android_ripple={{ color: c.rippleOnPrimary, foreground: true }}` (or `rippleOnDanger`); `android_ripple={null}` for a backdrop. Give rounded shapes `overflow: 'hidden'` so the ripple keeps to the corners. |
+| `PressScale` | The same, and it also shrinks a little while held: buttons, chips and cards. |
 | `RollingText` | Money totals and counts in headers: the digits roll to the new value. |
 | `PriceChart`, `Sparkline` | Price history (`react-native-svg`). |
 | `useDialogs()` | `confirm` and `alert` are Android's own dialog, `prompt` a small sheet, `toast` a Snackbar above the tabs, `undoable` the same Snackbar with Undo and a countdown ring (after every `…Later` delete). Use these rather than React Native's `Alert`, so wording and haptics stay the same everywhere. |
@@ -40,7 +41,7 @@ Use these; don't hand-build them again. Each one should wrap Android's control w
 
 Use these when a screen or feature needs them, rather than a home-made version:
 
-- **Touch feedback:** Android's ripple (`android_ripple` on `Pressable`) on everything that can be tapped.
+- **Touch feedback:** Android's ripple on everything that can be tapped (`Pressable` above). No pressed colours of our own.
 - **Back:** the system Back and the predictive back preview, on every screen and sheet. Never a screen that only closes with an on-screen button.
 - **Dynamic colour:** the wallpaper's colour (Android 12+), already offered in *Settings → Appearance*. Dark mode follows the system unless the user picks one.
 - **System font size and display size:** honoured everywhere (Android 14 scales text up to 200%). Don't cap scaling with `maxFontSizeMultiplier` except on a piece that can't grow (the tab bar labels), and then only as little as needed.
@@ -106,9 +107,6 @@ Parts of the app still follow the 6.x WebView rules. New screens follow this gui
 | Today | Moving to |
 |---|---|
 | `theme.ts` holds 6.x's Tailwind palette (`gray50`…`gray900`, `orange…`, `red…`, `green…`, `blue…`, and `white`/`brandGray` that turn dark in dark mode) | The Material 3 roles above, generated from the accent with `palette.ts`. Add the roles first beside the old names, move screens over, then remove the old names |
-| `fontFamily: 'monospace'` on numbers | `fontVariant: ['tabular-nums']` |
-| Upper case, letter-spaced labels on `Button`, `Tabs`, `FilterChips`, the Undo action and some headings | Sentence case, Material label sizes |
-| Pressed states that change the background colour (`Button`, `PressScale`) | Android ripple, plus the shrink |
 | `Button` sizes 36 and 44 dp | 40 dp visible, 48 dp touch area |
 | `Tabs`' sliding white pill | Material segmented buttons |
 | Grey outlines on cards | Surface tones |

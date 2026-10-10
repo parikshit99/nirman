@@ -1,4 +1,5 @@
-import { ActivityIndicator, Pressable, Text } from 'react-native';
+import { ActivityIndicator, Text } from 'react-native';
+import { Pressable } from './ui/Pressable';
 import { NO_KEY_MESSAGE } from '@nirman/core';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';

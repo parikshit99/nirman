@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable } from './Pressable';
 import Animated, { Easing, runOnJS, useAnimatedProps, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -171,7 +172,7 @@ function Snackbar({ toast, onDone }: { toast: Bulletin | null; onDone(): void })
             }}
             style={{ minHeight: 40, justifyContent: 'center', paddingHorizontal: 8, marginRight: -8 }}
           >
-            <Text style={{ color: c.orange300, fontSize: 14, fontWeight: '700', textTransform: 'uppercase' }}>Undo</Text>
+            <Text style={{ color: c.orange300, fontSize: 14, fontWeight: '700' }}>Undo</Text>
           </Pressable>
         )}
       </View>

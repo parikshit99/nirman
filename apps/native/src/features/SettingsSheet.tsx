@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Switch, Text, TextInput, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Linking, StyleSheet, Switch, Text, TextInput, View, useColorScheme } from 'react-native';
+import { Pressable } from '../components/ui/Pressable';
 import {
   BackupError,
   DEFAULT_MODEL,
@@ -97,7 +98,7 @@ function Hint({ children, tone }: { children: ReactNode; tone?: 'error' | 'ok' }
 function LinkButton({ children, onPress, danger, label, disabled }: { children: string; onPress(): void; danger?: boolean; label?: string; disabled?: boolean }) {
   const c = useColors();
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label ?? children} disabled={disabled} onPress={onPress} hitSlop={4} style={({ pressed }) => [styles.link, pressed && { backgroundColor: c.gray100 }, disabled && { opacity: 0.4 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label ?? children} disabled={disabled} onPress={onPress} hitSlop={4} style={[styles.link, disabled && { opacity: 0.4 }]}>
       <Text style={{ fontSize: 12, fontWeight: '700', color: danger ? c.red600 : c.orange700, textDecorationLine: 'underline' }}>{children}</Text>
     </Pressable>
   );
@@ -169,7 +170,7 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
             autoCapitalize="none"
             placeholder="AIza…"
             placeholderTextColor={c.gray500}
-            style={{ flex: 1, minHeight: 44, paddingHorizontal: 12, fontSize: 14, fontFamily: 'monospace', color: c.brandDark }}
+            style={{ flex: 1, minHeight: 44, paddingHorizontal: 12, fontSize: 14, fontVariant: ['tabular-nums'], color: c.brandDark }}
           />
           <Pressable accessibilityRole="button" accessibilityLabel={show ? 'Hide key' : 'Show key'} onPress={() => setShow(!show)} style={styles.iconButton}>
             <Icon name={show ? 'visibility-off' : 'visibility'} size={18} color={c.gray500} />
@@ -332,7 +333,7 @@ function ReadingSection() {
               accessibilityRole="radio"
               accessibilityState={{ checked: on }}
               onPress={() => set({ readingMode: mode })}
-              style={({ pressed }) => [styles.choice, { borderColor: on ? c.orange400 : c.gray200, backgroundColor: on ? c.orange50 : pressed ? c.gray100 : c.white }]}
+              style={[styles.choice, { borderColor: on ? c.orange400 : c.gray200, backgroundColor: on ? c.orange50 : c.white }]}
             >
               <Icon name={on ? 'radio-button-checked' : 'radio-button-unchecked'} size={20} color={on ? c.orange600 : c.gray400} />
               <View style={{ flex: 1 }}>
@@ -494,7 +495,7 @@ function ConversionsSection() {
                 .sort((a, b) => Number(a) - Number(b))
                 .map((d) => (
                   <View key={d} style={{ width: '30%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Text style={{ width: 44, fontSize: 12, fontFamily: 'monospace', color: c.gray700 }}>{d} mm</Text>
+                    <Text style={{ width: 44, fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray700 }}>{d} mm</Text>
                     <View style={{ flex: 1 }}>
                       <NumberField accessibilityLabel={`Bars per bundle for ${d} mm`} keyboardType="number-pad" value={bars[d]} onChangeText={edit((v: string) => setBars((b) => ({ ...b, [d]: v })))} />
                     </View>
@@ -715,7 +716,7 @@ function LearnedCorrections({ onForgetAll }: { onForgetAll(): void }) {
       {terms.map((t) =>
         editing === t.id ? (
           <View key={t.id} style={[styles.listRow, { flexDirection: 'column', alignItems: 'stretch', backgroundColor: c.orange50, gap: 6 }]}>
-            <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray600 }}>“{t.id}” is read as</Text>
+            <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray600 }}>“{t.id}” is read as</Text>
             <View style={{ flexDirection: 'row', gap: 6 }}>
               <View style={{ flex: 1 }}>
                 <Field accessibilityLabel="Read as name" value={draft.item_name} onChangeText={(v) => setDraft((d) => ({ ...d, item_name: v }))} />
@@ -745,7 +746,7 @@ function LearnedCorrections({ onForgetAll }: { onForgetAll(): void }) {
         ) : (
           <View key={t.id} style={[styles.listRow, { backgroundColor: c.gray50 }]}>
             <Text style={{ flex: 1, fontSize: 12, color: c.gray800 }}>
-              <Text style={{ fontFamily: 'monospace', color: c.gray600 }}>{t.id}</Text> → <Text style={{ fontWeight: '700' }}>{t.item_name}</Text>{' '}
+              <Text style={{ fontVariant: ['tabular-nums'], color: c.gray600 }}>{t.id}</Text> → <Text style={{ fontWeight: '700' }}>{t.item_name}</Text>{' '}
               <Text style={{ color: c.gray500 }}>· {t.unit}</Text>
             </Text>
             <LinkButton

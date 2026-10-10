@@ -27,7 +27,7 @@ function Digit({ digit, lineHeight, style }: { digit: number; lineHeight: number
 
 /**
  * Text whose digits roll to their new value when it changes, as Telegram's counters do (totals, prices). Places are
- * matched from the right, so ₹9,500 → ₹10,200 rolls the hundreds and adds a place. Use a monospace font so the width
+ * matched from the right, so ₹9,500 → ₹10,200 rolls the hundreds and adds a place. Use tabular figures (`fontVariant: ['tabular-nums']`) so the width
  * doesn't jump.
  */
 export function RollingText({ children, style, lineHeight }: { children: string; style: TextStyle; lineHeight: number }) {

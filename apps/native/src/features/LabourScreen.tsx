@@ -1,7 +1,8 @@
 import { FlashList } from '@shopify/flash-list';
 import Fuse from 'fuse.js';
 import { useMemo, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
+import { Pressable } from '../components/ui/Pressable';
 import { contractTotals, sumTotals, type ContractRow, type ContractTotals } from '@nirman/shared';
 import { prefs } from '@nirman/core';
 import { ActionFab, useHideOnScroll } from '../components/ActionFab';
@@ -33,7 +34,7 @@ const STATUS_TABS: { id: StatusFilter; label: string }[] = [
 /** Balance due, or a warning when more was paid than the work measured is worth. */
 export function BalanceText({ balance, align }: { balance: number; align?: 'right' }) {
   const c = useColors();
-  const style = { textAlign: align, fontWeight: '700' as const, fontSize: 12, fontFamily: 'monospace' };
+  const style = { textAlign: align, fontWeight: '700' as const, fontSize: 12, fontVariant: ['tabular-nums' as const] };
   if (balance < 0) return <Text style={[style, { color: c.red600 }]}>Paid ahead {rupees(-balance)}</Text>;
   return <Text style={[style, { color: balance > 0 ? c.red600 : c.green700 }]}>{balance > 0 ? `Due ${rupees(balance)}` : 'Settled'}</Text>;
 }
@@ -92,11 +93,11 @@ export function LabourScreen({ about }: { about: string }) {
         <View accessibilityLabel="Totals for the contracts shown" style={{ flexDirection: 'row', gap: 8, marginHorizontal: 16 }}>
           <View style={box}>
             <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>Work done</Text>
-            <RollingText lineHeight={17} style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: '700', color: c.brandDark }}>{rupees(totals.workDone)}</RollingText>
+            <RollingText lineHeight={17} style={{ fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '700', color: c.brandDark }}>{rupees(totals.workDone)}</RollingText>
           </View>
           <View style={box}>
             <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>Paid</Text>
-            <RollingText lineHeight={17} style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: '700', color: c.brandDark }}>{rupees(totals.paid)}</RollingText>
+            <RollingText lineHeight={17} style={{ fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '700', color: c.brandDark }}>{rupees(totals.paid)}</RollingText>
           </View>
           <View style={box}>
             <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>Balance</Text>
@@ -190,7 +191,7 @@ function ContractCard({ contract: x, totals: t, onOpen }: { contract: ContractRo
             {[x.address, x.category].filter(Boolean).join(' · ')}
           </Text>
         </View>
-        <Text style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', color: x.status === 'closed' ? c.gray500 : c.orange700, backgroundColor: x.status === 'closed' ? c.gray100 : c.orange50 }}>
+        <Text style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontSize: 12, fontWeight: '700', color: x.status === 'closed' ? c.gray500 : c.orange700, backgroundColor: x.status === 'closed' ? c.gray100 : c.orange50 }}>
           {x.status === 'closed' ? 'Closed' : x.kind === 'rate' ? `₹${x.rate}/${x.unit || 'unit'}` : 'Lump sum'}
         </Text>
       </View>
@@ -206,10 +207,10 @@ function ContractCard({ contract: x, totals: t, onOpen }: { contract: ContractRo
         </View>
       )}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 4 }}>
-        <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500 }}>
+        <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>
           Work <Text style={{ fontWeight: '700', color: c.gray800 }}>{rupees(t.workDone)}</Text>
         </Text>
-        <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500 }}>
+        <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>
           Paid <Text style={{ fontWeight: '700', color: c.gray800 }}>{rupees(t.paid)}</Text>
         </Text>
         <BalanceText balance={t.balance} align="right" />

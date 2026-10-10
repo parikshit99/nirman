@@ -1,4 +1,5 @@
-import { Pressable, Text } from 'react-native';
+import { Text } from 'react-native';
+import { Pressable } from './ui/Pressable';
 import { useColors } from '../theme';
 import { Icon } from './ui/Icon';
 

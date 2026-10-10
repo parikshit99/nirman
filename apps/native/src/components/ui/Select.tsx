@@ -1,6 +1,7 @@
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Pressable } from './Pressable';
 import { todayISO } from '@nirman/shared';
 import { useColors } from '../../theme';
 import { Icon } from './Icon';
@@ -32,7 +33,7 @@ export function Select({ label, value, options, onChange, placeholder }: { label
                 onChange(o.value);
                 setOpen(false);
               }}
-              style={({ pressed }) => [styles.option, { backgroundColor: o.value === value ? c.orange100 : pressed ? c.gray100 : c.gray50 }]}
+              style={[styles.option, { backgroundColor: o.value === value ? c.orange100 : c.gray50 }]}
             >
               <Text style={{ flex: 1, fontSize: 14, fontWeight: o.value === value ? '700' : '500', color: c.gray800 }}>{o.label}</Text>
               {o.value === value && <Icon name="check" size={18} color={c.orange600} />}
@@ -60,7 +61,7 @@ export function DateField({ label, value, onChange, max }: { label?: string; val
     <View style={{ flexShrink: 1, minWidth: 0 }}>
       {label ? <Label>{label}</Label> : null}
       <Pressable accessibilityRole="button" accessibilityLabel={label ? `${label}: ${value}` : value} onPress={open} style={[styles.box, { backgroundColor: c.white, borderColor: c.gray200 }]}>
-        <Text style={{ flex: 1, fontSize: 14, fontFamily: 'monospace', color: c.brandDark }}>{value || todayISO()}</Text>
+        <Text style={{ flex: 1, fontSize: 14, fontVariant: ['tabular-nums'], color: c.brandDark }}>{value || todayISO()}</Text>
         <Icon name="event" size={18} color={c.gray500} />
       </Pressable>
     </View>

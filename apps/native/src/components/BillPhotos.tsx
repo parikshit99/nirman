@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable } from './ui/Pressable';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 import { Sheet, SheetHeader } from './ui/Sheet';

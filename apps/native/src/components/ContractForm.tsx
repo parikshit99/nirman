@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
+import { Pressable } from './ui/Pressable';
 import { parseAmount, todayISO, type ContractRow } from '@nirman/shared';
 import type { ContractInput } from '@nirman/core';
 import { useColors } from '../theme';

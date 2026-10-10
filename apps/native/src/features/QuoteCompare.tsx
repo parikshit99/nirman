@@ -70,7 +70,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
               </Text>
               {v === best && <Text style={{ fontSize: 12, fontWeight: '700', color: c.green700 }}>Cheapest overall</Text>}
             </View>
-            <Text style={{ fontSize: 18, fontFamily: 'monospace', fontWeight: '700', color: c.brandDark }}>{rupees(Math.round(v.total))}</Text>
+            <Text style={{ fontSize: 18, fontVariant: ['tabular-nums'], fontWeight: '700', color: c.brandDark }}>{rupees(Math.round(v.total))}</Text>
             <Text style={{ fontSize: 12, color: c.gray500 }}>
               {shortDate(v.quote.quote_date)} · {v.quoted}/{boq.items.length} quoted
               {v.missing.length > 0 && <Text style={{ fontWeight: '700', color: c.red600 }}>{` · ${v.missing.length} missing`}</Text>}
@@ -102,12 +102,12 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={{ fontSize: 14, fontWeight: '700', color: c.brandDark }}>
-                  <Text style={{ fontFamily: 'monospace', fontSize: 12, color: c.gray500 }}>{row.sr}. </Text>
+                  <Text style={{ fontVariant: ['tabular-nums'], fontSize: 12, color: c.gray500 }}>{row.sr}. </Text>
                   {row.item.item_name}
                 </Text>
                 {variantLabel(row.item) ? <Text style={{ fontSize: 12, color: c.gray600 }}>{variantLabel(row.item)}</Text> : null}
               </View>
-              <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500 }}>
+              <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>
                 {row.item.quantity} {row.item.unit}
               </Text>
             </View>
@@ -146,7 +146,7 @@ export function QuoteCompare({ boq, quotes, onAdd }: { boq: HistoryRecord; quote
                 <Text style={{ flex: 1, fontSize: 12, color: c.gray800 }}>
                   {l.item_name} <Text style={{ color: c.gray500 }}>· {v.quote.vendor}</Text>
                 </Text>
-                <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray800 }}>{l.unit_price > 0 ? `${rupees(l.unit_price)}/${l.unit}` : 'no rate'}</Text>
+                <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray800 }}>{l.unit_price > 0 ? `${rupees(l.unit_price)}/${l.unit}` : 'no rate'}</Text>
               </View>
             )),
           )}
@@ -183,7 +183,7 @@ function PriceCell({ cell, projectId }: { cell?: QuoteCell; projectId: string })
   if (!cell || cell.price <= 0) return <Text style={{ fontSize: 12, fontStyle: 'italic', color: c.red500 }}>not quoted</Text>;
   return (
     <View style={{ alignItems: 'flex-end', flexShrink: 1 }}>
-      <Text style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: 12, color: cell.cheapest ? c.green700 : c.brandDark }}>
+      <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 12, color: cell.cheapest ? c.green700 : c.brandDark }}>
         {rupees(cell.price)}
         {cell.unitDiffers && <Text style={{ fontWeight: '400', color: c.orange600 }}>{`/${cell.line.unit}`}</Text>}
         {cell.cheapest && ' · Lowest'}

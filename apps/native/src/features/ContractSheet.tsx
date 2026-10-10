@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { Linking, Pressable, Text, TextInput, View } from 'react-native';
+import { Linking, Text, TextInput, View } from 'react-native';
+import { Pressable } from '../components/ui/Pressable';
 import {
   contractTotals,
   describeEntry,
@@ -67,7 +68,7 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
   const stat = (label: string, value: ReactNode, sub?: ReactNode) => (
     <View style={{ flexGrow: 1, flexBasis: '30%', minWidth: 96, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: c.gray100, backgroundColor: c.gray50 }}>
       <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>{label}</Text>
-      <Text style={{ fontSize: 14, fontFamily: 'monospace', fontWeight: '700', color: c.brandDark }}>{value}</Text>
+      <Text style={{ fontSize: 14, fontVariant: ['tabular-nums'], fontWeight: '700', color: c.brandDark }}>{value}</Text>
       {sub ? <Text style={{ fontSize: 12, color: c.gray500 }}>{sub}</Text> : null}
     </View>
   );
@@ -155,9 +156,9 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
                       <Text numberOfLines={2} style={[{ fontSize: 12, color: c.gray800 }, pending && { textDecorationLine: 'line-through' }]}>
                         {describeEntry(contract, e)}
                       </Text>
-                      <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500 }}>{e.date}</Text>
+                      <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>{e.date}</Text>
                     </Pressable>
-                    <Text style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: '700', color: e.kind === 'work' ? c.gray800 : isPaidOut(e.kind) ? c.green700 : c.red600 }}>
+                    <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '700', color: e.kind === 'work' ? c.gray800 : isPaidOut(e.kind) ? c.green700 : c.red600 }}>
                       {e.kind === 'work' ? '+' : '−'}
                       {rupees(value)}
                     </Text>
