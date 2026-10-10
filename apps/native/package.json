@@ -8,7 +8,8 @@
     "android": "expo run:android",
     "prebuild": "expo prebuild --platform android --clean",
     "lint": "tsc --noEmit",
-    "build": "expo export --platform android --output-dir dist"
+    "build": "expo export --platform android --output-dir dist",
+    "test": "vitest run"
   },
   "dependencies": {
     "@bottom-tabs/react-navigation": "^1.4.0",
@@ -48,6 +49,7 @@
   },
   "devDependencies": {
     "@types/react": "^19.1.1",
-    "typescript": "~5.8.2"
+    "typescript": "~5.8.2",
+    "vitest": "^3.2.4"
   }
 }
