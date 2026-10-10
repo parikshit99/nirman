@@ -9,8 +9,9 @@ import { useColors } from '../theme';
 /** Tick which lines of a saved purchase list or BOQ (an order) have reached the site. */
 export function DeliveriesSheet({ recordId, onClose }: { recordId: string; onClose(): void }) {
   const c = useColors();
-  const { history, actions } = useAppState();
-  const record: HistoryRecord | undefined = history.find((h) => h.id === recordId);
+  // Any project's list: Saved can show every project's lists.
+  const { allHistory, actions } = useAppState();
+  const record: HistoryRecord | undefined = allHistory.find((h) => h.id === recordId);
   if (!record) return null;
   const pending = record.items.filter((i) => !i.delivered_at);
 

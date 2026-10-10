@@ -8,6 +8,9 @@ import { Icon } from './Icon';
 import { Label } from './fields';
 import { Sheet, SheetHeader } from './Sheet';
 
+/** More options than this open in a dialog that scrolls instead of a bottom sheet. */
+const LONG_LIST = 8;
+
 /** Pick one of a few options (the old `<select>`): opens Android's list sheet. */
 export function Select({ label, value, options, onChange, placeholder }: { label?: string; value: string; options: readonly { value: string; label: string }[]; onChange(value: string): void; placeholder?: string }) {
   const c = useColors();
@@ -22,25 +25,26 @@ export function Select({ label, value, options, onChange, placeholder }: { label
         </Text>
         <Icon name="arrow-drop-down" size={22} color={c.gray500} />
       </Pressable>
-      {open && (
-        <Sheet closeOnBackdrop onClose={() => setOpen(false)} label={label}>
-          <SheetHeader title={label ?? 'Choose'} onClose={() => setOpen(false)} />
-          {options.map((o) => (
-            <Pressable
-              key={o.value}
-              accessibilityRole="button"
-              onPress={() => {
-                onChange(o.value);
-                setOpen(false);
-              }}
-              style={[styles.option, { backgroundColor: o.value === value ? c.orange100 : c.gray50 }]}
-            >
-              <Text style={{ flex: 1, fontSize: 14, fontWeight: o.value === value ? '700' : '500', color: c.gray800 }}>{o.label}</Text>
-              {o.value === value && <Icon name="check" size={18} color={c.orange600} />}
-            </Pressable>
-          ))}
-        </Sheet>
-      )}
+      {/* Kept loaded and only shown or hidden, as the ⋮ menu: building the native sheet on every tap made it stutter,
+          and unloading it while it closed could leave the app stuck. A long list (the Gemini models) is a dialog, as
+          the bottom sheet keeps resizing itself around a list taller than the screen. */}
+      <Sheet kind={options.length > LONG_LIST ? 'dialog' : 'sheet'} open={open} closeOnBackdrop onClose={() => setOpen(false)} label={label}>
+        <SheetHeader title={label ?? 'Choose'} onClose={() => setOpen(false)} />
+        {options.map((o) => (
+          <Pressable
+            key={o.value}
+            accessibilityRole="button"
+            onPress={() => {
+              onChange(o.value);
+              setOpen(false);
+            }}
+            style={[styles.option, { backgroundColor: o.value === value ? c.orange100 : c.gray50 }]}
+          >
+            <Text style={{ flex: 1, fontSize: 14, fontWeight: o.value === value ? '700' : '500', color: c.gray800 }}>{o.label}</Text>
+            {o.value === value && <Icon name="check" size={18} color={c.orange600} />}
+          </Pressable>
+        ))}
+      </Sheet>
     </View>
   );
 }

@@ -12,7 +12,7 @@ Code these flows come from:
 
 ## A-01 Overview
 
-Everything lives in one SQLite database on the phone, grouped by project (one site). The only outside service in daily use is Gemini, for bills the phone can't read by itself. Rates is the one view that spans all projects.
+Everything lives in one SQLite database on the phone, grouped by project (one site). The only outside service in daily use is Gemini, for bills the phone can't read by itself. Rates spans all projects, and Saved can too (*All projects*, since 7.5).
 
 ```mermaid
 flowchart LR
@@ -32,6 +32,7 @@ flowchart LR
     SL[Saved lists<br/>purchase lists and BOQs]
   end
   RT[[Rates<br/>every price, all projects]]
+  AP[[Saved · All projects<br/>every project's saved lists]]
   Q[Vendor quotes<br/>on a saved BOQ]
   OUT[PDF · Excel · JPG<br/>preview, then Share]
   SH([Share sheet<br/>WhatsApp · Drive · email])
@@ -42,6 +43,8 @@ flowchart LR
   M -- no AI needed --> OL
   OL & OB -- Save list moves it --> SL
   SL -- Open: edit in place --> OL
+  SL -. every project .-> AP
+  AP -- Open: switches to its project --> OL
   OL -- rate entered --> RT
   SL --> RT
   SL --> Q -- confirmed --> RT
@@ -50,6 +53,8 @@ flowchart LR
 ```
 
 Saving **moves** the open list into Saved, and an empty one is ready for the next bill (since 6.0). *Open* on a saved list edits that list itself; nothing is copied. The open lists and each saved list (its *Share* button, since 7.4) go out as PDF, Excel or JPG; a BOQ also as an order slip.
+
+*Saved → All projects* (since 7.5) lists the saved lists of every project, newest first, each marked with its project, with search and filters by work type and project. Closed projects' lists show only when *Show closed projects* is ticked. *Open* or *Quotes* on another project's list switches to that project first, so its tabs, quotes and site follow; *Delete all saved lists* is only offered for one project.
 
 Also on the phone:
 - **Backup** (`.zip`, by hand): everything, bill photos included, except entries not yet read.
