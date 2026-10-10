@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { Pressable } from './ui/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProjectsSheet } from '../features/ProjectsSheet';
 import { useSettings } from '../features/SettingsHost';
@@ -32,7 +33,7 @@ export function ScreenHeader({ onStatus, children }: { onStatus?(): void; childr
           <Icon name="arrow-drop-down" size={22} color={c.gray500} />
         </Pressable>
         <StatusChip onPress={onStatus ?? settings.open} />
-        <Pressable accessibilityRole="button" accessibilityLabel="Settings" onPress={settings.open} style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: pressed ? c.gray100 : 'transparent' })}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Settings" onPress={settings.open} android_ripple={{ color: c.ripple, borderless: true, radius: 24 }} style={{ minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="settings" size={22} color={c.gray600} />
         </Pressable>
       </View>

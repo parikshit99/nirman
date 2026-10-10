@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, BackHandler, Easing, Pressable, StyleSheet, Text } from 'react-native';
+import { Animated, BackHandler, Easing, StyleSheet, Text } from 'react-native';
+import { Pressable } from './ui/Pressable';
 import { haptic } from '../lib/haptics';
 import { useColors } from '../theme';
 import { Icon, type IconName } from './ui/Icon';
@@ -64,7 +65,7 @@ export function ActionFab({ label, icon = 'add', onPress, showMain = true, actio
   return (
     <>
       <Animated.View pointerEvents={open ? 'auto' : 'none'} style={[StyleSheet.absoluteFill, { backgroundColor: c.scrim, opacity: scrim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.35] }) }]}>
-        <Pressable accessibilityLabel="Close" style={{ flex: 1 }} onPress={() => setOpen(false)} />
+        <Pressable android_ripple={null} accessibilityLabel="Close" style={{ flex: 1 }} onPress={() => setOpen(false)} />
       </Animated.View>
       <Animated.View pointerEvents="box-none" style={[{ position: 'absolute', right: 16, bottom: 16, alignItems: 'flex-end', gap: 12 }, away]}>
         {actions.map((action, i) => {
@@ -82,7 +83,8 @@ export function ActionFab({ label, icon = 'add', onPress, showMain = true, actio
                 accessibilityRole="button"
                 accessibilityLabel={action.label}
                 onPress={() => run(action)}
-                style={({ pressed }) => ({ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: bg, opacity: pressed ? 0.8 : 1, elevation: 4 })}
+                android_ripple={{ color: action.tone === 'primary' ? c.rippleOnPrimary : action.tone === 'danger' ? c.rippleOnDanger : c.ripple, foreground: true }}
+                style={{ width: 48, height: 48, borderRadius: 24, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: bg, elevation: 4 }}
               >
                 <Icon name={action.icon} size={22} color={fg} />
               </Pressable>
@@ -98,7 +100,7 @@ export function ActionFab({ label, icon = 'add', onPress, showMain = true, actio
               haptic('tick');
               setOpen((o) => !o);
             }}
-            style={({ pressed }) => ({ width: 48, height: 48, marginRight: 4, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? c.gray100 : c.white, elevation: 4 })}
+            style={{ width: 48, height: 48, marginRight: 4, borderRadius: 24, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: c.white, elevation: 4 }}
           >
             <Animated.View style={{ transform: [{ rotate: scrim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '90deg'] }) }] }}>
               <Icon name={open ? 'close' : 'ios-share'} size={22} color={c.gray700} />
@@ -114,7 +116,8 @@ export function ActionFab({ label, icon = 'add', onPress, showMain = true, actio
               setOpen(false);
               onPress();
             }}
-            style={({ pressed }) => ({ width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? c.orange600 : c.brandPrimary, elevation: 6 })}
+            android_ripple={{ color: c.rippleOnPrimary, foreground: true }}
+            style={{ width: 56, height: 56, borderRadius: 28, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: c.brandPrimary, elevation: 6 }}
           >
             <Icon name={icon} size={26} color={c.onPrimary} />
           </Pressable>

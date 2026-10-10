@@ -22,7 +22,7 @@ export function FilterChips({ categories, categoryFilter, onCategory, addresses,
           const on = categoryFilter === cat;
           return (
             <PressScale key={cat} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => onCategory(cat)} style={{ minHeight: 40, paddingHorizontal: 16, justifyContent: 'center', borderRadius: 20, borderWidth: 1, borderColor: on ? c.orange500 : c.gray200, backgroundColor: on ? c.orange500 : c.white }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', color: on ? c.onPrimary : c.gray500 }}>{cat}</Text>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: on ? c.onPrimary : c.gray500 }}>{cat}</Text>
             </PressScale>
           );
         })}

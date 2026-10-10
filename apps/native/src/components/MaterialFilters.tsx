@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { Pressable } from './ui/Pressable';
 import type { MaterialFilter } from '@nirman/shared';
 import { useColors } from '../theme';
 import { Select } from './ui/Select';

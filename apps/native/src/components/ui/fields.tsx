@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle } from 'react-native';
+import { StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle } from 'react-native';
+import { Pressable } from './Pressable';
 import { matchSuggestions, type Suggestion } from './suggest';
 import { useColors } from '../../theme';
 
@@ -97,7 +98,7 @@ export function SuggestInput({
                 onChange(s.value);
                 setHidden(true);
               }}
-              style={({ pressed }) => [styles.suggestion, i > 0 && { borderTopWidth: 1, borderTopColor: c.gray200 }, pressed && { backgroundColor: c.orange50 }]}
+              style={[styles.suggestion, i > 0 && { borderTopWidth: 1, borderTopColor: c.gray200 }]}
             >
               <Text style={{ flexShrink: 1, fontSize: 14, color: c.gray800 }}>{s.value}</Text>
               {s.hint ? <Text style={{ fontSize: 12, color: c.gray500 }}>{s.hint}</Text> : null}
@@ -113,7 +114,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 12, fontWeight: '700', marginBottom: 4 },
   field: { flexShrink: 1, minWidth: 0 },
   input: { minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderRadius: 10, fontSize: 14 },
-  mono: { fontFamily: 'monospace' },
+  mono: { fontVariant: ['tabular-nums'] },
   list: { marginTop: 4, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
   suggestion: { minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
 });

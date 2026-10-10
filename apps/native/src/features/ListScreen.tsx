@@ -1,6 +1,7 @@
 import Fuse from 'fuse.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BackHandler, Pressable, Text, TextInput, View } from 'react-native';
+import { BackHandler, Text, TextInput, View } from 'react-native';
+import { Pressable } from '../components/ui/Pressable';
 import { guessCategory, todayISO } from '@nirman/shared';
 import { buildPdf, logStep, prefs, workTypeKey, type ListKind, type ListMeta } from '@nirman/core';
 import { ActionFab, useHideOnScroll, type FabAction } from '../components/ActionFab';
@@ -217,7 +218,7 @@ export function ListScreen({
         ) : (
           <View style={{ flexShrink: 1 }}>
             <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>{isAudit ? 'Spent' : 'Items'}</Text>
-            <RollingText lineHeight={20} style={{ fontSize: 14, fontFamily: 'monospace', fontWeight: '700', color: c.brandDark }}>
+            <RollingText lineHeight={20} style={{ fontSize: 14, fontVariant: ['tabular-nums'], fontWeight: '700', color: c.brandDark }}>
               {isAudit ? rupeesWhole(total) : String(filteredItems.length)}
             </RollingText>
           </View>

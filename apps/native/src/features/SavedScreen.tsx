@@ -2,7 +2,8 @@ import { useNavigation } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
 import Fuse from 'fuse.js';
 import { useMemo, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
+import { Pressable } from '../components/ui/Pressable';
 import { todayISO } from '@nirman/shared';
 import type { ListMeta } from '@nirman/core';
 import { ActionFab, useHideOnScroll, type FabAction } from '../components/ActionFab';
@@ -194,14 +195,14 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
                 <View style={{ padding: 16, gap: 12, borderRadius: 16, borderWidth: 1, borderColor: c.gray200, backgroundColor: c.white }}>
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
                     <Pressable accessibilityRole="button" onPress={() => editDetails(record)} style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: c.gray900, textTransform: 'uppercase' }}>{record.title}</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: c.gray900 }}>{record.title}</Text>
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                        <Text style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', color: c.orange700, backgroundColor: c.orange100 }}>{record.category || 'Civil'}</Text>
-                        <Text style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', color: c.gray500, backgroundColor: c.gray100 }}>{titlePrefix(record.kind)}</Text>
+                        <Text style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontSize: 12, fontWeight: '700', color: c.orange700, backgroundColor: c.orange100 }}>{record.category || 'Civil'}</Text>
+                        <Text style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontSize: 12, fontWeight: '700', color: c.gray500, backgroundColor: c.gray100 }}>{titlePrefix(record.kind)}</Text>
                       </View>
-                      <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500, marginTop: 4 }}>{new Date(record.created_at).toLocaleString('en-IN')}</Text>
+                      <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500, marginTop: 4 }}>{new Date(record.created_at).toLocaleString('en-IN')}</Text>
                       {record.address ? <Text numberOfLines={1} style={{ fontSize: 12, fontStyle: 'italic', color: c.gray500 }}>{record.address}</Text> : null}
-                      <Text style={{ fontSize: 12, fontWeight: '700', textTransform: 'uppercase', color: c.gray500 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: c.gray500 }}>
                         {plural(record.items.length, 'item')}
                         {record.items.length > 0 && <Text style={{ color: delivered === record.items.length ? c.green700 : c.gray500 }}>{` · ${delivered} of ${record.items.length} delivered`}</Text>}
                       </Text>
@@ -209,7 +210,7 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
                     {/* Delete is in the details sheet, next to Update, so it isn't tapped by accident. */}
                     <Pressable accessibilityRole="button" accessibilityLabel={`Edit details of ${record.title}`} onPress={() => editDetails(record)} style={{ minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8 }}>
                       <Icon name="edit" size={14} color={c.gray500} />
-                      <Text style={{ fontSize: 12, fontWeight: '700', textTransform: 'uppercase', color: c.gray500 }}>Edit</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: c.gray500 }}>Edit</Text>
                     </Pressable>
                   </View>
 
@@ -219,7 +220,7 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
                         <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, color: c.gray500 }}>
                           • {item.item_name}
                         </Text>
-                        <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500 }}>
+                        <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>
                           {item.quantity} {item.unit}
                         </Text>
                       </View>

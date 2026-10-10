@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
+import { Pressable } from '../components/ui/Pressable';
 import { Icon } from '../components/ui/Icon';
 import { Sheet, SheetHeader } from '../components/ui/Sheet';
 import { plural } from '../lib/format';
@@ -31,7 +32,7 @@ export function BoqPicker({ onPick, onClose }: { onPick(boqId: string): void; on
           boqs.map((b) => {
             const quotes = quotesFor(b.id).length;
             return (
-              <Pressable key={b.id} accessibilityRole="button" onPress={() => onPick(b.id)} style={({ pressed }) => ({ padding: 12, flexDirection: 'row', gap: 12, alignItems: 'flex-start', borderRadius: 12, borderWidth: 1, borderColor: pressed ? c.orange300 : c.gray200, backgroundColor: pressed ? c.orange50 : c.white })}>
+              <Pressable key={b.id} accessibilityRole="button" onPress={() => onPick(b.id)} style={{ padding: 12, flexDirection: 'row', gap: 12, alignItems: 'flex-start', borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: c.gray200, backgroundColor: c.white }}>
                 <Icon name="description" size={18} color={c.orange500} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '700', color: c.gray900 }}>
@@ -42,7 +43,7 @@ export function BoqPicker({ onPick, onClose }: { onPick(boqId: string): void; on
                       {b.address}
                     </Text>
                   ) : null}
-                  <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500, marginTop: 2 }}>
+                  <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500, marginTop: 2 }}>
                     {new Date(b.created_at).toLocaleDateString('en-IN')} · {plural(b.items.length, 'item')}
                     {quotes > 0 && ` · ${plural(quotes, 'quote')}`}
                   </Text>

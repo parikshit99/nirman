@@ -8,13 +8,14 @@ Site supervisors and owners, on a phone, on site: in sunlight, with gloves, with
 
 ## Principles
 
-1. **Lists first.** Each tab opens on its list. Adding is one tap away (the orange **Add** button).
-2. **One main action per screen or sheet** (the orange button). Everything else is secondary, or behind the small button above Add (Purchases and BOQ).
+1. **Lists first.** Each tab opens on its list. Adding is one tap away (the floating **Add** button).
+2. **One main action per screen or sheet** (the filled button in the accent colour). Everything else is secondary, or behind the small button above Add.
 3. **Everything is saved as it is made.** Each line is written the moment it is added or changed. *Save list* only moves the open list into Saved.
 4. **Works offline.** Every screen works without internet. Entries made offline are queued and read once the phone is online, and the app says so ("Waiting for internet", "Being read").
 5. **The phone first, Gemini when needed.** Bills are read on the phone where possible. The user picks this in *Settings → How bills are read*.
 6. **Nothing typed is lost.** Forms in sheets don't close on an outside tap, and the Add sheet keeps a half-typed entry when it is closed.
 7. **Preview before sharing.** Every PDF is shown as it will be shared (`DocumentPreview`) before the share sheet opens.
+8. **Behave like an Android app.** Back always goes back, the Android pickers, share sheet and dialogs are used, and the app follows the system's dark mode, font size, *Remove animations* and TalkBack. The [UI guideline](UI%20guideline.md) lists the native features to use.
 
 ## Words
 
@@ -46,6 +47,7 @@ Use these everywhere, including toasts, dialogs, Excel/PDF columns, the CHANGELO
 | A choice is needed, or something failed and the user must act | `confirm` / `alert` (Android's own dialog) |
 | A short typed answer (a name) | `prompt` |
 | Work in progress (saving, sharing, reading) | `busy` on the sheet or button, with a short label ("Reading 2 photos…") |
+| Work that finishes while the app is closed (queued bills read) | A notification, which opens the result. Only for things the user is waiting for, never for promotion |
 
 Never an alert for something that just worked. Never a silent failure: if something didn't happen, say so.
 

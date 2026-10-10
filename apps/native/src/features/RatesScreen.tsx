@@ -1,7 +1,8 @@
 import { FlashList } from '@shopify/flash-list';
 import Fuse from 'fuse.js';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
+import { Pressable } from '../components/ui/Pressable';
 import {
   VARIANT_FIELDS,
   filterMaterials,
@@ -496,8 +497,8 @@ function ChoiceChips({ options, value, onChange }: { options: string[]; value: s
 /** Latest price and range; with several brands/models, only the range (one brand's latest says little about another's). */
 function PriceSummary({ item }: { item: MaterialEntry }) {
   const c = useColors();
-  const price = { fontFamily: 'monospace', fontWeight: '700' as const, fontSize: 14, color: c.brandDark, textAlign: 'right' as const };
-  const range = { fontFamily: 'monospace', fontSize: 12, color: c.gray500, textAlign: 'right' as const };
+  const price = { fontVariant: ['tabular-nums' as const], fontWeight: '700' as const, fontSize: 14, color: c.brandDark, textAlign: 'right' as const };
+  const range = { fontVariant: ['tabular-nums' as const], fontSize: 12, color: c.gray500, textAlign: 'right' as const };
   if (item.variants.length > 1) {
     return (
       <View>
@@ -532,9 +533,9 @@ function VariantList({ material }: { material: MaterialEntry }) {
             <Text style={{ fontSize: 12, color: c.gray500 }}>{plural(v.priceHistory.length, 'price')}</Text>
           </View>
           <View>
-            <Text style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: 14, color: c.brandDark, textAlign: 'right' }}>{v.priceHistory.length ? rupees2(v.latestPrice) : '—'}</Text>
+            <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark, textAlign: 'right' }}>{v.priceHistory.length ? rupees2(v.latestPrice) : '—'}</Text>
             {v.minPrice !== v.maxPrice && (
-              <Text style={{ fontFamily: 'monospace', fontSize: 12, color: c.gray500, textAlign: 'right' }}>
+              <Text style={{ fontVariant: ['tabular-nums'], fontSize: 12, color: c.gray500, textAlign: 'right' }}>
                 {rupees2(v.minPrice)}–{rupees2(v.maxPrice)}
               </Text>
             )}
@@ -623,7 +624,7 @@ function PriceRow({ point: p, first }: { point: MaterialEntry['priceHistory'][nu
         <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, color: c.gray700 }}>
           {new Date(p.date).toLocaleDateString('en-IN')} · {p.vendor}
         </Text>
-        <Text style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupees2(p.price)}</Text>
+        <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupees2(p.price)}</Text>
         {id && <Icon name="edit" size={12} color={c.gray500} />}
       </View>
       {variantLabel(p.variant) ? (
@@ -784,7 +785,7 @@ function Categories() {
     <View style={{ margin: 16, marginTop: 0, borderWidth: 1, borderColor: c.gray200, borderRadius: 16, backgroundColor: c.white, overflow: 'hidden' }}>
       <View style={{ paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', justifyContent: 'space-between', backgroundColor: c.gray50, borderBottomWidth: 1, borderBottomColor: c.gray200 }}>
         <Text style={{ fontSize: 12, fontWeight: '700', color: c.gray500 }}>Work types</Text>
-        <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500 }}>{snapshot.categories.length} total</Text>
+        <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>{snapshot.categories.length} total</Text>
       </View>
       <View style={{ padding: 16, gap: 16 }}>
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>

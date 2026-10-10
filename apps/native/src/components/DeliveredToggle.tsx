@@ -1,5 +1,6 @@
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { Pressable } from './ui/Pressable';
 import { todayISO } from '@nirman/shared';
 import { useColors } from '../theme';
 import { Icon } from './ui/Icon';
@@ -31,7 +32,7 @@ export function DeliveredToggle({ name, deliveredAt, onChange }: { name: string;
       <Pressable accessibilityRole="button" accessibilityLabel={`Delivery date of ${name}: ${deliveredAt}`} onPress={pick} style={{ minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 8 }}>
         <Icon name="check-box" size={16} color={c.green700} />
         <Text style={{ fontSize: 12, fontWeight: '700', color: c.green700 }}>Delivered</Text>
-        <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.green700 }}>{deliveredAt}</Text>
+        <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.green700 }}>{deliveredAt}</Text>
       </Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel={`Mark ${name} not delivered`} onPress={() => onChange('')} style={{ minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center' }}>
         <Icon name="close" size={16} color={c.green800} />

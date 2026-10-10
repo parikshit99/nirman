@@ -1,6 +1,7 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
-import { LayoutAnimation, Pressable, Text, View } from 'react-native';
+import { LayoutAnimation, Text, View } from 'react-native';
+import { Pressable } from '../components/ui/Pressable';
 import { lastPaidFor, materialKey, todayISO, variantLabel, type ItemRow, type LastPaid, type MaterialEntry, type ReadAs } from '@nirman/shared';
 import type { ListKind } from '@nirman/core';
 import { BillPhotosSheet } from '../components/BillPhotos';
@@ -215,7 +216,7 @@ function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onLongPress, o
             </Text>
             <Icon name="edit" size={12} color={c.gray500} />
           </View>
-          {isAudit && <Text style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: '700', color: c.brandDark }}>{rupees(item.total_amount)}</Text>}
+          {isAudit && <Text style={{ fontVariant: ['tabular-nums'], fontSize: 14, fontWeight: '700', color: c.brandDark }}>{rupees(item.total_amount)}</Text>}
         </View>
         {variantLabel(item) ? <Text style={{ fontSize: 12, fontWeight: '700', color: c.gray700, marginTop: 2 }}>{variantLabel(item)}</Text> : null}
         {item.ordered_as ? <Text style={{ fontSize: 12, color: c.orange800, marginTop: 2 }}>Ordered: {item.ordered_as}</Text> : null}
@@ -231,7 +232,7 @@ function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onLongPress, o
           </View>
         )}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, rowGap: 2, marginTop: 2 }}>
-          <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500 }}>
+          <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>
             {item.quantity} {item.unit}
             {isAudit && ` × ${rupees(item.unit_price)}`}
           </Text>

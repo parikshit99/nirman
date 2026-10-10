@@ -4,8 +4,8 @@ What Nirman stores and how, written so the data can be read by any future versio
 
 ## Where it lives
 
-- **Phone:** one SQLite database named `nirmaan` (via `@capacitor-community/sqlite`).
-- **Browser (development):** the same SQLite database, run by sql.js and saved in IndexedDB as `nirmaan.db`.
+- **Phone:** one SQLite database, the file `databases/nirmaanSQLite.db` (via `expo-sqlite`; the name comes from the 6.x app, whose file is opened in place).
+- **Tests:** the same schema in an in-memory database run by sql.js.
 - **Diagnostic log:** not in the database or backups; the last 400 entries (errors, AI reading results, steps, timings, with no bill contents) are kept in the app's small key-value store (`expo-sqlite/kv-store`, set up in `apps/native/src/lib/coreSetup.ts`) under `nirmaan_diagnostics`.
 - **Gemini API key:** not in the database. It is kept in the phone's secure storage and is never included in backups.
 

@@ -1,6 +1,7 @@
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable } from './Pressable';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -79,9 +80,9 @@ export function Sheet({ kind = 'sheet', onClose, onBack, backEnabled = true, bus
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           {kind === 'dialog' ? (
-            <Pressable style={[styles.backdrop, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]} onPress={closeOnBackdrop && !busy ? onClose : undefined} accessibilityLabel={label}>
+            <Pressable android_ripple={null} style={[styles.backdrop, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]} onPress={closeOnBackdrop && !busy ? onClose : undefined} accessibilityLabel={label}>
               <PopIn>
-                <Pressable style={[styles.dialog, { backgroundColor: c.white, maxHeight: height * 0.9 }]}>{body(height * 0.8)}</Pressable>
+                <Pressable android_ripple={null} style={[styles.dialog, { backgroundColor: c.white, maxHeight: height * 0.9 }]}>{body(height * 0.8)}</Pressable>
               </PopIn>
             </Pressable>
           ) : (
@@ -264,7 +265,7 @@ export function SheetOption({ icon, label, about, busy, onPress, disabled }: { i
       accessibilityRole="button"
       disabled={disabled || busy}
       onPress={onPress}
-      style={({ pressed }) => [styles.option, { backgroundColor: pressed ? c.gray100 : c.gray50, opacity: disabled ? 0.5 : 1 }]}
+      style={[styles.option, { backgroundColor: c.gray50, opacity: disabled ? 0.5 : 1 }]}
     >
       <Icon name={busy ? 'hourglass-empty' : icon} size={22} color={c.orange500} />
       <View style={{ flex: 1 }}>

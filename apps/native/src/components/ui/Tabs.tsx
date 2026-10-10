@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Pressable } from './Pressable';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { DURATION, EASE_OUT } from '../../lib/motion';
 import { haptic } from '../../lib/haptics';
 import { useColors } from '../../theme';
 
-/** A row of tabs or filter options, one selected (the grey pill bar of the old app). */
+/** A row of tabs or filter options, one selected. */
 export function Tabs<T extends string>({ options, value, onChange, label }: { options: readonly { id: T; label: string }[]; value: T; onChange(id: T): void; label: string }) {
   const c = useColors();
   // The white pill slides to the picked tab (as Telegram's tab indicators do) instead of jumping.
@@ -50,5 +51,5 @@ const styles = StyleSheet.create({
   track: { position: 'absolute', top: 4, right: 4, bottom: 4, left: 4 },
   pill: { position: 'absolute', top: 0, bottom: 0, borderRadius: 6 },
   tab: { flex: 1, minHeight: 40, paddingHorizontal: 8, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  text: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
+  text: { fontSize: 14, fontWeight: '600' },
 });

@@ -5,7 +5,8 @@ import { Icon, type IconName } from './Icon';
 import { PressScale } from './PressScale';
 
 /**
- * - `primary` (orange): the one main action on a screen or sheet.
+ * Material 3 buttons, with Android's ripple.
+ * - `primary` (filled, the accent): the one main action on a screen or sheet.
  * - `secondary` (white, grey outline): other actions.
  * - `danger` (red): confirming a delete or clear.
  * - `dangerOutline` (red outline): a Delete button beside other actions.
@@ -46,7 +47,7 @@ export function Button({
     dangerOutline: { bg: c.white, border: c.red200, fg: c.red600 },
     ghost: { bg: 'transparent', border: 'transparent', fg: c.gray500 },
   }[variant];
-  const pressed = { primary: c.orange600, secondary: c.gray100, danger: c.red700, dangerOutline: c.red50, ghost: c.gray100 }[variant];
+  const ripple = variant === 'primary' ? c.rippleOnPrimary : variant === 'danger' ? c.rippleOnDanger : c.ripple;
   return (
     <PressScale
       accessibilityRole="button"
@@ -59,9 +60,10 @@ export function Button({
         else if (variant === 'danger') haptic('reject');
         onPress?.();
       }}
-      style={({ pressed: down }) => [
+      android_ripple={{ color: ripple, foreground: true }}
+      style={[
         styles.base,
-        { height: HEIGHT[size], paddingHorizontal: children ? 16 : 10, minWidth: children ? undefined : HEIGHT[size], backgroundColor: down ? pressed : look.bg, borderColor: look.border, opacity: disabled ? 0.5 : 1 },
+        { height: HEIGHT[size], paddingHorizontal: children ? 16 : 10, minWidth: children ? undefined : HEIGHT[size], backgroundColor: look.bg, borderColor: look.border, opacity: disabled ? 0.5 : 1 },
         block && styles.block,
         style,
       ]}
@@ -79,7 +81,7 @@ export function Button({
 }
 
 const styles = StyleSheet.create({
-  base: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, borderWidth: 1 },
+  base: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
   block: { alignSelf: 'stretch' },
-  text: { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
+  text: { fontSize: 14, fontWeight: '600' },
 });

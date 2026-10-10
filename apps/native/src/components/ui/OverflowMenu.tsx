@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable } from './Pressable';
 import { useColors } from '../../theme';
 import { Icon, type IconName } from './Icon';
 import { Sheet, SheetOption } from './Sheet';

@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable } from '../components/ui/Pressable';
 import { MAX_IMAGES, compareQuotes, parseAmount, todayISO, variantLabel, type QuoteRow } from '@nirman/shared';
 import { PhotoSourceSheet } from '../components/PhotoSourceSheet';
 import { Button } from '../components/ui/Button';
@@ -54,7 +55,7 @@ export function QuotesView({ boqId, initial, onClose }: { boqId: string; initial
           <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '700', color: c.brandDark }}>
             Vendor quotes · {boq.title || 'Untitled BOQ'}
           </Text>
-          <Text numberOfLines={1} style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500 }}>
+          <Text numberOfLines={1} style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>
             {plural(boq.items.length, 'BOQ item')}
             {boq.address ? ` · ${boq.address}` : ''}
           </Text>
@@ -152,7 +153,7 @@ function QuoteList({ boq, quotes, onAdd, onOpen }: { boq: HistoryRecord; quotes:
                 <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '700', color: c.gray900 }}>
                   {q.vendor || 'Unnamed vendor'}
                 </Text>
-                <Text style={{ fontSize: 12, fontFamily: 'monospace', color: c.gray500 }}>{new Date(q.quote_date).toLocaleDateString('en-IN')}</Text>
+                <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>{new Date(q.quote_date).toLocaleDateString('en-IN')}</Text>
               </View>
               <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${q.vendor}'s quote`} onPress={() => remove(q)} style={{ minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center', margin: -8 }}>
                 <Icon name="delete-outline" size={18} color={c.gray500} />
@@ -272,7 +273,7 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
                     onChangeText={(t) => setRates((r) => ({ ...r, [item.id]: t }))}
                     placeholder={`per ${item.unit}`}
                     placeholderTextColor={c.gray500}
-                    style={{ width: 96, minHeight: 44, paddingHorizontal: 8, borderWidth: 1, borderColor: c.gray200, borderRadius: 8, backgroundColor: c.gray50, color: c.brandDark, fontSize: 14, fontFamily: 'monospace' }}
+                    style={{ width: 96, minHeight: 44, paddingHorizontal: 8, borderWidth: 1, borderColor: c.gray200, borderRadius: 8, backgroundColor: c.gray50, color: c.brandDark, fontSize: 14, fontVariant: ['tabular-nums'] }}
                   />
                 </View>
               </View>
