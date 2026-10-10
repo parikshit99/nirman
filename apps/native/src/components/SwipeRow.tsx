@@ -2,7 +2,6 @@ import { useRef, type ReactElement } from 'react';
 import { Text, View, useWindowDimensions } from 'react-native';
 import Swipeable, { SwipeDirection, type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { haptic } from '../lib/haptics';
-import { useColors } from '../theme';
 import { Icon, type IconName } from './ui/Icon';
 
 export interface SwipeAction {
@@ -13,16 +12,14 @@ export interface SwipeAction {
 }
 
 /**
- * A row that can be swiped, as chats are in Telegram: to the left, past a third of its width (or a quick flick), deletes
- * it (the caller shows the Undo strip); to the right, `left` if given (e.g. Delivered), and the row springs back. The
- * row follows the finger one to one, as in Gmail.
+ * A row that can be swiped to the right for one action (`left`, e.g. Delivered), as chats are in Telegram; the row
+ * follows the finger and springs back. Deleting is a bin on the row (`TrashButton`), not a swipe.
  */
-export function SwipeRow({ onDelete, left, children }: { onDelete(): void; left?: SwipeAction; children: ReactElement }) {
-  const c = useColors();
+export function SwipeRow({ left, children }: { left: SwipeAction; children: ReactElement }) {
   const { width } = useWindowDimensions();
   const ref = useRef<SwipeableMethods>(null);
-  const panel = (bg: string, icon: IconName, label: string, side: 'left' | 'right') => (
-    <View style={{ width, flexDirection: 'row', alignItems: 'center', justifyContent: side === 'left' ? 'flex-start' : 'flex-end', gap: 8, paddingHorizontal: 24, backgroundColor: bg }}>
+  const panel = (bg: string, icon: IconName, label: string) => (
+    <View style={{ width, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 8, paddingHorizontal: 24, backgroundColor: bg }}>
       <Icon name={icon} size={22} color="#fff" />
       <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>{label}</Text>
     </View>
@@ -33,17 +30,12 @@ export function SwipeRow({ onDelete, left, children }: { onDelete(): void; left?
       friction={1}
       overshootFriction={8}
       leftThreshold={96}
-      rightThreshold={width / 3}
-      renderLeftActions={left ? () => panel(left.color, left.icon, left.label, 'left') : undefined}
-      renderRightActions={() => panel(c.red600, 'delete-outline', 'Delete', 'right')}
+      renderLeftActions={() => panel(left.color, left.icon, left.label)}
       onSwipeableOpen={(direction) => {
+        if (direction !== SwipeDirection.RIGHT) return;
         haptic('confirm');
-        if (direction === SwipeDirection.RIGHT) {
-          left?.onPress();
-          ref.current?.close();
-        } else {
-          onDelete();
-        }
+        left.onPress();
+        ref.current?.close();
       }}
     >
       {children}

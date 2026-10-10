@@ -9,7 +9,7 @@ import { ActionFab, useHideOnScroll } from '../components/ActionFab';
 import { ContractForm } from '../components/ContractForm';
 import { FilterChips } from '../components/FilterChips';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { SwipeRow } from '../components/SwipeRow';
+import { TrashButton } from '../components/TrashButton';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -146,9 +146,7 @@ export function LabourScreen({ about }: { about: string }) {
         }
         renderItem={({ item }) => (
           <View style={{ marginHorizontal: 16, marginTop: 12, borderRadius: 12, overflow: 'hidden' }}>
-            <SwipeRow onDelete={() => deleteWithUndo(item)}>
-              <ContractCard contract={item} totals={contractTotals(item, entriesFor(item.id))} onOpen={() => setOpenContract(item.id)} />
-            </SwipeRow>
+            <ContractCard contract={item} totals={contractTotals(item, entriesFor(item.id))} onOpen={() => setOpenContract(item.id)} onDelete={() => deleteWithUndo(item)} />
           </View>
         )}
       />
@@ -174,7 +172,7 @@ export function LabourScreen({ about }: { about: string }) {
   );
 }
 
-function ContractCard({ contract: x, totals: t, onOpen }: { contract: ContractRow; totals: ContractTotals; onOpen(): void }) {
+function ContractCard({ contract: x, totals: t, onOpen, onDelete }: { contract: ContractRow; totals: ContractTotals; onOpen(): void; onDelete(): void }) {
   const c = useColors();
   const progress = t.progress === null ? null : Math.min(1, t.progress);
   return (
@@ -194,6 +192,9 @@ function ContractCard({ contract: x, totals: t, onOpen }: { contract: ContractRo
         <Text style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontSize: 12, fontWeight: '700', color: x.status === 'closed' ? c.gray500 : c.orange700, backgroundColor: x.status === 'closed' ? c.gray100 : c.orange50 }}>
           {x.status === 'closed' ? 'Closed' : x.kind === 'rate' ? `₹${x.rate}/${x.unit || 'unit'}` : 'Lump sum'}
         </Text>
+        <View style={{ marginTop: -10, marginRight: -10 }}>
+          <TrashButton name={`the contract with ${x.contractor}`} onPress={onDelete} />
+        </View>
       </View>
       {progress !== null && (
         <View>

@@ -11,7 +11,7 @@ import { BillPhotosSheet, BillThumbs, photoIdsOf } from '../components/BillPhoto
 import { FilterChips } from '../components/FilterChips';
 import { SaveModal } from '../components/SaveModal';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { SwipeRow } from '../components/SwipeRow';
+import { TrashButton } from '../components/TrashButton';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -127,7 +127,7 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
     if (ok) await actions.deleteAllHistory(projectId);
   };
 
-  const swipeDelete = (record: HistoryRecord) => {
+  const deleteWithUndo = (record: HistoryRecord) => {
     actions.deleteListLater(record.id);
     dialogs.undoable(`Deleted “${record.title}”`, () => actions.undoDelete(record.id));
   };
@@ -189,7 +189,6 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
           const bills = photoIdsOf(record.items);
           return (
             <View style={{ marginHorizontal: 16, marginTop: 12, borderRadius: 16, overflow: 'hidden' }}>
-              <SwipeRow onDelete={() => swipeDelete(record)}>
                 <View style={{ padding: 16, gap: 12, borderRadius: 16, borderWidth: 1, borderColor: c.gray200, backgroundColor: c.white }}>
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
                     <Pressable accessibilityRole="button" onPress={() => editDetails(record)} style={{ flex: 1, minWidth: 0 }}>
@@ -257,9 +256,11 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
                         Share
                       </Button>
                     )}
+                    <View style={{ marginLeft: 'auto' }}>
+                      <TrashButton name={record.title} onPress={() => deleteWithUndo(record)} />
+                    </View>
                   </View>
                 </View>
-              </SwipeRow>
             </View>
           );
         }}
