@@ -19,6 +19,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Read-only by default; only `publish` may write (releases). The repo is public, so a pull request from a fork runs this
+# too, with no secrets (GitHub's rule for `pull_request`).
+permissions:
+  contents: read
+
 jobs:
   # Lint, unit tests and bundling. On a pull request it also works out whether the PR touches the Android build itself
   # (.github/scripts/changed-parts.sh): `test` already checks the app's code and bundles it, so a pull request builds
@@ -53,8 +58,11 @@ jobs:
     if: >-
       github.event_name != 'pull_request' || (!github.event.pull_request.draft &&
       (needs.test.outputs.android == 'true' || contains(github.event.pull_request.labels.*.name, 'build-apk')))
-    # On the owner's PC when the repository variable NATIVE_RUNNER is "self-hosted" (docs/self-hosted-runner.md).
-    runs-on: ${{ vars.NATIVE_RUNNER == 'self-hosted' && fromJSON('["self-hosted", "linux", "x64", "nirman-pc"]') || 'ubuntu-latest' }}
+    # On the owner's PC when the repository variable NATIVE_RUNNER is "self-hosted" (docs/self-hosted-runner.md), but
+    # never for a pull request from a fork: that would run a stranger's code on the PC. Those build on GitHub.
+    runs-on: >-
+      ${{ vars.NATIVE_RUNNER == 'self-hosted' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && fromJSON('["self-hosted", "linux", "x64", "nirman-pc"]') || 'ubuntu-latest' }}
     outputs:
       version: ${{ steps.build.outputs.version }}
     steps:
