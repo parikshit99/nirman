@@ -6,12 +6,13 @@ import { useProjectsSheet } from '../features/ProjectsSheet';
 import { useSettings } from '../features/SettingsHost';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
+import { BackupReminder } from './BackupReminder';
 import { StatusChip } from './StatusChip';
 import { Icon } from './ui/Icon';
 
 /**
  * The top of every tab: the open project (everything below belongs to it), the status, and Settings (a page of its
- * own). A tab's own actions are on the tab itself (Purchases and BOQ: the buttons at the bottom right). `children` is
+ * own), and the backup reminder. A tab's own actions are on the tab itself (Purchases and BOQ: the buttons at the bottom right). `children` is
  * a second row, e.g. the total.
  */
 export function ScreenHeader({ onStatus, children }: { onStatus?(): void; children?: ReactNode }) {
@@ -38,6 +39,7 @@ export function ScreenHeader({ onStatus, children }: { onStatus?(): void; childr
         </Pressable>
       </View>
       {children ? <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>{children}</View> : null}
+      <BackupReminder onBackUp={settings.open} />
     </View>
   );
 }

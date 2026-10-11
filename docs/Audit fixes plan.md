@@ -35,7 +35,7 @@ From the architecture audit of October 2026 (after #107). Each phase is one comm
 - **Settings** are saved as the changes the user made, merged into the current settings. Before this, a Settings page opened earlier could put back a Gemini model the worker had just replaced.
 - **Layers:** the `Services` type moves from `state/AppState.tsx` to `data/services.ts` (the data layer no longer imports from the state layer). Gemini gets the unit conversions in the request instead of reading the phone's preferences itself.
 
-## Phase 5: The backup reminder that went missing ⏳
+## Phase 5: The backup reminder that went missing ✅
 
 **Problem.** The CHANGELOG and *Nirman workflows* promise a reminder when there has been no backup for a week. It was shown by the 6.x app's `App.tsx` and was lost when that app was removed (#97). `backupOverdue` and `snoozeBackupReminder` have been unused since.
 
