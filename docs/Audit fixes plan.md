@@ -41,13 +41,21 @@ From the architecture audit of October 2026 (after #107). Each phase is one comm
 
 **Fix.** A reminder row under the header of every tab: *Last backup: …*, *Back up* (opens Settings), and ✕ to remind again in 3 days. It shows only when there is data and no backup for 7 days.
 
-## Phase 6: Duplicates and dead code ⏳
+## Phase 6: Duplicates and dead code ✅
 
 - **Money and quantities:** one `formatRupees` and one `formatQty` in `packages/shared` replace 9 rupee formatters and 3 quantity formatters. PDFs keep "Rs." (their font has no ₹).
 - **Export headers:** one `madeByLine()` replaces the 10 copies of "Nirman by Akohsa - <date>" in PDFs and spreadsheets.
 - **Backup versions:** `READABLE_VERSIONS` and the version check come from `VERSION`; no hand-written list of 1–14 to keep in step.
 - **One way to share:** backups go through the app's own share (`Nirman.shareFiles`) like every other file, and `expo-sharing` is removed. `expo-clipboard` (never imported) is removed too.
 - **Removed:** the unused `Actions` type, `webview: 'n/a'` in problem reports, and a comment about base64 pieces in `shareBytes`, which writes bytes.
+
+## Check on a phone
+
+The checks can't reach these; try them on a phone before release:
+- *Save backup* with many bill photos: the file shares, and restores on another phone (Phase 3).
+- *Save backup* from the start-up problem screen (Phase 3).
+- The backup reminder: shows with data and no backup for 7 days; ✕ hides it; it goes after a backup (Phase 5).
+- Swipe a line away, then switch to another app: the line stays deleted after the app is reopened (Phase 2).
 
 ## Left on purpose ⏸
 

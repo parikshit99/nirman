@@ -385,7 +385,6 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
 }
 
 export type AppState = ReturnType<typeof useAppStateValue>;
-export type Actions = AppState['actions'];
 export type { ExtractedMaterial };
 
 const AppStateContext = createContext<AppState | null>(null);

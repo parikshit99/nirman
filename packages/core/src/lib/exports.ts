@@ -1,8 +1,8 @@
 import type { jsPDF } from 'jspdf';
 import type { SheetData } from 'write-excel-file/browser';
-import { describeTerms, type ContractRow, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
+import { describeTerms, formatRupees, type ContractRow, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
-import { pdfToBase64, type OrderSlipDetails } from './pdf.ts';
+import { madeByLine, pdfToBase64, type OrderSlipDetails } from './pdf.ts';
 
 /** A file to share or save, as base64. */
 export interface SharedFile {
@@ -22,7 +22,7 @@ export function listSheet(kind: ListKind, items: ItemRow[], notes: string): Shee
   const isAudit = kind === 'audit';
   const head = ['Sr.', 'Item', 'Brand', 'Model / code', 'Size / spec', 'Color', 'Qty', 'Unit', 'Ordered as', 'Rate', 'Total'];
   if (isAudit) head.push('Vendor', 'Date');
-  const rows: SheetData = [[bold(isAudit ? 'Purchase report' : 'Bill of quantities')], [`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`], [], head.map(bold)];
+  const rows: SheetData = [[bold(isAudit ? 'Purchase report' : 'Bill of quantities')], [madeByLine()], [], head.map(bold)];
   items.forEach((item, i) => {
     const row: SheetData[number] = [i + 1, item.item_name, item.brand, item.model, item.spec, item.color, item.quantity, item.unit, item.ordered_as];
     if (isAudit) row.push(money(item.unit_price), money(item.total_amount), item.vendor, item.date);
@@ -39,7 +39,7 @@ export function listSheet(kind: ListKind, items: ItemRow[], notes: string): Shee
 
 /** Order slip for Excel: delivery details, then items with sizes and quantities, no rates. */
 export function orderSlipSheet(items: ItemRow[], d: OrderSlipDetails): SheetData {
-  const rows: SheetData = [[bold('Order slip')], [`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`], []];
+  const rows: SheetData = [[bold('Order slip')], [madeByLine()], []];
   if (d.vendor?.trim()) rows.push([bold('To'), d.vendor.trim()]);
   if (d.address) rows.push([bold('Deliver to'), d.address]);
   if (d.deliveryDate) rows.push([bold('Delivery by'), d.deliveryDate]);
@@ -56,7 +56,7 @@ export function comparisonSheet(boq: ListRow, comparison: QuoteComparison): Shee
   const rows: SheetData = [
     [bold('Vendor quote comparison')],
     [`${boq.title || 'BOQ'}${boq.address ? ` - ${boq.address}` : ''}`],
-    [`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`],
+    [madeByLine()],
     [],
     ['Sr.', 'Item', 'Brand', 'Model / code', 'Size / spec', 'Color', 'Qty', 'Unit', 'Last price', 'Last vendor', ...vendors.map((v) => v.quote.vendor || 'Vendor')].map(bold),
   ];
@@ -87,7 +87,7 @@ export function comparisonSheet(boq: ListRow, comparison: QuoteComparison): Shee
 
 /** Site report for Excel: the per-material summary, then every line. */
 export function siteReportSheet(address: string, filters: string, report: SiteReport, labour?: LabourReport): SheetData {
-  const rows: SheetData = [[bold('Site report')], [address], [filters], [`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`], []];
+  const rows: SheetData = [[bold('Site report')], [address], [filters], [madeByLine()], []];
   rows.push(['Work type', 'Material', 'Quantity', 'Unit', 'Avg rate', 'Amount', 'Vendors', 'Bills'].map(bold));
   for (const c of report.categories) {
     for (const m of c.materials) rows.push([c.name, m.name, m.quantity, m.unit, m.avgRate ? money(m.avgRate) : null, money(m.amount), m.vendors.join(', '), m.bills]);
@@ -113,8 +113,8 @@ export function siteReportSheet(address: string, filters: string, report: SiteRe
 
 /** A contractor's statement for Excel: terms, entries with running balance, then the summary. */
 export function contractStatementSheet(c: ContractRow, st: ContractStatement, period: string): SheetData {
-  const rupees = (n: number) => `Rs. ${Math.round(n).toLocaleString('en-IN')}`;
-  const rows: SheetData = [[bold('Labour statement')], [`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`], []];
+  const rupees = (n: number) => formatRupees(n, { whole: true, symbol: 'Rs. ' });
+  const rows: SheetData = [[bold('Labour statement')], [madeByLine()], []];
   rows.push([bold('Contractor'), [c.contractor, c.phone].filter(Boolean).join(' - ')]);
   if (c.work) rows.push([bold('Work'), c.work]);
   if (c.address) rows.push([bold('Site'), [c.address, c.category].filter(Boolean).join(' - ')]);

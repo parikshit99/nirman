@@ -96,7 +96,7 @@ Losing the preferences and asking for the key once saves a whole preparation rel
 ### Phase 6: Labour, site report, sharing
 
 - Labour (contracts, entries, advances, retention, statement), the site report.
-- `DocumentPreview` shows the PDF's pages drawn by Android's own `PdfRenderer` (the same pages as the JPG share), sharing PDF, Excel and JPG through Android's share sheet (`expo-sharing` for single files, the native module for several).
+- `DocumentPreview` shows the PDF's pages drawn by Android's own `PdfRenderer` (the same pages as the JPG share), sharing PDF, Excel and JPG through Android's share sheet (the native module `shareFiles`; `expo-sharing` was removed in the audit fixes, see [Audit fixes plan.md](Audit%20fixes%20plan.md)).
 - PDF and Excel are made by the same core code as today.
 - Read: `features/LabourView.tsx`, `features/ContractSheet.tsx`, `components/ContractForm.tsx`, `features/StatementSheet.tsx`, `features/SiteReport.tsx`, `components/ShareSheet.tsx`, `components/DocumentPreview.tsx`.
 

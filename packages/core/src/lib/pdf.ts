@@ -1,10 +1,13 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { describeTerms, variantLabel, type ContractRow, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
+import { describeTerms, formatQty, formatRupees, variantLabel, type ContractRow, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
 import { appIcon } from './pdfIcon.ts';
 
-const rupees = (n: number) => `Rs. ${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+const rupees = (n: number) => formatRupees(n, { symbol: 'Rs. ' });
+
+/** The line under every PDF and spreadsheet title. */
+export const madeByLine = (now = new Date()) => `Nirman by Akohsa - ${now.toLocaleDateString('en-IN')}`;
 /** Item name, with brand · model · size/spec · colour, and how it was ordered, on further lines when given. */
 const describe = (item: ItemRow) => [item.item_name, variantLabel(item), item.ordered_as && `Ordered: ${item.ordered_as}`].filter(Boolean).join('\n');
 
@@ -28,7 +31,7 @@ export function buildPdf(kind: ListKind, items: ItemRow[], notes: string): jsPDF
 
   doc.setFontSize(10);
   doc.setTextColor(100);
-  doc.text(`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`, 14, 28);
+  doc.text(madeByLine(), 14, 28);
   doc.text(isAudit ? 'Purchases recorded from site bills and notes.' : 'Material inventory and price estimation report.', 14, 33);
 
   const head = ['Sr.', 'Description', 'Qty', 'Unit', 'Rate', 'Total'];
@@ -112,7 +115,7 @@ export function buildQuoteComparisonPdf(boq: ListRow, comparison: QuoteCompariso
   doc.setFontSize(10);
   doc.setTextColor(100);
   doc.text(`${boq.title || 'BOQ'}${boq.address ? ` - ${boq.address}` : ''}`, 14, 28);
-  doc.text(`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`, 14, 33);
+  doc.text(madeByLine(), 14, 33);
 
   const head = ['Sr.', 'Item', 'Qty', 'Last price', ...comparison.vendors.map((v) => v.quote.vendor)];
   const body: string[][] = comparison.rows.map((row) => [
@@ -174,7 +177,7 @@ export function buildOrderSlipPdf(items: ItemRow[], d: OrderSlipDetails): jsPDF 
   drawTitle(doc, 'ORDER SLIP', 22);
   doc.setFontSize(10);
   doc.setTextColor(100);
-  doc.text(`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`, 14, 28);
+  doc.text(madeByLine(), 14, 28);
 
   const rows: [string, string][] = [];
   if (d.vendor?.trim()) rows.push(['To', d.vendor.trim()]);
@@ -197,7 +200,7 @@ export function buildOrderSlipPdf(items: ItemRow[], d: OrderSlipDetails): jsPDF 
   autoTable(doc, {
     head: [['Sr.', 'Item', 'Qty', 'Unit']],
     // An estimated weight (TMT ordered in bundles) is marked ≈ so the bundle count is what's ordered.
-    body: items.map((item, i) => [i + 1, describe(item), `${/estimated/i.test(item.ordered_as) ? '≈' : ''}${Number(item.quantity.toFixed(3)).toLocaleString('en-IN')}`, item.unit]),
+    body: items.map((item, i) => [i + 1, describe(item), `${/estimated/i.test(item.ordered_as) ? '≈' : ''}${formatQty(item.quantity)}`, item.unit]),
     startY: y,
     theme: 'grid',
     headStyles: { fillColor: [18, 18, 18], textColor: [255, 255, 255] },
@@ -218,7 +221,6 @@ export function buildOrderSlipPdf(items: ItemRow[], d: OrderSlipDetails): jsPDF 
   return doc;
 }
 
-const qty = (n: number) => Number(n.toFixed(3)).toLocaleString('en-IN');
 const lastY = (doc: jsPDF) => (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
 
 /**
@@ -234,7 +236,7 @@ export function buildSiteReportPdf(address: string, filters: string, report: Sit
   doc.setFontSize(9);
   doc.setTextColor(100);
   doc.text(doc.splitTextToSize(filters, 180), 14, 34);
-  doc.text(`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`, 14, 43);
+  doc.text(madeByLine(), 14, 43);
 
   const hasLabour = !!labour?.rows.length;
   if (report.lineCount === 0) {
@@ -249,7 +251,7 @@ export function buildSiteReportPdf(address: string, filters: string, report: Sit
   for (const c of report.categories) {
     summary.push([{ content: c.name.toUpperCase(), colSpan: 6, styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } }]);
     for (const m of c.materials) {
-      summary.push([m.name, `${qty(m.quantity)} ${m.unit}`, m.avgRate ? rupees(Math.round(m.avgRate)) : '-', rupees(Math.round(m.amount)), m.vendors.join(', ') || '-', String(m.bills)]);
+      summary.push([m.name, `${formatQty(m.quantity)} ${m.unit}`, m.avgRate ? rupees(Math.round(m.avgRate)) : '-', rupees(Math.round(m.amount)), m.vendors.join(', ') || '-', String(m.bills)]);
     }
     summary.push(['', '', { content: `${c.name} total`, styles: { fontStyle: 'bold', halign: 'right' } }, { content: rupees(Math.round(c.amount)), styles: { fontStyle: 'bold' } }, '', '']);
   }
@@ -282,7 +284,7 @@ export function buildSiteReportPdf(address: string, filters: string, report: Sit
     body: lines.map((l) => [
       l.date,
       describe(l.item),
-      `${qty(l.item.quantity)} ${l.item.unit}`,
+      `${formatQty(l.item.quantity)} ${l.item.unit}`,
       l.item.unit_price ? rupees(l.item.unit_price) : '-',
       rupees(l.item.total_amount),
       l.item.vendor || '-',
@@ -374,7 +376,7 @@ export function buildContractStatementPdf(c: ContractRow, st: ContractStatement,
   });
   doc.setFontSize(8);
   doc.setTextColor(120);
-  doc.text(`Nirman by Akohsa - ${new Date().toLocaleDateString('en-IN')}`, 14, lastY(doc) + 10);
+  doc.text(madeByLine(), 14, lastY(doc) + 10);
   return doc;
 }
 

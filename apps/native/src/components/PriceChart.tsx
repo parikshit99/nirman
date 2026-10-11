@@ -4,7 +4,8 @@ import { Pressable } from './ui/Pressable';
 import Svg, { Circle, Defs, LinearGradient, Path, Polyline, Stop } from 'react-native-svg';
 import type { PricePoint } from '@nirman/shared';
 import { useColors } from '../theme';
-import { rupees, shortDate } from './PriceBadges';
+import { rupees } from '../lib/format';
+import { shortDate } from './PriceBadges';
 
 /** Price over time as a filled line; tap it to read the price and date nearest to the finger. */
 export function PriceChart({ points, height = 48, id }: { points: PricePoint[]; height?: number; id: string }) {

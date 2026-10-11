@@ -12,11 +12,10 @@ import { DateField } from '../components/ui/Select';
 import { Sheet, SheetHeader } from '../components/ui/Sheet';
 import { pdfToJpegs, sheetToXlsx } from '../lib/exportFiles';
 import { shareFiles } from '../lib/files';
-import { plural } from '../lib/format';
+import { plural, rupeesWhole } from '../lib/format';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 
-const rupees = (n: number) => `₹${Math.round(n || 0).toLocaleString('en-IN')}`;
 
 /** Everything bought (or delivered) for the open project, for any period and work types, as PDF / Excel / JPG. */
 export function SiteReport({ onClose }: { onClose(): void }) {
@@ -138,14 +137,14 @@ export function SiteReport({ onClose }: { onClose(): void }) {
               <Text style={{ fontSize: 14, color: c.gray600 }}>
                 {plural(report.lineCount, 'line')} · {plural(materialCount, 'material')}
               </Text>
-              <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupees(report.total)}</Text>
+              <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupeesWhole(report.total)}</Text>
             </View>
             {labour.rows.length > 0 && (
               <View style={panel}>
                 <Text style={{ flex: 1, fontSize: 14, color: c.gray600 }}>
-                  Labour: {plural(labour.rows.length, 'contract')} · paid {rupees(labour.paid)}
+                  Labour: {plural(labour.rows.length, 'contract')} · paid {rupeesWhole(labour.paid)}
                 </Text>
-                <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupees(labour.workDone)}</Text>
+                <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupeesWhole(labour.workDone)}</Text>
               </View>
             )}
 

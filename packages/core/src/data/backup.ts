@@ -14,14 +14,15 @@ const APP_ID = 'nirmaan-auditor';
  * (their lists go into projects by site address; .json files have no photos).
  */
 const VERSION = 14;
-const READABLE_VERSIONS: unknown[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+/** Every version from 1 to this one restores. */
+const isReadableVersion = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= VERSION;
 
 /** A bill photo in the backup: its pages are files in the zip. */
 const billPhotoSchema = z.object({ id: z.string().min(1).max(200), created_at: z.string().max(40), files: z.array(z.string().max(300)).max(100) });
 
 const backupSchema = z.object({
   app: z.literal(APP_ID),
-  version: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7), z.literal(8), z.literal(9), z.literal(10), z.literal(11), z.literal(12), z.literal(13), z.literal(14)]),
+  version: z.number().refine(isReadableVersion),
   exported_at: z.string().datetime({ offset: true }),
   projects: z.array(rowSchemas.projects).default([]),
   lists: z.array(rowSchemas.lists),
@@ -140,7 +141,7 @@ export function parseBackup(text: string): Backup {
     throw new BackupError('This file is not a Nirman backup (it is not valid JSON).');
   }
   if ((raw as { app?: unknown })?.app !== APP_ID) throw new BackupError('This file is not a Nirman backup.');
-  if (!READABLE_VERSIONS.includes((raw as { version?: unknown }).version)) {
+  if (!isReadableVersion((raw as { version?: unknown }).version)) {
     throw new BackupError('This backup was made by a newer version of the app. Update the app and try again.');
   }
   const parsed = backupSchema.safeParse(raw);

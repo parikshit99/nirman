@@ -10,6 +10,7 @@ import { Icon } from './ui/Icon';
 import { Field, Label, NumberField, SuggestInput } from './ui/fields';
 import { DateField, Select } from './ui/Select';
 import { Sheet, SheetHeader } from './ui/Sheet';
+import { rupeesWhole } from '../lib/format';
 
 /** Common jobs, offered as suggestions; anything can be typed. */
 const WORK_SUGGESTIONS = ['Masonry', 'Plaster', 'Tiling', 'Flooring', 'Plumbing', 'Electrical wiring', 'Painting', 'Carpentry', 'POP / false ceiling', 'Waterproofing', 'Fabrication', 'Shuttering', 'RCC / slab casting', 'Excavation'];
@@ -123,7 +124,6 @@ export function ContractForm({
     }
   };
 
-  const money = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
 
   return (
     <Sheet label={contract ? 'Edit contract' : 'New labour contract'} onClose={onClose} busy={saving} padding={20} gap={12}>
@@ -180,7 +180,7 @@ export function ContractForm({
       )}
       {preview > 0 && (
         <Text style={{ fontSize: 12, color: c.gray500 }}>
-          Contract value {money(preview)}
+          Contract value {rupeesWhole(preview)}
           {isRate ? ' (estimate)' : ''}
         </Text>
       )}
