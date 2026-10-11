@@ -181,7 +181,8 @@ export class JobWorker {
         const items = await matchMaterials(this.db, read);
         facts.matched = items.filter((i) => i.read_as).length;
         const ids = await completeJob(this.db, job.id, items);
-        if (collectTraining && images.length) await saveTrainingSample(this.db, { engine, ocr_text: ocrText, images, item_ids: ids, category: job.category });
+        // Nothing stored (the entry or its list was deleted while it was read): no sample either.
+        if (collectTraining && images.length && ids.length) await saveTrainingSample(this.db, { engine, ocr_text: ocrText, images, item_ids: ids, category: job.category });
       };
 
       // A vendor quote: read on the phone and matched to the BOQ there when it can be, so quotes work offline too.

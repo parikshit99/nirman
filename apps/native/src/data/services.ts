@@ -1,4 +1,4 @@
-import { ensureProjects, JobWorker, loadSnapshot, logPerf, migrateLocal, resetStuckJobs, settingsStore, type Db, type Snapshot } from '@nirman/core';
+import { ensureProjects, JobWorker, loadSnapshot, logPerf, logStep, migrateLocal, removeOrphans, resetStuckJobs, settingsStore, type Db, type Snapshot } from '@nirman/core';
 import type { TextBox } from '@nirman/shared';
 import Nirman from '../../modules/nirman-native';
 import { connectivity } from '../lib/connectivity';
@@ -13,6 +13,8 @@ export async function startServices(db: Db): Promise<{ services: Services; initi
   await migrateLocal(db);
   await ensureProjects(db);
   await resetStuckJobs(db);
+  const orphans = await removeOrphans(db);
+  if (orphans.jobs || orphans.items || orphans.quotes) logStep('removed rows of deleted lists', orphans);
 
   const settings = { current: await settingsStore.load() };
   const worker = new JobWorker(
