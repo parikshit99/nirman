@@ -671,4 +671,12 @@ describe('transaction', () => {
     await expect(failing).rejects.toThrow('original');
     expect(await db.all('SELECT 1 AS one')).toEqual([{ one: 1 }]);
   });
+
+  it('runs a script of several statements (migrations), even with a ";" inside a value, all or nothing', async () => {
+    const db = await freshDb();
+    await db.transaction((tx) => tx.exec("CREATE TABLE t (x TEXT); INSERT INTO t (x) VALUES ('a;b'); INSERT INTO t (x) VALUES ('c')"));
+    expect(await db.all('SELECT x FROM t ORDER BY x')).toEqual([{ x: 'a;b' }, { x: 'c' }]);
+    await expect(db.transaction((tx) => tx.exec("INSERT INTO t (x) VALUES ('d'); INSERT INTO nowhere VALUES (1)"))).rejects.toThrow();
+    expect(await db.all('SELECT COUNT(*) AS n FROM t')).toEqual([{ n: 2 }]);
+  });
 });

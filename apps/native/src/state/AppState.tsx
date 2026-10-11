@@ -23,7 +23,6 @@ import {
   type ListKind,
   type Snapshot,
   type Db,
-  type JobWorker,
   type WorkerStatus,
   describe,
   logError,
@@ -35,6 +34,7 @@ import {
   type Settings,
 } from '@nirman/core';
 import * as repo from '@nirman/core';
+import type { Services } from '../data/services';
 
 /**
  * Log each action for the diagnostic log: its name, time taken and what it
@@ -84,14 +84,6 @@ export interface HistoryRecord extends ListRow {
   items: ItemRow[];
 }
 
-export interface Services {
-  db: Db;
-  worker: JobWorker;
-  /** Current settings; the worker reads the key from here. */
-  settings: { current: Settings };
-  /** Fires when the worker changed stored data (queue or items). */
-  onDataChanged(fn: () => void): () => void;
-}
 
 const PROJECT_PREF = 'nirmaan_project';
 const EDITING_PREF = 'nirmaan_editing_by_project';
@@ -267,7 +259,9 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
         worker.schedule();
       },
       processQueue: () => worker.schedule(),
-      async saveSettings(next: Settings) {
+      /** Only what the user changed, merged into the current settings (the worker may have replaced the model meanwhile). */
+      async saveSettings(patch: Partial<Settings>) {
+        const next = { ...settingsRef.current, ...patch };
         await settingsStore.save(next);
         settingsRef.current = next;
         setSettings(next);

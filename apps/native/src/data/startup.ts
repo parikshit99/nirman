@@ -1,8 +1,7 @@
 import { logError, logStep, migrateLocal, prefs, restoreBackup, type BackupFile, type Db, type Snapshot } from '@nirman/core';
 import Nirman from '../../modules/nirman-native';
-import type { Services } from '../state/AppState';
 import { DATABASE_FILE, openNirmanDb } from './db';
-import { startServices } from './services';
+import { startServices, type Services } from './services';
 
 /** Set once the app has started with its data; until then each start is the first launch after installing or updating. */
 const READY_PREF = 'nirmaan_native_ready';

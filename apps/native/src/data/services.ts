@@ -1,8 +1,17 @@
-import { ensureProjects, JobWorker, loadSnapshot, logPerf, logStep, migrateLocal, removeOrphans, resetStuckJobs, settingsStore, type Db, type Snapshot } from '@nirman/core';
+import { ensureProjects, JobWorker, loadSnapshot, logPerf, logStep, migrateLocal, removeOrphans, resetStuckJobs, settingsStore, type Db, type Settings, type Snapshot } from '@nirman/core';
 import type { TextBox } from '@nirman/shared';
 import Nirman from '../../modules/nirman-native';
 import { connectivity } from '../lib/connectivity';
-import type { Services } from '../state/AppState';
+
+/** What the app's state needs from the data layer. */
+export interface Services {
+  db: Db;
+  worker: JobWorker;
+  /** Current settings; the worker reads the key from here. */
+  settings: { current: Settings };
+  /** Fires after every committed write (`Db.onWrite`): the worker's, a screen's or a restore's. */
+  onDataChanged(fn: () => void): () => void;
+}
 
 /** Reads the text on a photo on the phone (no internet). */
 const readPhotoText = async (image: string): Promise<TextBox[]> => (await Nirman.readText(image)).lines;

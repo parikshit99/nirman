@@ -256,7 +256,8 @@ export async function migrateLocal(db: Db): Promise<void> {
     const script = MIGRATIONS[version];
     const next = version + 1;
     await db.transaction(async (tx) => {
-      for (const stmt of splitStatements(script)) await tx.run(stmt);
+      // The driver runs the script as SQLite parses it: a ';' inside a trigger or a text value is safe.
+      await tx.exec(script);
       await tx.run('UPDATE schema_version SET version = ?', [next]);
       if (next === 1) await seedCategories(tx);
     });
@@ -271,8 +272,4 @@ export async function seedCategories(tx: SqlExecutor) {
       [name.toLowerCase(), name, createdAt],
     );
   }
-}
-
-function splitStatements(script: string): string[] {
-  return script.split(';').map((s) => s.trim()).filter(Boolean);
 }

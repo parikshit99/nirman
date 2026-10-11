@@ -29,7 +29,7 @@ From the architecture audit of October 2026 (after #107). Each phase is one comm
 - `writeBackupZip` streams the `.zip` (fflate `Zip`): one bill at a time is read from the database and handed to the app, which writes it straight to the file.
 - Restore keeps the unzipped pages as bytes and turns one bill at a time into text while inserting it.
 
-## Phase 4: Robustness ⏳
+## Phase 4: Robustness ✅
 
 - **Migrations** run each script with `exec` inside their transaction instead of splitting it on `;`, which would break the first time a statement holds a `;` (a trigger or a text value).
 - **Settings** are saved as the changes the user made, merged into the current settings. Before this, a Settings page opened earlier could put back a Gemini model the worker had just replaced.

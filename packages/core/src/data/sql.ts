@@ -9,9 +9,14 @@ export interface SqlExecutor {
   run(sql: string, params?: SqlValue[]): Promise<void>;
 }
 
+/** Inside a transaction: also a script of several statements (migrations). */
+export interface Tx extends SqlExecutor {
+  exec(script: string): Promise<void>;
+}
+
 export interface Db extends SqlExecutor {
   /** Run `fn` atomically. Other callers wait until it finishes. */
-  transaction<T>(fn: (tx: SqlExecutor) => Promise<T>): Promise<T>;
+  transaction<T>(fn: (tx: Tx) => Promise<T>): Promise<T>;
   /** Execute a script of several statements (used for migrations). */
   exec(script: string): Promise<void>;
   close(): Promise<void>;
@@ -71,9 +76,10 @@ export function wrapDriver(driver: RawDriver): Db {
     transaction: (fn) =>
       mutex.lock(async () => {
         let changed = false;
-        const tx: SqlExecutor = {
+        const tx: Tx = {
           all,
           run: (sql, params = []) => ((changed = true), driver.run(sql, params)),
+          exec: (script) => ((changed = true), driver.exec(script)),
         };
         await driver.begin();
         try {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { ConversionSettings } from './conversions.ts';
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
 const isoTimestamp = z.string().datetime({ offset: true });
@@ -309,6 +310,8 @@ export interface ExtractionRequest {
   learning: LearningMap;
   /** Material names already in Rates (and the catalog's), to be reused for the same things. */
   materials?: { name: string; unit: string }[];
+  /** How to convert units in what is read (Settings → Units); the defaults if not given. */
+  conversions?: ConversionSettings;
 }
 
 /** One line of a vendor quote as read by the AI. boq_sr is the matched BOQ Sr. number (1-based) or null. */

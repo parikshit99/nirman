@@ -279,6 +279,7 @@ export class JobWorker {
         capture_date: job.capture_date || todayISO(),
         learning,
         materials: namesForReading(known),
+        conversions: loadConversions(),
       });
       if (items.length === 0) {
         await setJobStatus(this.db, job.id, 'failed', 'No items detected. Make sure the photo or text is clear, then retry.');
