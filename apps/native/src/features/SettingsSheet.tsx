@@ -32,7 +32,7 @@ import { Tabs } from '../components/ui/Tabs';
 import { pickBackupFile } from '../lib/backupFile';
 import { latestNotes } from '../lib/changelog';
 import { APP_VERSION } from '../lib/coreSetup';
-import { shareBytes, shareFile, textToBase64 } from '../lib/files';
+import { shareBackupZip, shareFile, textToBase64 } from '../lib/files';
 import { plural } from '../lib/format';
 import { look, onLookChange, setAccent, setThemeChoice, setThemeStyle, themeChoice, type ThemeChoice, type ThemeStyle } from '../lib/theme';
 import { useAppState } from '../state/AppState';
@@ -382,8 +382,7 @@ function BackupSection() {
   const doExport = async () => {
     setBusy(true);
     try {
-      const { bytes } = await actions.exportBackup();
-      await shareBytes(backupFilename(), bytes, 'application/zip');
+      await shareBackupZip(backupFilename(), (write) => actions.exportBackup(write));
       recordBackup();
       setLastBackup(describeLastBackup());
     } catch (err) {

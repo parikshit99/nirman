@@ -21,7 +21,7 @@ From the architecture audit of October 2026 (after #107). Each phase is one comm
 - Saving a backup carries them out first.
 - When the app goes to the background, they are carried out (Android may close it there).
 
-## Phase 3: Backups that don't fit in memory ⏳
+## Phase 3: Backups that don't fit in memory ✅
 
 **Problem.** *Save backup* reads every bill photo, builds the whole `.zip` in memory and only then writes it. Restore unzips the whole file and turns every page into text at once. With many kept bill photos this can run the phone out of memory, so the safety net can fail exactly when there is most to lose.
 

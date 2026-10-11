@@ -14,7 +14,7 @@ import {
 import {
   createPendingDeletes,
   createReloader,
-  exportBackupZip,
+  writeBackupZip,
   parseBackupFile,
   restoreBackup,
   type BackupFile,
@@ -274,9 +274,9 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
         worker.schedule();
       },
       /** Deletes still waiting for Undo are carried out first, so the backup doesn't bring them back. */
-      async exportBackup() {
+      async exportBackup(write: (chunk: Uint8Array) => void) {
         await pending.flush();
-        return exportBackupZip(db);
+        return writeBackupZip(db, write);
       },
       countTrainingSamples: () => repo.countTrainingSamples(db),
       exportTrainingData: () => repo.exportTrainingData(db),
