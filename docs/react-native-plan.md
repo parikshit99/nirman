@@ -143,11 +143,21 @@ Several people edit the same projects: on site from their phones, in the office 
 - **Phones stay offline-first.** Each phone keeps its own SQLite file, as now, and syncs with Supabase when it has a connection. A site with no signal loses nothing; changes go up later.
 - **The web version is online-only.** It needs a connection, and it keeps nothing important in the browser.
 - **The Gemini key stays on each phone.** It never goes into Supabase, the web version or the repo. Reading bill photos stays on the phones.
+- **Free and open.** Nirman is free to use and open source, so sync must cost nothing to run and use only open-source pieces: Supabase (open source, and its free tier is enough) and our own sync code. No paid service, and nothing a user would have to pay for to keep their data in step.
+
+**Why our own sync, not a sync service** (checked October 2026; look again before starting):
+- *PowerSync* would save writing the sync code, but its hosted free plan is limited and pauses with no use, its paid plans cost money every month, and running it yourself means keeping a server going (and its server is source-available, not open source).
+- *ElectricSQL* also needs its own sync server running somewhere.
+- *RxDB* has Supabase sync, but its SQLite storage for React Native is a paid plugin.
+- *WatermelonDB* is open source and free, but it replaces the whole data layer (`repo.ts`, the backups, the tests), which costs more than the sync code it saves.
+
+Our own sync stays small because the app was built for it: every row has a text id made on the phone, every change goes through `repo.ts`, and `Db.onWrite` already says when something changed.
 
 ### What it costs
 
 - **Supabase free tier** is enough to start: a 500 MB database and 1 GB of file storage. A free project is paused after a week with no use and must be resumed from the dashboard; the Pro plan (about $25 a month) removes the pause, adds daily backups and much more storage. Check the current limits before starting. Bill photos fill storage first, so they are resized before upload.
-- **GitHub Pages** is free for public repositories. This repository is private, so Pages needs GitHub Pro (about $4 a month). The site itself is public either way, which is fine: it holds no data, and everything behind it needs a sign-in. If paying for Pro isn't wanted, Cloudflare Pages does the same for free from a private repository.
+- **Supabase can also be run on your own computer or server** (it is open source), so the data never depends on Supabase's hosted service staying free; the app only needs the address and public key changed.
+- **GitHub Pages** is free, as the repository is public. The site holds no data; everything behind it needs a sign-in.
 
 ### Sync 1: groundwork in the app (MINOR)
 
