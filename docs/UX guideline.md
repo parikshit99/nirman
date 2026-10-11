@@ -15,7 +15,7 @@ Site supervisors and owners, on a phone, on site: in sunlight, with gloves, with
 5. **The phone first, Gemini when needed.** Bills are read on the phone where possible. The user picks this in *Settings → How bills are read*.
 6. **Nothing typed is lost.** Forms in sheets don't close on an outside tap, and the Add sheet keeps a half-typed entry when it is closed.
 7. **Preview before sharing.** Every PDF is shown as it will be shared (`DocumentPreview`) before the share sheet opens.
-8. **Behave like an Android app.** Back always goes back, the Android pickers, share sheet and dialogs are used, and the app follows the system's dark mode, font size, *Remove animations* and TalkBack. The [UI guideline](UI%20guideline.md) lists the native features to use.
+8. **Behave like an Android app.** Back always goes back, the Android pickers and share sheet are used, dialogs follow Material 3 in the app's own colours, and the app follows the system's dark mode, font size, *Remove animations* and TalkBack. The [UI guideline](UI%20guideline.md) lists the native features to use.
 
 ## Words
 
@@ -44,7 +44,7 @@ Use these everywhere, including toasts, dialogs, Excel/PDF columns, the CHANGELO
 | Situation | Use |
 |---|---|
 | Something just worked and needs no choice | `toast` (a Snackbar): "Backup restored", "List saved" |
-| A choice is needed, or something failed and the user must act | `confirm` / `alert` (Android's own dialog) |
+| A choice is needed, or something failed and the user must act | `confirm` / `alert` (the app's Material 3 dialog) |
 | A short typed answer (a name) | `prompt` |
 | Work in progress (saving, sharing, reading) | `busy` on the sheet or button, with a short label ("Reading 2 photos…") |
 | Work that finishes while the app is closed (queued bills read) | A notification, which opens the result. Only for things the user is waiting for, never for promotion |

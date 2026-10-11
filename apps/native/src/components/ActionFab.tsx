@@ -74,14 +74,14 @@ export function ActionFab({ label, icon = 'add', onPress, showMain = true, actio
         {actions.map((action, i) => {
           const v = items[i];
           const fg = action.tone === 'primary' ? c.onPrimary : action.tone === 'danger' ? '#fff' : c.gray800;
-          const bg = action.tone === 'primary' ? c.brandPrimary : action.tone === 'danger' ? c.red600 : c.white;
+          const bg = action.tone === 'primary' ? c.brandPrimary : action.tone === 'danger' ? c.red600 : c.raised;
           return (
             <Animated.View
               key={action.label}
               pointerEvents={open ? 'auto' : 'none'}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginRight: 4, opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }, { scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] }}
             >
-              <Text style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, overflow: 'hidden', fontSize: 14, fontWeight: '700', color: c.brandDark, backgroundColor: c.white, elevation: 3 }}>{action.label}</Text>
+              <Text style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, overflow: 'hidden', fontSize: 14, fontWeight: '700', color: c.brandDark, backgroundColor: c.raised, elevation: 3 }}>{action.label}</Text>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={action.label}
@@ -104,10 +104,11 @@ export function ActionFab({ label, icon = 'add', onPress, showMain = true, actio
               if (single) single.onPress();
               else setOpen((o) => !o);
             }}
-            style={{ width: 48, height: 48, marginRight: 4, borderRadius: 24, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: c.white, elevation: 4 }}
+            android_ripple={{ color: c.ripple, foreground: true }}
+            style={{ width: 48, height: 48, marginRight: 4, borderRadius: 24, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.orange200, backgroundColor: c.orange100, elevation: 4 }}
           >
             <Animated.View style={{ transform: [{ rotate: scrim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '90deg'] }) }] }}>
-              <Icon name={single ? single.icon : open ? 'close' : 'more-vert'} size={22} color={c.gray700} />
+              <Icon name={single ? single.icon : open ? 'close' : 'more-vert'} size={24} color={c.orange700} />
             </Animated.View>
           </Pressable>
         )}
