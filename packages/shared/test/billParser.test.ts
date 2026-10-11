@@ -13,7 +13,7 @@ describe('reading bills on the phone', () => {
   it('reads a printed bill: quantity × rate = amount, vendor, date and total', () => {
     const rows = [
       'SHARMA BUILDING MATERIAL',
-      'Sector 44, Gurgaon  Mob 9810012345',
+      'Sector 44, Gurgaon  Mob 9000000001',
       'Bill No 231   Date: 03/10/2026',
       'Sr  Item  HSN  Qty  Rate  Amount',
       '1  OPC Cement 53 Grade  252329  50 Bags  380.00  19,000.00',

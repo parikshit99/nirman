@@ -36,7 +36,7 @@ Use these; don't hand-build them again. Each one should wrap Android's control w
 | `useDialogs()` | `confirm` and `alert` are Android's own dialog, `prompt` a small sheet, `toast` a Snackbar above the tabs, `undoable` the same Snackbar with Undo and a countdown ring (after every `…Later` delete). Use these rather than React Native's `Alert`, so wording and haptics stay the same everywhere. |
 | `LineEditor` (`components/`) | Editing a material line anywhere: purchase and BOQ lines, prices in Rates. Extend it; don't add another line form. |
 | `DocumentPreview` (`components/`) | Before sharing any PDF (list, site report, quote comparison, order slip, statement): show the file as it will be shared, then Share. |
-| `ScreenHeader` (`components/`) | The top app bar of every tab: the project, the status, Settings, and a second row such as the total. It may hold up to two action icons and a ⋮ for the tab's less used actions; the main ones stay on the Add button and the button above it. |
+| `ScreenHeader` (`components/`) | The top app bar of every tab: the project, the status, Settings, a second row such as the total, and the backup reminder (`BackupReminder`) when one is due. It may hold up to two action icons and a ⋮ for the tab's less used actions; the main ones stay on the Add button and the button above it. |
 
 ## Native features to use
 

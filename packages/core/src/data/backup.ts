@@ -1,4 +1,4 @@
-import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from 'fflate';
+import { strFromU8, strToU8, unzipSync, Zip, ZipDeflate, ZipPassThrough } from 'fflate';
 import { z } from 'zod';
 import { dataTables, rowSchemas, todayISO, type RowTypes } from '@nirman/shared';
 import { clearAllData, ensureProjectRows, pruneBillPhotos, selectAll, writeRow } from './repo.ts';
@@ -14,14 +14,15 @@ const APP_ID = 'nirmaan-auditor';
  * (their lists go into projects by site address; .json files have no photos).
  */
 const VERSION = 14;
-const READABLE_VERSIONS: unknown[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+/** Every version from 1 to this one restores. */
+const isReadableVersion = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= VERSION;
 
 /** A bill photo in the backup: its pages are files in the zip. */
 const billPhotoSchema = z.object({ id: z.string().min(1).max(200), created_at: z.string().max(40), files: z.array(z.string().max(300)).max(100) });
 
 const backupSchema = z.object({
   app: z.literal(APP_ID),
-  version: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7), z.literal(8), z.literal(9), z.literal(10), z.literal(11), z.literal(12), z.literal(13), z.literal(14)]),
+  version: z.number().refine(isReadableVersion),
   exported_at: z.string().datetime({ offset: true }),
   projects: z.array(rowSchemas.projects).default([]),
   lists: z.array(rowSchemas.lists),
@@ -52,27 +53,61 @@ export async function exportBackup(db: Db): Promise<Backup> {
   });
 }
 
-/** A backup as read from a file: the data, and the bill photos (id → pages as base64 JPEG). */
+/** Bill photos read from a backup: id → pages as JPEG bytes (made into text one bill at a time while restoring). */
+export type BackupPhotos = Map<string, Uint8Array[]>;
+
+/** A backup as read from a file: the data, and the bill photos. */
 export interface BackupFile {
   backup: Backup;
-  photos: Map<string, string[]>;
+  photos: BackupPhotos;
 }
 
-/** The backup as one .zip: backup.json and every bill photo as a JPEG (stored as is: they are compressed already). */
-export async function exportBackupZip(db: Db): Promise<{ bytes: Uint8Array; photos: number }> {
+/**
+ * The backup as one .zip: every bill photo as a JPEG (stored as is: they are compressed already), then backup.json.
+ * It is handed to `write` piece by piece and only one bill's photos are read from the database at a time, so a phone
+ * with many photos never holds the whole backup in memory.
+ */
+export async function writeBackupZip(db: Db, write: (chunk: Uint8Array) => void): Promise<{ photos: number }> {
   const backup = await exportBackup(db);
-  const zip: Zippable = {};
-  const rows = await db.all<{ id: string; created_at: string; images: string }>('SELECT id, created_at, images FROM bill_photos ORDER BY created_at');
-  backup.bill_photos = rows.map((row) => {
+  let failed: Error | null = null;
+  const zip = new Zip((err, chunk) => {
+    if (err) failed ??= err;
+    else if (!failed) write(chunk);
+  });
+  const ids = await db.all<{ id: string; created_at: string }>('SELECT id, created_at FROM bill_photos ORDER BY created_at');
+  backup.bill_photos = [];
+  for (const { id, created_at } of ids) {
+    const [row] = await db.all<{ images: string }>('SELECT images FROM bill_photos WHERE id = ?', [id]);
+    if (!row) continue;
     const files = (JSON.parse(row.images) as string[]).map((data, i) => {
-      const path = `photos/${row.id}-${i + 1}.jpg`;
-      zip[path] = [base64ToBytes(data), { level: 0 }];
+      const path = `photos/${id}-${i + 1}.jpg`;
+      const file = new ZipPassThrough(path);
+      zip.add(file);
+      file.push(base64ToBytes(data), true);
       return path;
     });
-    return { id: row.id, created_at: row.created_at, files };
-  });
-  zip['backup.json'] = strToU8(JSON.stringify(backup));
-  return { bytes: zipSync(zip), photos: rows.length };
+    backup.bill_photos.push({ id, created_at, files });
+    if (failed) throw failed;
+  }
+  const json = new ZipDeflate('backup.json');
+  zip.add(json);
+  json.push(strToU8(JSON.stringify(backup)), true);
+  zip.end();
+  if (failed) throw failed;
+  return { photos: backup.bill_photos.length };
+}
+
+/** The whole backup .zip in memory (tests, and small data). */
+export async function exportBackupZip(db: Db): Promise<{ bytes: Uint8Array; photos: number }> {
+  const chunks: Uint8Array[] = [];
+  const { photos } = await writeBackupZip(db, (c) => chunks.push(c));
+  const bytes = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+  let at = 0;
+  for (const c of chunks) {
+    bytes.set(c, at);
+    at += c.length;
+  }
+  return { bytes, photos };
 }
 
 /** Read a backup file: a .zip (with bill photos) or an older .json. */
@@ -87,9 +122,9 @@ export function parseBackupFile(bytes: Uint8Array): BackupFile {
   }
   if (!files['backup.json']) throw new BackupError('This file is not a Nirman backup (no backup.json inside).');
   const backup = parseBackup(strFromU8(files['backup.json']));
-  const photos = new Map<string, string[]>();
+  const photos: BackupPhotos = new Map();
   for (const p of backup.bill_photos) {
-    const pages = p.files.filter((f) => files[f]).map((f) => bytesToBase64(files[f]));
+    const pages = p.files.filter((f) => files[f]).map((f) => files[f]);
     if (pages.length) photos.set(p.id, pages);
   }
   return { backup, photos };
@@ -106,7 +141,7 @@ export function parseBackup(text: string): Backup {
     throw new BackupError('This file is not a Nirman backup (it is not valid JSON).');
   }
   if ((raw as { app?: unknown })?.app !== APP_ID) throw new BackupError('This file is not a Nirman backup.');
-  if (!READABLE_VERSIONS.includes((raw as { version?: unknown }).version)) {
+  if (!isReadableVersion((raw as { version?: unknown }).version)) {
     throw new BackupError('This backup was made by a newer version of the app. Update the app and try again.');
   }
   const parsed = backupSchema.safeParse(raw);
@@ -118,7 +153,7 @@ export function parseBackup(text: string): Backup {
 }
 
 /** Replace all data on the phone with the backup. All or nothing. */
-export async function restoreBackup(db: Db, backup: Backup, photos: Map<string, string[]> = new Map()): Promise<void> {
+export async function restoreBackup(db: Db, backup: Backup, photos: BackupPhotos = new Map()): Promise<void> {
   await db.transaction(async (tx) => {
     await clearAllData(tx, { seedDefaults: false });
     for (const table of dataTables) {
@@ -128,7 +163,7 @@ export async function restoreBackup(db: Db, backup: Backup, photos: Map<string, 
     // Bill photos come with a .zip backup; restoring an older .json keeps those of restored lines already on this phone.
     for (const p of backup.bill_photos) {
       const pages = photos.get(p.id);
-      if (pages) await tx.run('INSERT OR REPLACE INTO bill_photos (id, created_at, images) VALUES (?, ?, ?)', [p.id, p.created_at, JSON.stringify(pages)]);
+      if (pages) await tx.run('INSERT OR REPLACE INTO bill_photos (id, created_at, images) VALUES (?, ?, ?)', [p.id, p.created_at, JSON.stringify(pages.map(bytesToBase64))]);
     }
     await pruneBillPhotos(tx);
   });

@@ -15,6 +15,8 @@ The repository variable `NATIVE_RUNNER` decides where `native` runs (*Settings �
 
 **While the PC is off or asleep, the build waits** (and fails after 24 hours), and nothing is published. Before a trip, delete the variable so CI goes back to GitHub.
 
+**The repository is public**, so anyone can open a pull request. CI never sends a pull request from a fork to the PC (`ci.yml`, `native`: only pushes, manual runs and branches of this repository), because that would run a stranger's code there. Keep it that way, and keep *Settings → Actions → General → Fork pull request workflows* on *Require approval for all external contributors*.
+
 ## Setting up the PC (once)
 
 ### 1. WSL2 with Ubuntu 24.04 (PowerShell as administrator)

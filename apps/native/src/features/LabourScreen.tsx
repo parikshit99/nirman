@@ -20,8 +20,8 @@ import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 import { ContractSheet } from './ContractSheet';
 import { useSiteReport } from './SiteReport';
+import { rupeesWhole } from '../lib/format';
 
-export const rupees = (n: number) => `₹${Math.round(n || 0).toLocaleString('en-IN')}`;
 
 type StatusFilter = 'active' | 'closed' | 'all';
 
@@ -35,8 +35,8 @@ const STATUS_TABS: { id: StatusFilter; label: string }[] = [
 export function BalanceText({ balance, align }: { balance: number; align?: 'right' }) {
   const c = useColors();
   const style = { textAlign: align, fontWeight: '700' as const, fontSize: 12, fontVariant: ['tabular-nums' as const] };
-  if (balance < 0) return <Text style={[style, { color: c.red600 }]}>Paid ahead {rupees(-balance)}</Text>;
-  return <Text style={[style, { color: balance > 0 ? c.red600 : c.green700 }]}>{balance > 0 ? `Due ${rupees(balance)}` : 'Settled'}</Text>;
+  if (balance < 0) return <Text style={[style, { color: c.red600 }]}>Paid ahead {rupeesWhole(-balance)}</Text>;
+  return <Text style={[style, { color: balance > 0 ? c.red600 : c.green700 }]}>{balance > 0 ? `Due ${rupeesWhole(balance)}` : 'Settled'}</Text>;
 }
 
 /** The Labour tab: contracts as cards (who, what and where, progress, and what is owed) and the button to add one. */
@@ -93,11 +93,11 @@ export function LabourScreen({ about }: { about: string }) {
         <View accessibilityLabel="Totals for the contracts shown" style={{ flexDirection: 'row', gap: 8, marginHorizontal: 16 }}>
           <View style={box}>
             <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>Work done</Text>
-            <RollingText lineHeight={17} style={{ fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '700', color: c.brandDark }}>{rupees(totals.workDone)}</RollingText>
+            <RollingText lineHeight={17} style={{ fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '700', color: c.brandDark }}>{rupeesWhole(totals.workDone)}</RollingText>
           </View>
           <View style={box}>
             <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>Paid</Text>
-            <RollingText lineHeight={17} style={{ fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '700', color: c.brandDark }}>{rupees(totals.paid)}</RollingText>
+            <RollingText lineHeight={17} style={{ fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '700', color: c.brandDark }}>{rupeesWhole(totals.paid)}</RollingText>
           </View>
           <View style={box}>
             <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>Balance</Text>
@@ -209,10 +209,10 @@ function ContractCard({ contract: x, totals: t, onOpen, onDelete }: { contract: 
       )}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 4 }}>
         <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>
-          Work <Text style={{ fontWeight: '700', color: c.gray800 }}>{rupees(t.workDone)}</Text>
+          Work <Text style={{ fontWeight: '700', color: c.gray800 }}>{rupeesWhole(t.workDone)}</Text>
         </Text>
         <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>
-          Paid <Text style={{ fontWeight: '700', color: c.gray800 }}>{rupees(t.paid)}</Text>
+          Paid <Text style={{ fontWeight: '700', color: c.gray800 }}>{rupeesWhole(t.paid)}</Text>
         </Text>
         <BalanceText balance={t.balance} align="right" />
       </View>

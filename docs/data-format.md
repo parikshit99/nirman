@@ -75,7 +75,7 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
 
 ## Backup file
 
-*Settings → Save backup* writes one zip file, `nirman-backup-YYYY-MM-DD.zip`, holding `backup.json` and every bill photo as `photos/<bill_photos id>-<page>.jpg` (stored uncompressed: they are JPEGs already). `backup.json`:
+*Settings → Save backup* writes one zip file, `nirman-backup-YYYY-MM-DD.zip`, holding `backup.json` and every bill photo as `photos/<bill_photos id>-<page>.jpg` (stored uncompressed: they are JPEGs already). The zip is written to the file as it is made, one bill's photos at a time, and `backup.json` comes last; readers find files by name, so the order doesn't matter. `backup.json`:
 
 ```json
 {

@@ -64,8 +64,6 @@ export class JobWorker {
   constructor(
     private db: Db,
     private getSettings: () => Settings,
-    /** Called whenever the queue or stored items changed. */
-    private onDataChanged: () => void,
     private makeExtractor: (apiKey: string, model: string, onModelReplaced?: (model: string) => void) => Extractor = createGeminiExtractor,
     /** Called when Gemini no longer knew the configured model and another was used. */
     private onModelReplaced?: (model: string) => void,
@@ -183,7 +181,8 @@ export class JobWorker {
         const items = await matchMaterials(this.db, read);
         facts.matched = items.filter((i) => i.read_as).length;
         const ids = await completeJob(this.db, job.id, items);
-        if (collectTraining && images.length) await saveTrainingSample(this.db, { engine, ocr_text: ocrText, images, item_ids: ids, category: job.category });
+        // Nothing stored (the entry or its list was deleted while it was read): no sample either.
+        if (collectTraining && images.length && ids.length) await saveTrainingSample(this.db, { engine, ocr_text: ocrText, images, item_ids: ids, category: job.category });
       };
 
       // A vendor quote: read on the phone and matched to the BOQ there when it can be, so quotes work offline too.
@@ -251,7 +250,6 @@ export class JobWorker {
       await setJobStatus(this.db, job.id, 'processing');
       const model = this.getSettings().geminiModel;
       this.progress(job, 'gemini', !phone ? 'Reading with Gemini' : phone.lines.length ? `Phone was unsure (${Math.round(phone.confidence * 100)}% sure), reading with Gemini` : 'Phone couldn’t read it, reading with Gemini', null, model);
-      this.onDataChanged();
       if (job.quote_id) {
         // Sr. numbers are the BOQ's printed order; remember which item each one was.
         const boq = await listItems(this.db, job.list_id);
@@ -281,6 +279,7 @@ export class JobWorker {
         capture_date: job.capture_date || todayISO(),
         learning,
         materials: namesForReading(known),
+        conversions: loadConversions(),
       });
       if (items.length === 0) {
         await setJobStatus(this.db, job.id, 'failed', 'No items detected. Make sure the photo or text is clear, then retry.');
@@ -309,8 +308,8 @@ export class JobWorker {
       }
       return null;
     } finally {
+      // Changed data reaches the screens through `db.onWrite`, whichever way the entry ended.
       this.setStatus({ current: null });
-      this.onDataChanged();
     }
   }
 }

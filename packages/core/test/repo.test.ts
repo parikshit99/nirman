@@ -7,6 +7,8 @@ import {
   clearHiddenMaterials,
   clearListItems,
   completeJob,
+  countBillPhotos,
+  removeOrphans,
   completeQuoteJob,
   confirmQuote,
   deleteJob,
@@ -334,6 +336,46 @@ describe('local repository', () => {
     expect(await getBillPhotos(db, photoId)).toEqual([]);
   });
 
+  it('drops the queued entries of a deleted list, and never stores lines into a list that is gone', async () => {
+    const db = await freshDb();
+    await addItems(db, DRAFT_IDS.audit, [cement]);
+    const listId = await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
+    // An entry queued while the saved list was open for editing, then the list deleted.
+    const queued = await enqueueJob(db, { listId, text: '15 bori', images: ['AAA'], category: 'Civil', captureDate: '2026-09-30' });
+    await deleteList(db, listId);
+    expect((await loadSnapshot(db)).jobs).toEqual([]);
+    expect(await getJobImages(db, queued)).toEqual([]);
+
+    // The same, when the worker was already reading it: its lines are not stored and the entry goes.
+    const other = await saveDraftToHistory(db, DRAFT_IDS.audit, meta);
+    const reading = await enqueueJob(db, { listId: other, text: '', images: ['BBB'], category: '', captureDate: '2026-09-30' });
+    await db.run('DELETE FROM lists WHERE id = ?', [other]);
+    expect(await completeJob(db, reading, [cement])).toEqual([]);
+    const snap = await loadSnapshot(db);
+    expect(snap.items).toEqual([]);
+    expect(snap.jobs).toEqual([]);
+    expect(await countBillPhotos(db)).toBe(0);
+  });
+
+  it('removes entries and lines that earlier versions left under deleted lists', async () => {
+    const db = await freshDb();
+    await addItems(db, DRAFT_IDS.audit, [cement]);
+    const jobId = await enqueueJob(db, { listId: 'gone', text: '', images: ['AAA'], category: '', captureDate: '2026-09-30' });
+    await db.run(`INSERT INTO bill_photos (id, created_at, images) VALUES ('p1', '2026-01-01', '["AAA"]')`);
+    await db.run(
+      `INSERT INTO items (id, list_id, item_name, original_term, quantity, unit, unit_price, total_amount, vendor, date, delivered_at, ordered_as, photo_id, created_at, updated_at)
+       VALUES ('orphan', 'gone', 'Sand', '', 1, 'Bag', 1, 1, '', '', '', '', 'p1', '2026-01-01', '2026-01-01')`,
+    );
+    expect(await removeOrphans(db)).toEqual({ jobs: 1, items: 1, quotes: 0 });
+    const snap = await loadSnapshot(db);
+    expect(snap.items.map((i) => i.item_name)).toEqual(['Cement']);
+    expect(snap.jobs).toEqual([]);
+    expect(await getJobImages(db, jobId)).toEqual([]);
+    expect(await countBillPhotos(db)).toBe(0);
+    // Nothing left to do on the next start.
+    expect(await removeOrphans(db)).toEqual({ jobs: 0, items: 0, quotes: 0 });
+  });
+
   it('clears deleted materials for good: rates deleted, saved lines kept but out of Rates', async () => {
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.audit, [cement, sand]);
@@ -628,5 +670,13 @@ describe('transaction', () => {
     });
     await expect(failing).rejects.toThrow('original');
     expect(await db.all('SELECT 1 AS one')).toEqual([{ one: 1 }]);
+  });
+
+  it('runs a script of several statements (migrations), even with a ";" inside a value, all or nothing', async () => {
+    const db = await freshDb();
+    await db.transaction((tx) => tx.exec("CREATE TABLE t (x TEXT); INSERT INTO t (x) VALUES ('a;b'); INSERT INTO t (x) VALUES ('c')"));
+    expect(await db.all('SELECT x FROM t ORDER BY x')).toEqual([{ x: 'a;b' }, { x: 'c' }]);
+    await expect(db.transaction((tx) => tx.exec("INSERT INTO t (x) VALUES ('d'); INSERT INTO nowhere VALUES (1)"))).rejects.toThrow();
+    expect(await db.all('SELECT COUNT(*) AS n FROM t')).toEqual([{ n: 2 }]);
   });
 });

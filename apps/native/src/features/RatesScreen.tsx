@@ -33,7 +33,7 @@ import { Field, NumberField } from '../components/ui/fields';
 import { Sheet, SheetHeader, SheetLabel, SheetOption } from '../components/ui/Sheet';
 import { Tabs } from '../components/ui/Tabs';
 import { shareFile, textToBase64 } from '../lib/files';
-import { plural } from '../lib/format';
+import { plural, rupees, rupeesWhole } from '../lib/format';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 
@@ -45,8 +45,6 @@ const SUB_TABS: { id: SubTab; label: string; about: string }[] = [
 ];
 
 const SORT_ICONS: Record<MaterialSort, IconName> = { newest: 'schedule', oldest: 'history', name: 'sort-by-alpha', nameDesc: 'sort-by-alpha' };
-const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
-const rupees2 = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
 /** The Rates tab: every price recorded in all projects, per material, to see how rates change over time. */
 export function RatesScreen() {
@@ -509,17 +507,17 @@ function PriceSummary({ item }: { item: MaterialEntry }) {
   if (item.variants.length > 1) {
     return (
       <View>
-        <Text style={price}>{item.minPrice === item.maxPrice ? inr(item.minPrice) : `${inr(item.minPrice)}–${inr(item.maxPrice)}`}</Text>
+        <Text style={price}>{item.minPrice === item.maxPrice ? rupeesWhole(item.minPrice) : `${rupeesWhole(item.minPrice)}–${rupeesWhole(item.maxPrice)}`}</Text>
         <Text style={[range, { fontFamily: undefined }]}>{item.variants.length} variants</Text>
       </View>
     );
   }
   return (
     <View>
-      <Text style={price}>{inr(item.latestPrice)}</Text>
+      <Text style={price}>{rupeesWhole(item.latestPrice)}</Text>
       {item.minPrice !== item.maxPrice && (
         <Text style={range}>
-          {inr(item.minPrice)}–{inr(item.maxPrice)}
+          {rupeesWhole(item.minPrice)}–{rupeesWhole(item.maxPrice)}
         </Text>
       )}
     </View>
@@ -540,10 +538,10 @@ function VariantList({ material }: { material: MaterialEntry }) {
             <Text style={{ fontSize: 12, color: c.gray500 }}>{plural(v.priceHistory.length, 'price')}</Text>
           </View>
           <View>
-            <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark, textAlign: 'right' }}>{v.priceHistory.length ? rupees2(v.latestPrice) : '—'}</Text>
+            <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark, textAlign: 'right' }}>{v.priceHistory.length ? rupees(v.latestPrice) : '—'}</Text>
             {v.minPrice !== v.maxPrice && (
               <Text style={{ fontVariant: ['tabular-nums'], fontSize: 12, color: c.gray500, textAlign: 'right' }}>
-                {rupees2(v.minPrice)}–{rupees2(v.maxPrice)}
+                {rupees(v.minPrice)}–{rupees(v.maxPrice)}
               </Text>
             )}
           </View>
@@ -616,7 +614,7 @@ function PriceRow({ point: p, first }: { point: MaterialEntry['priceHistory'][nu
       <View style={[{ paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.red50 }, border]}>
         <View style={{ flex: 1, minWidth: 0, opacity: 0.6 }}>
           <Text style={{ fontSize: 14, textDecorationLine: 'line-through', color: c.gray700 }}>
-            {new Date(p.date).toLocaleDateString('en-IN')} · {p.vendor} · {rupees2(p.price)}
+            {new Date(p.date).toLocaleDateString('en-IN')} · {p.vendor} · {rupees(p.price)}
           </Text>
           {p.itemId ? <Text style={{ fontSize: 12, color: c.gray600 }}>(line removed from the list)</Text> : null}
         </View>
@@ -631,7 +629,7 @@ function PriceRow({ point: p, first }: { point: MaterialEntry['priceHistory'][nu
         <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, color: c.gray700 }}>
           {new Date(p.date).toLocaleDateString('en-IN')} · {p.vendor}
         </Text>
-        <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupees2(p.price)}</Text>
+        <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupees(p.price)}</Text>
         {id && <Icon name="edit" size={12} color={c.gray500} />}
       </View>
       {variantLabel(p.variant) ? (

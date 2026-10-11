@@ -9,12 +9,22 @@ export interface SqlExecutor {
   run(sql: string, params?: SqlValue[]): Promise<void>;
 }
 
+/** Inside a transaction: also a script of several statements (migrations). */
+export interface Tx extends SqlExecutor {
+  exec(script: string): Promise<void>;
+}
+
 export interface Db extends SqlExecutor {
   /** Run `fn` atomically. Other callers wait until it finishes. */
-  transaction<T>(fn: (tx: SqlExecutor) => Promise<T>): Promise<T>;
+  transaction<T>(fn: (tx: Tx) => Promise<T>): Promise<T>;
   /** Execute a script of several statements (used for migrations). */
   exec(script: string): Promise<void>;
   close(): Promise<void>;
+  /**
+   * Call `fn` after every committed write: a `run`, an `exec`, or a transaction that wrote something
+   * (not one that only read, nor one rolled back). Whoever changes the data, the screens hear of it.
+   */
+  onWrite(fn: () => void): () => void;
 }
 
 /** Serialises access so a transaction never interleaves with other statements. */
@@ -34,36 +44,48 @@ export interface RawDriver {
   begin(): Promise<void>;
   commit(): Promise<void>;
   rollback(): Promise<void>;
-  /** Called after each committed write outside a transaction, and after each commit. */
-  afterWrite?(): void;
   close(): Promise<void>;
 }
 
 export function wrapDriver(driver: RawDriver): Db {
   const mutex = new Mutex();
-  const raw: SqlExecutor = {
-    all: async <T,>(sql: string, params: SqlValue[] = []) => (await driver.all(sql, params)) as T[],
-    run: (sql, params = []) => driver.run(sql, params),
+  const listeners = new Set<() => void>();
+  const wrote = () => {
+    for (const fn of listeners) {
+      // A listener's mistake must not make the write look failed: it is already committed.
+      try {
+        fn();
+      } catch {
+        // ignored
+      }
+    }
   };
+  const all = async <T,>(sql: string, params: SqlValue[] = []) => (await driver.all(sql, params)) as T[];
   return {
-    all: (sql, params) => mutex.lock(() => raw.all(sql, params)),
-    run: (sql, params) =>
+    all: (sql, params) => mutex.lock(() => all(sql, params)),
+    run: (sql, params = []) =>
       mutex.lock(async () => {
-        await raw.run(sql, params);
-        driver.afterWrite?.();
+        await driver.run(sql, params);
+        wrote();
       }),
     exec: (script) =>
       mutex.lock(async () => {
         await driver.exec(script);
-        driver.afterWrite?.();
+        wrote();
       }),
     transaction: (fn) =>
       mutex.lock(async () => {
+        let changed = false;
+        const tx: Tx = {
+          all,
+          run: (sql, params = []) => ((changed = true), driver.run(sql, params)),
+          exec: (script) => ((changed = true), driver.exec(script)),
+        };
         await driver.begin();
         try {
-          const result = await fn(raw);
+          const result = await fn(tx);
           await driver.commit();
-          driver.afterWrite?.();
+          if (changed) wrote();
           return result;
         } catch (err) {
           // Throw the original error even if the rollback fails too (SQLite may already have ended the transaction).
@@ -72,5 +94,9 @@ export function wrapDriver(driver: RawDriver): Db {
         }
       }),
     close: () => mutex.lock(() => driver.close()),
+    onWrite(fn) {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
   };
 }

@@ -8,12 +8,11 @@ import { useDialogs } from '../components/ui/Dialogs';
 import { Icon } from '../components/ui/Icon';
 import { Field, SuggestInput } from '../components/ui/fields';
 import { Sheet, SheetHeader } from '../components/ui/Sheet';
-import { plural } from '../lib/format';
+import { plural, rupeesWhole } from '../lib/format';
 import { haptic } from '../lib/haptics';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 
-const rupees = (n: number) => `₹${Math.round(n || 0).toLocaleString('en-IN')}`;
 
 /** Projects pinned to the top of the list, newest pin first. Kept on this phone (like the theme), not in backups. */
 const PINNED_PREF = 'nirmaan_pinned_projects';
@@ -65,7 +64,7 @@ export function ProjectsSheet({ onClose, onNew, onEdit, backEnabled = true }: { 
             <Text style={{ fontSize: 12, color: c.gray500 }}>
               {plural(s.lists, 'saved list')}
               {s.contracts > 0 && ` · ${plural(s.contracts, 'contract')}`}
-              {s.spent > 0 && ` · ${rupees(s.spent)}`}
+              {s.spent > 0 && ` · ${rupeesWhole(s.spent)}`}
             </Text>
           </View>
         </Pressable>

@@ -2,8 +2,8 @@ import { Text } from 'react-native';
 import Svg, { Polyline } from 'react-native-svg';
 import type { PricePoint } from '@nirman/shared';
 import { useColors } from '../theme';
+import { rupees } from '../lib/format';
 
-export const rupees = (n: number) => `₹${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 export const pct = (x: number) => `${x > 0 ? '+' : ''}${Math.round(x * 100)}%`;
 export const shortDate = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' });
 

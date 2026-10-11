@@ -32,7 +32,7 @@ import { Tabs } from '../components/ui/Tabs';
 import { pickBackupFile } from '../lib/backupFile';
 import { latestNotes } from '../lib/changelog';
 import { APP_VERSION } from '../lib/coreSetup';
-import { shareBytes, shareFile, textToBase64 } from '../lib/files';
+import { shareBackupZip, shareFile, textToBase64 } from '../lib/files';
 import { plural } from '../lib/format';
 import { look, onLookChange, setAccent, setThemeChoice, setThemeStyle, themeChoice, type ThemeChoice, type ThemeStyle } from '../lib/theme';
 import { useAppState } from '../state/AppState';
@@ -109,6 +109,8 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
   const { settings, actions } = useAppState();
   const [key, setKey] = useState(settings.geminiApiKey);
   const [model, setModel] = useState(settings.geminiModel);
+  // The model shown when this opened: saved only if the user picked another, so a replacement the worker found meanwhile stays.
+  const [startModel] = useState(settings.geminiModel);
   const [show, setShow] = useState(false);
   const [state, setState] = useState<{ kind: 'idle' | 'testing' | 'ok' | 'error'; message?: string }>({ kind: 'idle' });
   const [models, setModels] = useState<ModelOption[]>(FALLBACK_MODELS);
@@ -129,7 +131,8 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
   const dirty = key.trim() !== settings.geminiApiKey || (model.trim() || DEFAULT_MODEL) !== settings.geminiModel;
 
   const save = async () => {
-    await actions.saveSettings({ ...settings, geminiApiKey: key.trim(), geminiModel: model.trim() || DEFAULT_MODEL });
+    const picked = model.trim() || DEFAULT_MODEL;
+    await actions.saveSettings({ geminiApiKey: key.trim(), ...(picked !== startModel ? { geminiModel: picked } : {}) });
     setState({ kind: 'ok', message: 'Saved' });
     onSaved?.();
   };
@@ -300,7 +303,7 @@ function ReadingSection() {
   useEffect(() => {
     void actions.countTrainingSamples().then(setSamples);
   }, [actions]);
-  const set = (patch: Partial<typeof settings>) => actions.saveSettings({ ...settings, ...patch });
+  const set = (patch: Partial<typeof settings>) => actions.saveSettings(patch);
 
   const exportData = async () => {
     setBusy(true);
@@ -382,8 +385,7 @@ function BackupSection() {
   const doExport = async () => {
     setBusy(true);
     try {
-      const { bytes } = await actions.exportBackup();
-      await shareBytes(backupFilename(), bytes, 'application/zip');
+      await shareBackupZip(backupFilename(), (write) => actions.exportBackup(write));
       recordBackup();
       setLastBackup(describeLastBackup());
     } catch (err) {

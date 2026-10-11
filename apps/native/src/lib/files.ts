@@ -1,5 +1,5 @@
 import { cacheDirectory, deleteAsync, makeDirectoryAsync, writeAsStringAsync } from 'expo-file-system/legacy';
-import { shareAsync } from 'expo-sharing';
+import { File } from 'expo-file-system';
 import { bytesToBase64, type SharedFile } from '@nirman/core';
 import Nirman from '../../modules/nirman-native';
 
@@ -35,22 +35,30 @@ export async function shareFiles(files: SharedFile[]): Promise<void> {
   }
 }
 
-/** A large binary file (a backup .zip): written in pieces, so the whole file never sits in memory as base64 text. */
-export async function shareBytes(filename: string, bytes: Uint8Array, mimeType: string): Promise<void> {
+/**
+ * A backup .zip: written to the file piece by piece as `fill` makes it, then shared like every other file. The whole
+ * backup is never in memory. A file left half written by an error is deleted.
+ */
+export async function shareBackupZip<T>(filename: string, fill: (write: (chunk: Uint8Array) => void) => Promise<T>): Promise<T> {
   await makeDirectoryAsync(EXPORTS, { intermediates: true });
   const uri = `${EXPORTS}${filename.replace(/[^\w.-]+/g, '_')}`;
-  const CHUNK = 3 * 1024 * 1024; // a multiple of 3, so the base64 pieces join up
-  const { File } = await import('expo-file-system');
   const file = new File(uri);
   if (file.exists) file.delete();
   file.create();
-  const handle = file.open();
+  let result: T;
   try {
-    for (let at = 0; at < bytes.length; at += CHUNK) handle.writeBytes(bytes.subarray(at, at + CHUNK));
-  } finally {
-    handle.close();
+    const handle = file.open();
+    try {
+      result = await fill((chunk) => handle.writeBytes(chunk));
+    } finally {
+      handle.close();
+    }
+  } catch (err) {
+    if (file.exists) file.delete();
+    throw err;
   }
-  await shareAsync(uri, { mimeType, dialogTitle: 'Save or send' });
+  await Nirman.shareFiles([uri.replace(/^file:\/\//, '')], ['application/zip'], filename);
+  return result;
 }
 
 export function textToBase64(text: string): string {

@@ -3,7 +3,7 @@ import { Text, TextInput, View } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
 import { compareQuotes, normalizeTerm, parseAmount, variantDifferences, variantLabel, type QuoteLineRow, type QuoteRow, type VariantField } from '@nirman/shared';
 import type { QuoteLinePatch } from '@nirman/core';
-import { VsLastBadge, rupees } from '../components/PriceBadges';
+import { VsLastBadge } from '../components/PriceBadges';
 import { UndoButton } from '../components/UndoButton';
 import { VariantFields } from '../components/VariantFields';
 import { Button } from '../components/ui/Button';
@@ -11,7 +11,7 @@ import { useDialogs } from '../components/ui/Dialogs';
 import { Icon } from '../components/ui/Icon';
 import { Select } from '../components/ui/Select';
 import { Label } from '../components/ui/fields';
-import { plural } from '../lib/format';
+import { plural, rupees } from '../lib/format';
 import { useAppState, type HistoryRecord } from '../state/AppState';
 import { useColors } from '../theme';
 

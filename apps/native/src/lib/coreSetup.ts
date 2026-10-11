@@ -27,7 +27,6 @@ configureCore({
       app: APP_VERSION,
       android: constants.Release ?? String(Platform.Version),
       phone: constants.Model ?? 'n/a',
-      webview: 'n/a',
       screen: `${Math.round(width)}×${Math.round(height)}`,
     };
   },

@@ -7,3 +7,4 @@ export * from './billParser.ts';
 export * from './quoteMatch.ts';
 export * from './catalog.ts';
 export * from './palette.ts';
+export * from './format.ts';

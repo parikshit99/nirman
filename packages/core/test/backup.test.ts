@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BackupError, exportBackup, exportBackupZip, parseBackup, parseBackupFile, restoreBackup } from '../src/data/backup.ts';
+import { BackupError, exportBackup, exportBackupZip, writeBackupZip, parseBackup, parseBackupFile, restoreBackup } from '../src/data/backup.ts';
 import { getBillPhotos } from '../src/data/repo.ts';
 import {
   addCategory,
@@ -90,6 +90,34 @@ describe('backup', () => {
     const old = parseBackupFile(new TextEncoder().encode(JSON.stringify(await exportBackup(source))));
     expect([old.backup.items.length, old.photos.size]).toEqual([file.backup.items.length, 0]);
     expect(() => parseBackupFile(new Uint8Array([0x50, 0x4b, 1, 2]))).toThrow(/damaged/);
+  });
+
+  it('writes the .zip piece by piece, one bill at a time, and restores every photo', async () => {
+    const source = await populated();
+    const page = (n: number) => btoa(String.fromCharCode(0xff, 0xd8, n, n, n));
+    for (let n = 0; n < 5; n++) {
+      await source.run('INSERT INTO bill_photos (id, created_at, images) VALUES (?, ?, ?)', [`ph${n}`, `2026-09-30T10:00:0${n}.000Z`, JSON.stringify([page(n), page(n + 10)])]);
+      await source.run(
+        `INSERT INTO items (id, list_id, item_name, original_term, quantity, unit, unit_price, total_amount, vendor, date, delivered_at, ordered_as, photo_id, created_at, updated_at)
+         VALUES (?, 'draft-audit', 'Sand', '', 1, 'Bag', 1, 1, '', '', '', '', ?, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`,
+        [`line${n}`, `ph${n}`],
+      );
+    }
+    const chunks: Uint8Array[] = [];
+    // Each photo is read on its own, never all in one query.
+    const read: string[] = [];
+    const all = source.all.bind(source);
+    source.all = ((sql: string, params?: (string | number | null)[]) => (read.push(sql), all(sql, params))) as typeof source.all;
+    expect(await writeBackupZip(source, (c) => chunks.push(c))).toEqual({ photos: 5 });
+    expect(read.filter((q) => /SELECT .*images/.test(q))).toEqual(Array(5).fill('SELECT images FROM bill_photos WHERE id = ?'));
+    expect(chunks.length).toBeGreaterThan(5);
+
+    const bytes = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+    chunks.reduce((at, c) => (bytes.set(c, at), at + c.length), 0);
+    const file = parseBackupFile(bytes);
+    const target = await freshDb();
+    await restoreBackup(target, file.backup, file.photos);
+    for (let n = 0; n < 5; n++) expect(await getBillPhotos(target, `ph${n}`)).toEqual([page(n), page(n + 10)]);
   });
 
   it('rejects other files without touching the data', async () => {

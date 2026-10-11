@@ -25,7 +25,7 @@ import { Sheet } from '../components/ui/Sheet';
 import { plural } from '../lib/format';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
-import { rupees } from './LabourScreen';
+import { rupeesWhole } from '../lib/format';
 import { StatementSheet } from './StatementSheet';
 
 const KIND_LABEL: Record<ContractEntryKind, string> = { work: 'Work done', payment: 'Payment', advance: 'Advance (kharcha)', deduction: 'Deduction' };
@@ -48,7 +48,7 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
   const closeContract = async () => {
     const release = t.retention > 0;
     const ok = await dialogs.confirm('Close this contract?', {
-      message: `It moves to Closed; entries can still be added.${release ? ` The retention held (${rupees(t.retention)}) is released today and becomes due.` : ''}`,
+      message: `It moves to Closed; entries can still be added.${release ? ` The retention held (${rupeesWhole(t.retention)}) is released today and becomes due.` : ''}`,
       confirmLabel: 'Close contract',
     });
     if (ok) await actions.setContractStatus(contract.id, 'closed', release ? todayISO() : '');
@@ -83,7 +83,7 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
             </Text>
             <Text style={{ fontSize: 14, color: c.gray700 }}>{contract.work || 'Work not described'}</Text>
             <Text style={{ fontSize: 12, color: c.gray500 }}>{[contract.address, contract.category, contract.start_date && `from ${contract.start_date}`].filter(Boolean).join(' · ')}</Text>
-            <Text style={{ fontSize: 12, color: c.gray500 }}>{describeTerms(contract, rupees)}</Text>
+            <Text style={{ fontSize: 12, color: c.gray500 }}>{describeTerms(contract, rupeesWhole)}</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             {!!contract.phone && (
@@ -98,17 +98,17 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
         </View>
 
         <View accessibilityLabel="Contract totals" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {stat('Work done', rupees(t.workDone), t.progress !== null ? `${Math.round(t.progress * 100)}% of ${rupees(t.value)}` : undefined)}
-          {stat('Paid', rupees(t.paid))}
+          {stat('Work done', rupeesWhole(t.workDone), t.progress !== null ? `${Math.round(t.progress * 100)}% of ${rupeesWhole(t.value)}` : undefined)}
+          {stat('Paid', rupeesWhole(t.paid))}
           {stat(
             t.balance < 0 ? 'Paid ahead of work' : t.balance > 0 ? 'Balance due' : 'Balance',
-            <Text style={{ color: t.balance < 0 ? c.red600 : t.balance > 0 ? c.gray900 : c.green700 }}>{t.balance ? rupees(Math.abs(t.balance)) : 'Settled'}</Text>,
+            <Text style={{ color: t.balance < 0 ? c.red600 : t.balance > 0 ? c.gray900 : c.green700 }}>{t.balance ? rupeesWhole(Math.abs(t.balance)) : 'Settled'}</Text>,
           )}
-          {t.advances > 0 && stat('Advances (kharcha)', rupees(t.advances), 'in Paid')}
+          {t.advances > 0 && stat('Advances (kharcha)', rupeesWhole(t.advances), 'in Paid')}
           {contract.retention_pct > 0 &&
             stat(
               'Retention',
-              rupees(t.retention),
+              rupeesWhole(t.retention),
               contract.retention_released_at ? (
                 <Text style={{ textDecorationLine: 'underline' }} onPress={() => actions.setRetentionReleased(contract.id, '')}>
                   released {contract.retention_released_at} · hold again
@@ -119,7 +119,7 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
                 </Text>
               ),
             )}
-          {t.deductions > 0 && stat('Deductions', rupees(t.deductions))}
+          {t.deductions > 0 && stat('Deductions', rupeesWhole(t.deductions))}
         </View>
 
         {entryForm ? (
@@ -160,7 +160,7 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
                     </Pressable>
                     <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '700', color: e.kind === 'work' ? c.gray800 : isPaidOut(e.kind) ? c.green700 : c.red600 }}>
                       {e.kind === 'work' ? '+' : '−'}
-                      {rupees(value)}
+                      {rupeesWhole(value)}
                     </Text>
                     {pending ? (
                       <UndoButton onUndo={() => actions.undoDelete(e.id)} label={KIND_LABEL[e.kind]} />
@@ -241,7 +241,7 @@ function EntryForm({ contract, kind, entry, onDone }: { contract: ContractRow; k
           <DateField label="Date" value={date} onChange={setDate} />
         </View>
       </View>
-      {isWork && preview > 0 && <Text style={{ fontSize: 12, color: c.gray600 }}>Worth {rupees(preview)}</Text>}
+      {isWork && preview > 0 && <Text style={{ fontSize: 12, color: c.gray600 }}>Worth {rupeesWhole(preview)}</Text>}
       {isPaidOut(kind) && (
         <View accessibilityLabel="Paid by" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
           {paymentModes.map((m) => (

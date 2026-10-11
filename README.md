@@ -1,5 +1,7 @@
 # Nirman
 
+> **A personal side project.** Nirman was vibe coded (built mostly with AI coding tools) for my own use on my construction sites. You are welcome to use it, copy it and change it, but **not to sell it**, or sell a product or service built mainly on it. See [LICENSE](LICENSE) (MIT with the Commons Clause). It comes with no warranty or support: back up your data.
+
 An Android app for tracking construction materials on site. You photograph bills or handwritten notes, dictate (English or Hindi) or type what was bought. Google Gemini reads it and turns it into clean line items: Hindi/Hinglish terms become standard English names and units. The app keeps:
 
 - a **purchase log** with rates, totals and vendors;
@@ -9,7 +11,7 @@ An Android app for tracking construction materials on site. You photograph bills
 
 Everything is stored **only on your phone**. There is no server or account. The app keeps a small diagnostic log (errors, AI reading results, steps taken, slow screens; never bill contents, prices, addresses or keys), which leaves the phone only when you send it from *Settings → Report a problem* or *Share log*.
 
-**[⬇ Download the latest APK](https://github.com/parikshit99/nirman/releases/download/latest/nirman.apk)**: rebuilt automatically every time a change is merged into `main`. While this repository is private, you need to be signed in to GitHub for the link to work.
+**[⬇ Download the latest APK](https://github.com/parikshit99/nirman/releases/download/latest/nirman.apk)**: rebuilt automatically every time a change is merged into `main`.
 
 ## How it works
 
@@ -82,3 +84,11 @@ Versions are `MAJOR.MINOR.PATCH` (e.g. `2.2.3`):
 [docs/Code guideline.md](docs/Code%20guideline.md) has the rules for deciding which kind a change is. Android's internal version code is the CI build number, so every APK still installs over the previous one as an update. The version shows in *Settings → On this phone*, in Android's App info, in the release title, and as a `v2.2.3` tag on the commit it was built from. Local builds show `dev`.
 
 CI (`.github/workflows/ci.yml`) type-checks, runs the tests and builds a release APK on every push, signed with the key in the repo secrets `RELEASE_KEYSTORE_BASE64` (the PKCS12 keystore, base64) and `RELEASE_KEYSTORE_PASSWORD` (key alias `nirman`). Keep a copy of that keystore somewhere safe: without it, the next update needs an uninstall. Builds of `main` are published to the [`latest` release](https://github.com/parikshit99/nirman/releases/tag/latest), which is where the download link above points. The [last 5 builds](https://github.com/parikshit99/nirman/releases) are also kept as `v4.3.2`-style releases, to go back to in an emergency: Android won't install an older version over a newer one, so *Settings → Save backup*, uninstall, install the older APK and *Restore* (a backup made by a newer version may not restore in an older one if the data format changed in between). Builds of a pull request are under that workflow run's *Artifacts*. CI signs every APK with the release key and the rotation record from the old debug key (`.github/keys/debug.keystore`), which phones that once had a debug-signed build need; keep that file too.
+
+## License
+
+MIT with the [Commons Clause](https://commonsclause.com): free to use, copy, change and share, but not to sell, or to sell a product or service (hosting, support, a paid app) whose value comes mainly from Nirman. Full text in [LICENSE](LICENSE).
+
+## Security
+
+Your Gemini API key stays on your phone (Android Keystore) and is never put in the app or this repository; CI fails a build that contains anything that looks like one. If you find a security problem, please report it privately through GitHub's *Security → Report a vulnerability* on this repository rather than in an issue.

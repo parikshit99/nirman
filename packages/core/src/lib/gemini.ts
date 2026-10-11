@@ -13,7 +13,6 @@ import {
   type ExtractionRequest,
   type QuoteExtractionRequest,
 } from '@nirman/shared';
-import { loadConversions } from './conversionSettings.ts';
 
 export interface Extractor {
   extract(req: ExtractionRequest): Promise<MaterialInput[]>;
@@ -239,7 +238,7 @@ export function createGeminiExtractor(apiKey: string, model: string, onModelRepl
         buildSystemInstruction({ learning: req.learning, materials: req.materials, category: req.category, captureDate: req.capture_date }),
         RESPONSE_SCHEMA,
       );
-      return parseExtractionOutput(output, loadConversions());
+      return parseExtractionOutput(output, req.conversions);
     },
     async extractQuote(req) {
       const output = await generate(

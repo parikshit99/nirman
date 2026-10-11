@@ -1,3 +1,4 @@
+import { formatQty } from './format.ts';
 import type { ContractEntryRow, ContractRow } from './schemas.ts';
 
 // ---------------------------------------------------------------------------
@@ -88,12 +89,11 @@ const PAYMENT_MODES: Record<string, string> = { cash: 'Cash', upi: 'UPI', bank: 
 export const paymentModes = Object.keys(PAYMENT_MODES);
 export const paymentModeLabel = (mode: string) => PAYMENT_MODES[mode] ?? mode;
 
-const num = (n: number) => Number(n.toFixed(3)).toLocaleString('en-IN');
 
 /** One line describing an entry, e.g. "Work: 120 sqft" or "Payment (UPI) - advance". */
 export function describeEntry(c: ContractRow, e: ContractEntryRow): string {
   const note = e.note.trim() ? ` - ${e.note.trim()}` : '';
-  if (e.kind === 'work') return `Work: ${c.kind === 'rate' ? `${num(e.quantity)} ${c.unit || 'unit'} @ ${num(c.rate)}` : `${num(e.quantity)}% of the job`}${note}`;
+  if (e.kind === 'work') return `Work: ${c.kind === 'rate' ? `${formatQty(e.quantity)} ${c.unit || 'unit'} @ ${formatQty(c.rate)}` : `${formatQty(e.quantity)}% of the job`}${note}`;
   if (e.kind === 'payment') return `Payment${e.mode ? ` (${paymentModeLabel(e.mode)})` : ''}${note}`;
   if (e.kind === 'advance') return `Advance (kharcha)${e.mode ? `, ${paymentModeLabel(e.mode)}` : ''}${note}`;
   return `Deduction${note}`;
@@ -103,9 +103,9 @@ export function describeEntry(c: ContractRow, e: ContractEntryRow): string {
 export function describeTerms(c: ContractRow, money: (n: number) => string): string {
   const terms =
     c.kind === 'rate'
-      ? `${money(c.rate)} per ${c.unit || 'unit'}${c.est_quantity > 0 ? `, about ${num(c.est_quantity)} ${c.unit || 'unit'} (${money(contractValue(c))})` : ''}`
+      ? `${money(c.rate)} per ${c.unit || 'unit'}${c.est_quantity > 0 ? `, about ${formatQty(c.est_quantity)} ${c.unit || 'unit'} (${money(contractValue(c))})` : ''}`
       : `Lump sum ${money(c.amount)}`;
-  return c.retention_pct > 0 ? `${terms}; ${num(c.retention_pct)}% retention` : terms;
+  return c.retention_pct > 0 ? `${terms}; ${formatQty(c.retention_pct)}% retention` : terms;
 }
 
 export interface StatementRow {

@@ -282,8 +282,7 @@ export async function deleteProject(db: Db, id: string) {
   await db.transaction(async (tx) => {
     const lists = `SELECT id FROM lists WHERE project_id = ?`;
     await deleteQuotesWhere(tx, `boq_id IN (${lists})`, [id]);
-    await tx.run(`DELETE FROM job_images WHERE job_id IN (SELECT id FROM jobs WHERE list_id IN (${lists}))`, [id]);
-    await tx.run(`DELETE FROM jobs WHERE list_id IN (${lists})`, [id]);
+    await deleteJobsWhere(tx, `list_id IN (${lists})`, [id]);
     await tx.run(`DELETE FROM items WHERE list_id IN (${lists})`, [id]);
     await tx.run('DELETE FROM lists WHERE project_id = ?', [id]);
     await tx.run('DELETE FROM contract_entries WHERE contract_id IN (SELECT id FROM contracts WHERE project_id = ?)', [id]);
@@ -515,6 +514,8 @@ export async function renameList(db: Db, id: string, title: string) {
 export async function deleteList(db: Db, id: string) {
   await db.transaction(async (tx) => {
     await deleteQuotesWhere(tx, 'boq_id = ?', [id]);
+    // Entries still waiting to be read into it go too, or their lines would land in a list that is gone.
+    await deleteJobsWhere(tx, 'list_id = ?', [id]);
     await tx.run('DELETE FROM items WHERE list_id = ?', [id]);
     await tx.run('DELETE FROM lists WHERE id = ?', [id]);
     await pruneBillPhotos(tx);
@@ -526,6 +527,7 @@ export async function deleteAllHistory(db: Db, projectId: string) {
   await db.transaction(async (tx) => {
     const saved = `SELECT id FROM lists WHERE status = 'saved' AND project_id = ?`;
     await deleteQuotesWhere(tx, `boq_id IN (${saved})`, [projectId]);
+    await deleteJobsWhere(tx, `list_id IN (${saved})`, [projectId]);
     await tx.run(`DELETE FROM items WHERE list_id IN (${saved})`, [projectId]);
     await tx.run(`DELETE FROM lists WHERE status = 'saved' AND project_id = ?`, [projectId]);
     await pruneBillPhotos(tx);
@@ -911,12 +913,18 @@ export async function retryJob(db: Db, jobId: string) {
   await db.run(`UPDATE jobs SET status = 'pending', error = NULL, attempts = 0 WHERE id = ?`, [jobId]);
 }
 
-/** Store the extracted items and drop the job in one step. */
-/** Store the extracted items and drop the job in one step; returns the new items' ids. */
+/**
+ * Store the extracted items and drop the job in one step; returns the new items' ids. None when the job was
+ * deleted while it was read, or its list was (the job is dropped then: there is nowhere to put its lines).
+ */
 export async function completeJob(db: Db, jobId: string, materials: MaterialInput[]): Promise<string[]> {
   return db.transaction(async (tx) => {
     const [job] = await tx.all<Job>('SELECT * FROM jobs WHERE id = ?', [jobId]);
     if (!job) return [];
+    if (!(await getRow(tx, 'lists', job.list_id))) {
+      await deleteJobsWhere(tx, 'id = ?', [jobId]);
+      return [];
+    }
     // Keep the bill photos with the lines they became, so they can be checked against the bill later.
     const images = await tx.all<{ data: string }>('SELECT data FROM job_images WHERE job_id = ? ORDER BY idx', [jobId]);
     let photoId = '';
@@ -997,8 +1005,41 @@ export async function deleteJob(db: Db, jobId: string) {
   await db.transaction(async (tx) => {
     const [job] = await tx.all<Job>('SELECT * FROM jobs WHERE id = ?', [jobId]);
     if (job?.quote_id) await deleteQuotesWhere(tx, 'id = ?', [job.quote_id]);
-    await tx.run('DELETE FROM job_images WHERE job_id = ?', [jobId]);
-    await tx.run('DELETE FROM jobs WHERE id = ?', [jobId]);
+    await deleteJobsWhere(tx, 'id = ?', [jobId]);
+  });
+}
+
+/** Queued entries matching `where` (on `jobs`), with their photos. */
+async function deleteJobsWhere(tx: SqlExecutor, where: string, params: SqlValue[] = []) {
+  await tx.run(`DELETE FROM job_images WHERE job_id IN (SELECT id FROM jobs WHERE ${where})`, params);
+  await tx.run(`DELETE FROM jobs WHERE ${where}`, params);
+}
+
+/**
+ * Clean up what earlier versions could leave when a list was deleted while an entry for it was still queued: the
+ * entry stayed, and once read, its lines were stored under the deleted list, where nothing shows them. Removes those
+ * entries and lines, quotes of BOQs that are gone, and the bill photos only they used. Returns how many rows went.
+ */
+export async function removeOrphans(db: Db): Promise<{ jobs: number; items: number; quotes: number }> {
+  return db.transaction(async (tx) => {
+    const count = async (sql: string) => (await tx.all<{ n: number }>(`SELECT COUNT(*) AS n FROM ${sql}`))[0]?.n ?? 0;
+    const noList = 'list_id NOT IN (SELECT id FROM lists)';
+    const found = {
+      jobs: await count(`jobs WHERE ${noList} OR (quote_id IS NOT NULL AND quote_id NOT IN (SELECT id FROM quotes))`),
+      items: await count(`items WHERE ${noList}`),
+      quotes: await count('quotes WHERE boq_id NOT IN (SELECT id FROM lists)'),
+    };
+    if (!found.jobs && !found.items && !found.quotes) {
+      // Photos of entries that are gone (nothing else to do on almost every start).
+      await tx.run('DELETE FROM job_images WHERE job_id NOT IN (SELECT id FROM jobs)');
+      return found;
+    }
+    await deleteQuotesWhere(tx, 'boq_id NOT IN (SELECT id FROM lists)');
+    await deleteJobsWhere(tx, `${noList} OR (quote_id IS NOT NULL AND quote_id NOT IN (SELECT id FROM quotes))`);
+    await tx.run('DELETE FROM job_images WHERE job_id NOT IN (SELECT id FROM jobs)');
+    await tx.run(`DELETE FROM items WHERE ${noList}`);
+    await pruneBillPhotos(tx);
+    return found;
   });
 }
 
@@ -1109,6 +1150,10 @@ export async function completeQuoteJob(db: Db, jobId: string, input: QuoteLineIn
   await db.transaction(async (tx) => {
     const [job] = await tx.all<Job>('SELECT * FROM jobs WHERE id = ?', [jobId]);
     if (!job?.quote_id) return;
+    if (!(await getRow(tx, 'quotes', job.quote_id))) {
+      await deleteJobsWhere(tx, 'id = ?', [jobId]);
+      return;
+    }
     await tx.run('DELETE FROM quote_lines WHERE quote_id = ?', [job.quote_id]);
     for (const [position, l] of lines.entries()) {
       await writeRow(tx, 'quote_lines', {

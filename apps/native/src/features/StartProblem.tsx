@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BackupError, backupFilename, exportBackupZip, logError, parseBackupFile, recordBackup, type BackupFile } from '@nirman/core';
+import { BackupError, backupFilename, writeBackupZip, logError, parseBackupFile, recordBackup, type BackupFile } from '@nirman/core';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { Icon } from '../components/ui/Icon';
 import { openNirmanDb } from '../data/db';
 import type { StartProblem as Problem } from '../data/startup';
 import { pickBackupFile } from '../lib/backupFile';
-import { shareBytes } from '../lib/files';
+import { shareBackupZip } from '../lib/files';
 import { plural } from '../lib/format';
 import { useColors } from '../theme';
 
@@ -70,8 +70,7 @@ export function StartProblem({ problem, onRestore, onContinue }: { problem: Prob
     try {
       const db = await openNirmanDb();
       try {
-        const { bytes } = await exportBackupZip(db);
-        await shareBytes(backupFilename(), bytes, 'application/zip');
+        await shareBackupZip(backupFilename(), (write) => writeBackupZip(db, write));
         recordBackup();
       } finally {
         await db.close();
