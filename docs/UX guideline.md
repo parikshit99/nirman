@@ -54,7 +54,7 @@ Never an alert for something that just worked. Never a silent failure: if someth
 ## Deleting
 
 Deleting is never silent:
-- **Use Undo** where possible: the `…Later` actions take the row away and show `dialogs.undoable` (the strip with *Undo* and a countdown).
+- **Use Undo** where possible: the `…Later` actions take the row away and show `dialogs.undoable` (the strip with *Undo* and a countdown). Waiting deletes are carried out when the app goes to the background and before a backup, and forgotten when a backup is restored (`createPendingDeletes`).
 - **Otherwise ask first** with a `danger` confirm: a saved list, a contract, clearing a draft, delete all.
 
 Where Delete lives:

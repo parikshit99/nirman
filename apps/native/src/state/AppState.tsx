@@ -1,4 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { AppState as RNAppState } from 'react-native';
 import {
   buildItemDatabase,
   unusedHiddenMaterials,
@@ -11,6 +12,7 @@ import {
   type QuoteRow,
 } from '@nirman/shared';
 import {
+  createPendingDeletes,
   createReloader,
   exportBackupZip,
   parseBackupFile,
@@ -134,30 +136,23 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
   const refresh = reloader.reload;
 
   // Deletes wait UNDO_MS so they can be undone; meanwhile the row shows struck through.
-  const pending = useRef(new Map<string, { timer: ReturnType<typeof setTimeout>; commit: () => Promise<void> }>());
   const [pendingDeletes, setPendingDeletes] = useState<ReadonlySet<string>>(new Set());
-  const syncPending = useCallback(() => setPendingDeletes(new Set(pending.current.keys())), []);
-  const finishDelete = useCallback(
-    async (id: string) => {
-      const entry = pending.current.get(id);
-      if (!entry) return;
-      clearTimeout(entry.timer);
-      pending.current.delete(id);
-      syncPending();
-      await entry.commit();
-      await refresh();
-    },
-    [refresh, syncPending],
-  );
+  const pending = useMemo(() => createPendingDeletes(UNDO_MS, setPendingDeletes), []);
   const deleteLater = useCallback(
-    (commit: (db: Db, id: string) => Promise<void>) => (id: string) => {
-      if (pending.current.has(id)) return;
-      const timer = setTimeout(() => void finishDelete(id), UNDO_MS);
-      pending.current.set(id, { timer, commit: () => commit(db, id) });
-      syncPending();
-    },
-    [db, finishDelete, syncPending],
+    (commit: (db: Db, id: string) => Promise<void>) => (id: string) =>
+      pending.add(id, async () => {
+        await commit(db, id);
+        await refresh();
+      }),
+    [db, pending, refresh],
   );
+  // Android may close the app once it is in the background: carry out waiting deletes before that.
+  useEffect(() => {
+    const sub = RNAppState.addEventListener('change', (s) => {
+      if (s === 'background') pending.flush().catch((err) => logError(err, 'flushDeletes'));
+    });
+    return () => sub.remove();
+  }, [pending]);
 
   // Any committed write (the worker, a screen, a restore) reloads what is shown.
   useEffect(
@@ -245,15 +240,9 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       deleteItemLater: deleteLater(repo.deleteItem),
       deleteQuoteLineLater: deleteLater(repo.deleteQuoteLine),
       deleteIndexedRateLater: deleteLater(repo.deleteIndexedRate),
-      undoDelete(id: string) {
-        const entry = pending.current.get(id);
-        if (!entry) return;
-        clearTimeout(entry.timer);
-        pending.current.delete(id);
-        syncPending();
-      },
+      undoDelete: (id: string) => pending.undo(id),
       /** Carry out waiting deletes now, e.g. before saving, exporting or leaving a screen. */
-      flushDeletes: () => Promise.all([...pending.current.keys()].map(finishDelete)).then(() => undefined),
+      flushDeletes: () => pending.flush(),
       updateQuote: write(repo.updateQuote),
       updateQuoteLine: write(repo.updateQuoteLine),
       deleteQuoteLine: write(repo.deleteQuoteLine),
@@ -284,17 +273,23 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
         setSettings(next);
         worker.schedule();
       },
-      exportBackup: () => exportBackupZip(db),
+      /** Deletes still waiting for Undo are carried out first, so the backup doesn't bring them back. */
+      async exportBackup() {
+        await pending.flush();
+        return exportBackupZip(db);
+      },
       countTrainingSamples: () => repo.countTrainingSamples(db),
       exportTrainingData: () => repo.exportTrainingData(db),
       clearTrainingSamples: () => repo.clearTrainingSamples(db),
       parseBackup: parseBackupFile,
       async restoreBackup({ backup, photos }: BackupFile) {
+        // The restore replaces everything: deletes waiting for Undo were for data that is gone.
+        pending.cancelAll();
         await restoreBackup(db, backup, photos);
         await refresh();
       },
     }, ['flushDeletes', 'processQueue', 'parseBackup', 'getBillPhotos', 'getBillPhotoCovers']),
-    [db, worker, settingsRef, refresh, write, deleteLater, finishDelete, syncPending, openProject],
+    [db, worker, settingsRef, refresh, write, deleteLater, pending, openProject],
   );
 
   const derived = useMemo(() => {

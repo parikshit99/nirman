@@ -12,7 +12,7 @@ From the architecture audit of October 2026 (after #107). Each phase is one comm
 - No training sample when nothing was stored (the entry was deleted while being read).
 - At start, `removeOrphans` cleans what earlier versions left: entries and lines of lists that no longer exist, then the photos only they used.
 
-## Phase 2: Deletes waiting for Undo ⏳
+## Phase 2: Deletes waiting for Undo ✅
 
 **Problem.** A swiped-away row is deleted 10 seconds later by a timer that holds `deleteX(id)`. A restore inside those seconds is followed by the timer deleting the restored row with the same id. A backup inside them still contains the row. If the app is closed inside them, the delete never happens.
 

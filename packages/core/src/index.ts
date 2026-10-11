@@ -4,6 +4,7 @@ export * from './data/sql.ts';
 export * from './data/schema.ts';
 export * from './data/repo.ts';
 export * from './data/reloader.ts';
+export * from './data/pendingDeletes.ts';
 export * from './data/backup.ts';
 export * from './jobs/worker.ts';
 export * from './lib/gemini.ts';
