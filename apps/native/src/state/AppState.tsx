@@ -11,6 +11,7 @@ import {
   type QuoteRow,
 } from '@nirman/shared';
 import {
+  createReloader,
   exportBackupZip,
   parseBackupFile,
   restoreBackup,
@@ -128,7 +129,9 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
   const [status, setStatus] = useState<WorkerStatus>(worker.status);
   const [settings, setSettings] = useState<Settings>(settingsRef.current);
 
-  const refresh = useCallback(async () => setSnapshot(await timed('loadSnapshot', () => repo.loadSnapshot(db))), [db]);
+  // Reloads in order, once per write, so a slower older read never replaces a newer one.
+  const reloader = useMemo(() => createReloader(() => timed('loadSnapshot', () => repo.loadSnapshot(db)), setSnapshot), [db]);
+  const refresh = reloader.reload;
 
   // Deletes wait UNDO_MS so they can be undone; meanwhile the row shows struck through.
   const pending = useRef(new Map<string, { timer: ReturnType<typeof setTimeout>; commit: () => Promise<void> }>());
@@ -156,7 +159,14 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
     [db, finishDelete, syncPending],
   );
 
-  useEffect(() => onDataChanged(() => void refresh()), [onDataChanged, refresh]);
+  // Any committed write (the worker, a screen, a restore) reloads what is shown.
+  useEffect(
+    () =>
+      onDataChanged(() => {
+        reloader.wrote().catch((err) => logError(err, 'refresh'));
+      }),
+    [onDataChanged, reloader],
+  );
   useEffect(
     () =>
       worker.subscribe(() => {
@@ -167,7 +177,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
     [worker, settingsRef],
   );
 
-  /** Wrap a repository write so the UI refreshes afterwards. */
+  /** Wrap a repository write so it resolves once the UI shows it (joining the reload its write started). */
   const write = useCallback(
     <A extends unknown[], R>(fn: (db: Db, ...args: A) => Promise<R>) =>
       async (...args: A): Promise<R> => {

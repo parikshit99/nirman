@@ -22,7 +22,7 @@ function setup(
       extract: (req) => (calls.push(req), behaviour(req)),
       extractQuote: (req) => (quoteCalls.push(req), quoteBehaviour(req)),
     };
-    const worker = new JobWorker(db, () => settings, () => {}, (key) => (keys.push(key), extractor), undefined, readPhoto);
+    const worker = new JobWorker(db, () => settings, (key) => (keys.push(key), extractor), undefined, readPhoto);
     return { db, worker, calls, quoteCalls, keys, settings };
   });
 }

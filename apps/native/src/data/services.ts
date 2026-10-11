@@ -15,11 +15,9 @@ export async function startServices(db: Db): Promise<{ services: Services; initi
   await resetStuckJobs(db);
 
   const settings = { current: await settingsStore.load() };
-  const dataListeners = new Set<() => void>();
   const worker = new JobWorker(
     db,
     () => settings.current,
-    () => dataListeners.forEach((fn) => fn()),
     undefined,
     // Remember a replacement model so the next reading doesn't look it up again.
     (geminiModel) => {
@@ -32,10 +30,8 @@ export async function startServices(db: Db): Promise<{ services: Services; initi
     db,
     worker,
     settings,
-    onDataChanged(fn) {
-      dataListeners.add(fn);
-      return () => dataListeners.delete(fn);
-    },
+    // Every committed write, by the worker, a screen or a restore.
+    onDataChanged: (fn) => db.onWrite(fn),
   };
   const initial = await loadSnapshot(db);
   logPerf('startup', performance.now() - started, { lists: initial.lists.length, items: initial.items.length, rates: initial.rates.length });

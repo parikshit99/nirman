@@ -12,7 +12,7 @@ async function readWith(lines: ReturnType<typeof line>[]) {
   const db = await freshDb();
   const calls: ExtractionRequest[] = [];
   const extractor: Extractor = { extract: async (req) => (calls.push(req), lines), extractQuote: async () => [] };
-  const worker = new JobWorker(db, () => ({ ...DEFAULT_SETTINGS, geminiApiKey: 'AIza-test', readingMode: 'gemini' }), () => {}, () => extractor);
+  const worker = new JobWorker(db, () => ({ ...DEFAULT_SETTINGS, geminiApiKey: 'AIza-test', readingMode: 'gemini' }), () => extractor);
   const read = async () => {
     await enqueueJob(db, { listId: DRAFT_IDS.audit, text: 'bill', images: [], category: 'Civil', captureDate: '2026-10-01' });
     await worker.run();
