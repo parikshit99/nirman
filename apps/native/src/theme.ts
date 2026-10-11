@@ -20,6 +20,8 @@ export const light = {
   /** The ripple on red buttons (white text in both modes). */
   rippleOnDanger: '#ffffff3d',
   white: '#ffffff',
+  /** Things that float over a list (the buttons above Add, their labels, dialogs): lighter than the cards in dark mode. */
+  raised: '#ffffff',
   brandDark: '#121212',
   brandGray: '#f5f5f5',
   brandConcrete: '#e4e3e0',
@@ -74,6 +76,7 @@ export const dark: Colors = {
   ripple: '#ffffff24',
   rippleOnPrimary: '#16181c3d',
   white: '#16181c',
+  raised: '#26292e',
   brandGray: '#0c0d10',
   brandDark: '#eaebed',
   brandConcrete: '#313337',

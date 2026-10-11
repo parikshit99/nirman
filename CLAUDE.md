@@ -15,4 +15,5 @@ Rules that always apply:
 - Decide the version size of every change (Code guideline, *Versions*). Fixes need nothing; a feature bumps the minor number in `apps/native/package.json` and adds a CHANGELOG section.
 - Never put the Gemini API key in the app or the repo. Never log photos or the key.
 - Keep internal ids unchanged (app id, `nirmaan` database names, backup `APP_ID`, signing key), so existing installs keep their data.
+- No `Co-authored-by` or `Claude-Session` lines at the end of commit messages, and no "Generated with Claude Code" footer or session link at the end of PR descriptions.
 - Times shown to the user are in IST. Claude: give every time in IST (UTC+5:30) when talking to the owner too (CI runs, check-ins, schedules), never only UTC.

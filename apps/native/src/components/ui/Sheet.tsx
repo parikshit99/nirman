@@ -85,7 +85,7 @@ export function Sheet({ kind = 'sheet', onClose, onBack, backEnabled = true, bus
           {kind === 'dialog' ? (
             <Pressable android_ripple={null} style={[styles.backdrop, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]} onPress={closeOnBackdrop && !busy ? onClose : undefined} accessibilityLabel={label}>
               <PopIn>
-                <Pressable android_ripple={null} style={[styles.dialog, { backgroundColor: c.white, maxHeight: height * 0.9 }]}>{body(height * 0.8)}</Pressable>
+                <Pressable android_ripple={null} style={[styles.dialog, { backgroundColor: c.raised, maxHeight: height * 0.9 }]}>{body(height * 0.8)}</Pressable>
               </PopIn>
             </Pressable>
           ) : (
@@ -281,7 +281,7 @@ export function SheetOption({ icon, label, about, busy, onPress, disabled }: { i
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', paddingHorizontal: 16 },
-  dialog: { borderRadius: 16, overflow: 'hidden', width: '100%', maxWidth: 440, alignSelf: 'center' },
+  dialog: { borderRadius: 28, overflow: 'hidden', width: '100%', maxWidth: 440, alignSelf: 'center' },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { flexShrink: 1, fontSize: 14, fontWeight: '700' },

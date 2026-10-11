@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { Pressable } from './Pressable';
 import Animated, { Easing, runOnJS, useAnimatedProps, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
@@ -29,6 +29,7 @@ export function useDialogs(): Dialogs {
 }
 
 const TOAST_MS = 2500;
+let nextId = 1;
 
 export interface Bulletin {
   id: number;
@@ -37,28 +38,33 @@ export interface Bulletin {
   ms: number;
 }
 
-/** `confirm` and `alert` are Android's own dialog; `prompt` is a small sheet; `toast` is a Snackbar above the tab bar. */
+interface Asking {
+  id: number;
+  title: string;
+  message?: string;
+  confirmLabel: string;
+  /** No cancel button: an alert, with only OK. */
+  cancelLabel?: string;
+  danger?: boolean;
+  resolve(ok: boolean): void;
+}
+
+/** `confirm` and `alert` are the app's own Material 3 dialog; `prompt` is a small one with a field; `toast` is a Snackbar above the tab bar. */
 export function DialogProvider({ children }: { children: ReactNode }) {
   const [prompting, setPrompting] = useState<{ title: string; value: string; resolve(v: string | null): void } | null>(null);
+  // Questions waiting their turn: one dialog shows at a time.
+  const [asking, setAsking] = useState<Asking[]>([]);
   const [toast, setToast] = useState<Bulletin | null>(null);
 
   const api = useMemo<Dialogs>(
     () => ({
       alert: (title, message) =>
         new Promise<void>((resolve) => {
-          Alert.alert(title, message, [{ text: 'OK', onPress: () => resolve() }], { cancelable: true, onDismiss: () => resolve() });
+          setAsking((q) => [...q, { id: nextId++, title, message, confirmLabel: 'OK', resolve: () => resolve() }]);
         }),
       confirm: (title, opts = {}) =>
         new Promise<boolean>((resolve) => {
-          Alert.alert(
-            title,
-            opts.message,
-            [
-              { text: opts.cancelLabel ?? 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-              { text: opts.confirmLabel ?? 'OK', style: opts.danger ? 'destructive' : 'default', onPress: () => resolve(true) },
-            ],
-            { cancelable: true, onDismiss: () => resolve(false) },
-          );
+          setAsking((q) => [...q, { id: nextId++, title, message: opts.message, confirmLabel: opts.confirmLabel ?? 'OK', cancelLabel: opts.cancelLabel ?? 'Cancel', danger: opts.danger, resolve }]);
         }),
       prompt: (title, defaultValue = '') => new Promise<string | null>((resolve) => setPrompting({ title, value: defaultValue, resolve })),
       toast: (message) => {
@@ -73,6 +79,12 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const current = asking[0];
+  const answer = (ok: boolean) => {
+    current?.resolve(ok);
+    setAsking((q) => q.slice(1));
+  };
+
   const closePrompt = (value: string | null) => {
     prompting?.resolve(value);
     setPrompting(null);
@@ -81,6 +93,11 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   return (
     <DialogContext.Provider value={api}>
       {children}
+      {current && (
+        <Sheet key={current.id} kind="dialog" closeOnBackdrop onClose={() => answer(false)} label={current.title} padding={24} gap={16}>
+          <AskBody asking={current} onAnswer={answer} />
+        </Sheet>
+      )}
       {prompting && (
         <Sheet kind="dialog" closeOnBackdrop onClose={() => closePrompt(null)} label={prompting.title}>
           <PromptBody title={prompting.title} initial={prompting.value} onDone={closePrompt} />
@@ -88,6 +105,29 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       )}
       <Snackbar toast={toast} onDone={() => setToast(null)} />
     </DialogContext.Provider>
+  );
+}
+
+/** Material 3's basic dialog: a headline, the supporting text, and the buttons at the end (Cancel as a text button). */
+function AskBody({ asking, onAnswer }: { asking: Asking; onAnswer(ok: boolean): void }) {
+  const c = useColors();
+  return (
+    <>
+      <Text accessibilityRole="header" style={{ fontSize: 22, lineHeight: 28, fontWeight: '600', color: c.brandDark }}>
+        {asking.title}
+      </Text>
+      {!!asking.message && <Text style={{ fontSize: 14, lineHeight: 20, color: c.gray600 }}>{asking.message}</Text>}
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+        {asking.cancelLabel && (
+          <Button variant="ghost" onPress={() => onAnswer(false)}>
+            {asking.cancelLabel}
+          </Button>
+        )}
+        <Button variant={asking.danger ? 'danger' : 'primary'} onPress={() => onAnswer(true)}>
+          {asking.confirmLabel}
+        </Button>
+      </View>
+    </>
   );
 }
 
