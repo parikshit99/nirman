@@ -3,6 +3,8 @@
 // blue keep their meaning and don't change. Worked in OKLCH, so each shade keeps the lightness of the orange shade it
 // replaces: text and backgrounds stay as readable as they are in orange.
 
+import { clampChroma, converter, formatHex, modeLrgb, modeOklab, modeOklch, modeRgb, useMode, wcagContrast, wcagLuminance } from 'culori/fn';
+
 export const ACCENT_STEPS = ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900'] as const;
 export type AccentStep = (typeof ACCENT_STEPS)[number];
 export type AccentKey = `orange${AccentStep}` | 'brandPrimary';
@@ -57,6 +59,12 @@ export const ACCENTS: { id: string; label: string; hex: string }[] = [
 
 /** Text and icons on an accent background: white or near-black, whichever reads better. */
 const LIGHT_TEXT = '#ffffff';
+// culori's tree-shakeable build: only the colour spaces used here.
+useMode(modeRgb);
+useMode(modeLrgb);
+useMode(modeOklab);
+useMode(modeOklch);
+
 const DARK_TEXT = '#121212';
 
 // How far each shade follows the chosen colour's own lightness (500 is the colour itself). The pale shades are
@@ -117,10 +125,7 @@ export function textOn(shades: AccentShades): string {
 }
 
 /** WCAG contrast ratio of two colours (1 to 21). */
-export function contrast(a: string, b: string): number {
-  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
-  return (x + 0.05) / (y + 0.05);
-}
+export const contrast = (a: string, b: string): number => wcagContrast(normalizeHex(a) ?? '#000000', normalizeHex(b) ?? '#000000');
 
 /** `#rrggbb` in lower case, from `#rgb` or `#rrggbb` (with or without `#`); null if it isn't a colour. */
 export function normalizeHex(value: string): string | null {
@@ -138,18 +143,7 @@ function visibleOn(color: string, background: string): string {
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-function luminance(hex: string): number {
-  const [r, g, b] = toLinear(hex);
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-function toLinear(hex: string): [number, number, number] {
-  const h = normalizeHex(hex) ?? '#000000';
-  return [1, 3, 5].map((i) => {
-    const v = parseInt(h.slice(i, i + 2), 16) / 255;
-    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  }) as [number, number, number];
-}
+const luminance = (hex: string) => wcagLuminance(normalizeHex(hex) ?? '#000000');
 
 interface Oklch {
   l: number;
@@ -157,51 +151,15 @@ interface Oklch {
   h: number;
 }
 
+const oklch = converter('oklch');
+
 export function toOklch(hex: string): Oklch {
-  const [r, g, b] = toLinear(hex);
-  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
-  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
-  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
-  const L = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s;
-  const A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
-  const B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
-  return { l: L, c: Math.hypot(A, B), h: ((Math.atan2(B, A) * 180) / Math.PI + 360) % 360 };
+  const { l, c, h } = oklch(normalizeHex(hex) ?? '#000000')!;
+  // Greys have no hue.
+  return { l, c, h: h ?? 0 };
 }
-
-function oklchToLinear({ l, c, h }: Oklch): [number, number, number] {
-  const A = c * Math.cos((h * Math.PI) / 180);
-  const B = c * Math.sin((h * Math.PI) / 180);
-  const l_ = (l + 0.3963377774 * A + 0.2158037573 * B) ** 3;
-  const m_ = (l - 0.1055613458 * A - 0.0638541728 * B) ** 3;
-  const s_ = (l - 0.0894841775 * A - 1.291485548 * B) ** 3;
-  return [
-    4.0767416621 * l_ - 3.3077115913 * m_ + 0.2309699292 * s_,
-    -1.2684380046 * l_ + 2.6097574011 * m_ - 0.3413193965 * s_,
-    -0.0041960863 * l_ - 0.7034186147 * m_ + 1.707614701 * s_,
-  ];
-}
-
-const inGamut = (rgb: number[]) => rgb.every((v) => v >= -1e-4 && v <= 1 + 1e-4);
 
 /** The nearest sRGB colour: lowers the chroma (keeping lightness and hue) until it fits. */
 export function fromOklch(color: Oklch): string {
-  let rgb = oklchToLinear(color);
-  if (!inGamut(rgb)) {
-    let [lo, hi] = [0, color.c];
-    for (let i = 0; i < 24; i++) {
-      const mid = (lo + hi) / 2;
-      if (inGamut(oklchToLinear({ ...color, c: mid }))) lo = mid;
-      else hi = mid;
-    }
-    rgb = oklchToLinear({ ...color, c: lo });
-  }
-  return `#${rgb
-    .map((v) => {
-      const x = clamp(v, 0, 1);
-      const srgb = x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055;
-      return Math.round(clamp(srgb, 0, 1) * 255)
-        .toString(16)
-        .padStart(2, '0');
-    })
-    .join('')}`;
+  return formatHex(clampChroma({ mode: 'oklch', ...color }, 'oklch'));
 }
