@@ -1,5 +1,6 @@
-import { formatQty } from './format.ts';
-import type { ContractEntryRow, ContractRow } from './schemas.ts';
+import { cleanUnit, unitFactor } from './catalog.ts';
+import { formatDay, formatQty, formatRupees } from './format.ts';
+import type { ContractEntryRow, ContractRow, ProjectRow } from './schemas.ts';
 
 // ---------------------------------------------------------------------------
 // Labour contracts: what has been earned, held back, deducted and paid.
@@ -193,4 +194,128 @@ export function buildLabourReport(
   rows.sort((a, b) => b.workDone - a.workDone || a.contract.contractor.localeCompare(b.contract.contractor));
   const sum = (f: 'workDone' | 'paid' | 'balance') => round2(rows.reduce((a, r) => a + r[f], 0));
   return { rows, workDone: sum('workDone'), paid: sum('paid'), balance: sum('balance') };
+}
+
+// ---------------------------------------------------------------------------
+// Labour rates: what each trade has been paid per unit, across every project, to compare a new
+// contractor's rate with the ones already agreed. Only rate contracts count; a lump sum says nothing per unit.
+// ---------------------------------------------------------------------------
+
+/** Trades and the words (English and Hinglish) that name them in a contract's Work. */
+const TRADES: [trade: string, words: string[]][] = [
+  ['Masonry', ['masonry', 'brick work', 'chinai', 'block work']],
+  ['Plaster', ['plaster', 'plastering']],
+  ['Tiling', ['tile', 'tiling']],
+  ['Flooring', ['flooring', 'marble', 'granite', 'kota']],
+  ['Painting', ['painting', 'paint', 'putty', 'primer', 'texture']],
+  ['Shuttering', ['shuttering', 'centering', 'formwork']],
+  ['Bar bending', ['bar bending', 'reinforcement', 'sariya bandhai']],
+  ['Concrete', ['concrete', 'casting', 'dhalai', 'rcc', 'pcc']],
+  ['Waterproofing', ['waterproofing']],
+  ['POP and false ceiling', ['pop', 'plaster of paris', 'false ceiling', 'gypsum']],
+  ['Plumbing', ['plumbing', 'plumber']],
+  ['Electrical', ['electrical', 'wiring', 'electrician']],
+  ['Carpentry', ['carpentry', 'carpenter', 'woodwork']],
+  ['Fabrication', ['fabrication', 'welding', 'grill', 'railing']],
+  ['Excavation', ['excavation', 'digging', 'khudai']],
+];
+
+// Each word as it is matched: also written as one word ("brickwork") and in the plural ("tiles").
+const TRADE_WORDS = TRADES.flatMap(([trade, words]) =>
+  words.flatMap((w) => [...new Set([w, w.replace(/ /g, '')])].flatMap((v) => [v, `${v}s`]).map((v) => ({ trade, text: ` ${v} ` }))),
+);
+
+/**
+ * The trade a contract's Work names ("Internal plaster, 2nd floor" → Plaster), or null. Whole words only, so
+ * "plastic" is not plaster. When several trades are named, the first one written wins ("Brick work and plaster"
+ * is Masonry); at the same place the longer phrase wins ("Plaster of Paris" is POP).
+ */
+export function guessTrade(work: string): string | null {
+  const text = ` ${work.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `;
+  let best: { trade: string; at: number; length: number } | null = null;
+  for (const w of TRADE_WORDS) {
+    const at = text.indexOf(w.text);
+    if (at < 0) continue;
+    if (!best || at < best.at || (at === best.at && w.text.length > best.length)) best = { trade: w.trade, at, length: w.text.length };
+  }
+  return best?.trade ?? null;
+}
+
+/** The card a contract's rate shows on in Labour rates: its trade, else its work type ("Civil, other work"). */
+export const contractTrade = (c: Pick<ContractRow, 'work' | 'category'>) => guessTrade(c.work) ?? `${c.category.trim() || 'Uncategorised'}, other work`;
+
+export interface LabourRateRow {
+  contract: ContractRow;
+  /** Name of the contract's project ('' when it is not found). */
+  project: string;
+  /** Rate per the card's unit: the contract's own, or converted from a unit of the same kind (sqm → sqft). */
+  rate: number;
+  /** The contract's start date, else the day (IST) it was added, YYYY-MM-DD. */
+  date: string;
+  closed: boolean;
+}
+
+export interface LabourRate {
+  /** Trade and unit, unique among the cards. */
+  key: string;
+  trade: string;
+  unit: string;
+  min: number;
+  max: number;
+  count: number;
+  /** The newest contract. */
+  last: LabourRateRow;
+  /** Every contract on the card, newest first. */
+  rows: LabourRateRow[];
+}
+
+const IST_MS = 330 * 60_000;
+const dayOf = (c: ContractRow) => c.start_date || (c.created_at ? new Date(Date.parse(c.created_at) + IST_MS).toISOString().slice(0, 10) : '');
+const OTHER_WORK = /, other work$/;
+
+/**
+ * One card per trade and unit from the rate contracts of every project, ongoing and closed. Units of one kind share
+ * a card (sqm with sqft), in the unit most of its contracts use; other units (day, point) get their own. Lump sums
+ * and contracts without a rate are left out. Named trades come first, A to Z, then the "other work" cards.
+ */
+export function labourRates(contracts: ContractRow[], projects: Pick<ProjectRow, 'id' | 'name'>[]): LabourRate[] {
+  const projectName = new Map(projects.map((p) => [p.id, p.name]));
+  const groups: { trade: string; unit: string; contracts: { c: ContractRow; unit: string; date: string }[] }[] = [];
+  for (const c of contracts) {
+    if (c.kind !== 'rate' || !(c.rate > 0)) continue;
+    const trade = contractTrade(c);
+    const unit = cleanUnit(c.unit) || 'unit';
+    let group = groups.find((g) => g.trade === trade && unitFactor(unit, g.unit) !== null);
+    if (!group) groups.push((group = { trade, unit, contracts: [] }));
+    group.contracts.push({ c, unit, date: dayOf(c) });
+  }
+  const cards = groups.map((g): LabourRate => {
+    const sorted = g.contracts.sort((a, b) => b.date.localeCompare(a.date) || b.c.created_at.localeCompare(a.c.created_at));
+    // The unit most contracts use; on a tie, the newest one's.
+    const uses = new Map<string, number>();
+    for (const x of sorted) uses.set(x.unit.toLowerCase(), (uses.get(x.unit.toLowerCase()) ?? 0) + 1);
+    const unit = sorted.reduce((best, x) => (uses.get(x.unit.toLowerCase())! > uses.get(best.toLowerCase())! ? x.unit : best), sorted[0].unit);
+    const rows = sorted.map(({ c, unit: own, date }) => ({ contract: c, project: projectName.get(c.project_id) ?? '', rate: round2(c.rate / (unitFactor(own, unit) ?? 1)), date, closed: c.status === 'closed' }));
+    const rates = rows.map((r) => r.rate);
+    return { key: JSON.stringify([g.trade, unit.toLowerCase()]), trade: g.trade, unit, min: Math.min(...rates), max: Math.max(...rates), count: rows.length, last: rows[0], rows };
+  });
+  return cards.sort((a, b) => Number(OTHER_WORK.test(a.trade)) - Number(OTHER_WORK.test(b.trade)) || a.trade.localeCompare(b.trade) || a.unit.localeCompare(b.unit));
+}
+
+/** A card in words: "₹18 to ₹24 per sqft · 4 contracts" and "Last ₹22 · Ramesh, Sharma house, 3 Sep" (with the year when it isn't `today`'s). */
+export function describeLabourRate(card: LabourRate, today: string): { range: string; last: string } {
+  const range = card.min === card.max ? formatRupees(card.min) : `${formatRupees(card.min)} to ${formatRupees(card.max)}`;
+  const { last } = card;
+  const day = formatDay(last.date, { year: last.date.slice(0, 4) !== today.slice(0, 4) });
+  return {
+    range: `${range} per ${card.unit} · ${card.count} ${card.count === 1 ? 'contract' : 'contracts'}`,
+    last: `Last ${formatRupees(last.rate)} · ${[last.contract.contractor, last.project, day].filter(Boolean).join(', ')}`,
+  };
+}
+
+/** A contract on a card: "₹22 per sqft · Ramesh · Sharma house · 3 Sep 2026", with its own terms when they were converted. */
+export function describeLabourRateRow(row: LabourRateRow, unit: string): string {
+  const own = cleanUnit(row.contract.unit) || 'unit';
+  const rate = `${formatRupees(row.rate)} per ${unit}${own.toLowerCase() !== unit.toLowerCase() ? ` (${formatRupees(row.contract.rate)} per ${own})` : ''}`;
+  return [rate, row.contract.contractor, row.project, formatDay(row.date)].filter(Boolean).join(' · ');
 }

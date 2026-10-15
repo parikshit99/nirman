@@ -1,6 +1,7 @@
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
 import Fuse from 'fuse.js';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
 import { contractTotals, sumTotals, type ContractRow, type ContractTotals } from '@nirman/shared';
@@ -56,6 +57,14 @@ export function LabourScreen({ about }: { about: string }) {
   /** Contract being added (no contract) or edited. */
   const [contractForm, setContractForm] = useState<{ contract?: ContractRow } | null>(null);
   const [openContract, setOpenContract] = useState<string | null>(null);
+  // Rates → Labour opens a contract here (in its project) by passing its id.
+  const asked = useRoute().params as { contract?: string } | undefined;
+  const navigation = useNavigation<{ setParams(params: object): void }>();
+  useEffect(() => {
+    if (!asked?.contract) return;
+    setOpenContract(asked.contract);
+    navigation.setParams({ contract: undefined });
+  }, [asked?.contract, navigation]);
 
   const q = search.trim();
   const contracts = useMemo(() => {
