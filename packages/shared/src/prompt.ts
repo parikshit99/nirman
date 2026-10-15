@@ -68,10 +68,16 @@ function learningContext(learning?: LearningMap): string {
     : '';
 }
 
+/** What Gemini answers in rates_name when no known material is the same thing (an enum value can't be empty). */
+export const NO_RATES_NAME = '(none)';
+
 function materialsContext(materials?: { name: string; unit: string }[]): string {
   return materials?.length
-    ? `\n\nKNOWN MATERIALS (name | unit): when an item is one of these (another spelling, a short form or a brand of it),
-       use exactly this item_name, and its unit where the bill's unit is of the same kind. Otherwise name it as usual.
+    ? `\n\nKNOWN MATERIALS (name | unit), already in the user's rates. For every item set rates_name:
+       - the known name that is the same material: the same thing in any language or spelling, a short form, Hindi/Hinglish
+         or a trade name of it (e.g. "MS angle" = "Angle iron", "Bajri" = "Aggregate"). Brand, size and grade may differ.
+       - ${quote(NO_RATES_NAME)} when none of them is the same material (a new material). Never pick a merely similar one.
+       Keep item_name as usual: a clean English name for what is written, not the known name.
        ${materials.map((m) => `- ${quote(m.name)}${m.unit ? ` | ${quote(m.unit)}` : ''}`).join('\n')}`
     : '';
 }

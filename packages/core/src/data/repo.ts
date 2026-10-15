@@ -422,7 +422,9 @@ export async function matchMaterials(db: Db, materials: MaterialInput[]): Promis
   const known = await knownMaterials(db);
   const learning = learningMap(await db.all<LearnedTermRow>(selectAll('learned_terms', 'id')));
   return materials.map((m) => {
-    const { line, readAs } = standardizeLine(extractedMaterialSchema.parse(m), known, learning);
+    const { line: matched, readAs } = standardizeLine(extractedMaterialSchema.parse(m), known, learning);
+    // Gemini's choice of name has done its job; it is not stored.
+    const { rates_name: _named, ...line } = matched;
     return readAs ? { ...line, read_as: JSON.stringify(readAs) } : line;
   });
 }
