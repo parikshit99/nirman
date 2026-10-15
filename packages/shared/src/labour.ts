@@ -1,5 +1,6 @@
+import { todayISO } from './domain.ts';
 import { formatQty } from './format.ts';
-import type { ContractEntryRow, ContractRow } from './schemas.ts';
+import type { ContractEntryRow, ContractRateRow, ContractRow } from './schemas.ts';
 
 // ---------------------------------------------------------------------------
 // Labour contracts: what has been earned, held back, deducted and paid.
@@ -8,13 +9,52 @@ import type { ContractEntryRow, ContractRow } from './schemas.ts';
 /** Money handed to the contractor: a payment, or an advance (kharcha) before the work is measured. */
 export const isPaidOut = (kind: ContractEntryRow['kind']) => kind === 'payment' || kind === 'advance';
 
-/** Value of one work entry: quantity × rate, or % of the lump sum. */
-export function workValue(c: Pick<ContractRow, 'kind' | 'rate' | 'amount'>, e: Pick<ContractEntryRow, 'quantity'>): number {
-  return c.kind === 'rate' ? e.quantity * c.rate : (e.quantity / 100) * c.amount;
+/** A rate change as the rules need it. */
+export type RateChange = Pick<ContractRateRow, 'rate' | 'from_date'>;
+
+/**
+ * A contract with its rate changes (rate contracts only; a lump sum's are ignored). Without `rates` it is valued at
+ * its own rate throughout, as before rate changes existed. The rules below all take one.
+ */
+export type ContractWithRates = ContractRow & { rates?: readonly RateChange[] };
+
+/** Each contract with its own rate changes, oldest first (any not above 0 left out): what the screens, statements and reports are given. */
+export function withRates<C extends ContractRow>(contracts: C[], rates: readonly ContractRateRow[]): (C & { rates: ContractRateRow[] })[] {
+  const byContract = new Map<string, ContractRateRow[]>();
+  for (const r of rates) {
+    if (!(r.rate > 0)) continue;
+    const list = byContract.get(r.contract_id);
+    if (list) list.push(r);
+    else byContract.set(r.contract_id, [r]);
+  }
+  for (const list of byContract.values()) list.sort((a, b) => a.from_date.localeCompare(b.from_date));
+  return contracts.map((c) => ({ ...c, rates: byContract.get(c.id) ?? [] }));
 }
 
-/** Agreed value: the lump sum, or estimated quantity × rate (0 when no estimate). */
-export const contractValue = (c: ContractRow) => (c.kind === 'rate' ? c.est_quantity * c.rate : c.amount);
+/**
+ * The rate in effect on a date: the latest change from that date or before, else the contract's own rate. Without a
+ * date (a new entry not dated yet), the latest rate. A change not above 0 (only possible from an edited backup) is ignored.
+ */
+export function rateOn(c: Pick<ContractWithRates, 'kind' | 'rate' | 'rates'>, date?: string): number {
+  let rate = c.rate;
+  let since = '';
+  if (c.kind !== 'rate') return rate;
+  for (const r of c.rates ?? []) {
+    if (r.rate > 0 && (date === undefined || r.from_date <= date) && r.from_date >= since) {
+      rate = r.rate;
+      since = r.from_date;
+    }
+  }
+  return rate;
+}
+
+/** Value of one work entry: quantity × the rate in effect on its date, or % of the lump sum. */
+export function workValue(c: Pick<ContractWithRates, 'kind' | 'rate' | 'amount' | 'rates'>, e: Pick<ContractEntryRow, 'quantity'> & { date?: string }): number {
+  return c.kind === 'rate' ? e.quantity * rateOn(c, e.date) : (e.quantity / 100) * c.amount;
+}
+
+/** Agreed value: the lump sum, or estimated quantity × the latest rate (0 when no estimate). */
+export const contractValue = (c: ContractWithRates) => (c.kind === 'rate' ? c.est_quantity * rateOn(c) : c.amount);
 
 /**
  * Work counted for a total of work entries worth `value`: a lump sum never earns more than its amount, however much
@@ -49,7 +89,7 @@ export interface ContractTotals {
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Totals for a contract from its entries, optionally only those up to `upTo` (YYYY-MM-DD). */
-export function contractTotals(c: ContractRow, entries: ContractEntryRow[], upTo = ''): ContractTotals {
+export function contractTotals(c: ContractWithRates, entries: ContractEntryRow[], upTo = ''): ContractTotals {
   let doneQty = 0;
   let workDone = 0;
   let deductions = 0;
@@ -146,8 +186,11 @@ export function kindLockedNote(c: Pick<ContractRow, 'kind' | 'unit'>): string {
   return c.kind === 'rate' ? `Work is recorded in ${c.unit || 'unit'}, so this contract stays a rate contract.` : 'Work is recorded as % of the job, so this contract stays a lump sum.';
 }
 
+/** Why a rate contract with rate changes (and no work) keeps its kind: a lump sum has no rate changes. */
+export const rateChangesLockedNote = 'This contract has rate changes, so it stays a rate contract. Delete them to change it.';
+
 /** "Measured 5,000 of about 4,000 sqft" for a rate job measured past its estimate (the rate is owed on all of it); otherwise null. */
-export function pastEstimate(c: ContractRow, t: Pick<ContractTotals, 'doneQty'>): string | null {
+export function pastEstimate(c: ContractWithRates, t: Pick<ContractTotals, 'doneQty'>): string | null {
   if (c.kind !== 'rate' || !(c.est_quantity > 0) || t.doneQty <= c.est_quantity) return null;
   return `Measured ${formatQty(t.doneQty)} of about ${formatQty(c.est_quantity)} ${c.unit || 'unit'}`;
 }
@@ -157,20 +200,37 @@ export const paymentModes = Object.keys(PAYMENT_MODES);
 export const paymentModeLabel = (mode: string) => PAYMENT_MODES[mode] ?? mode;
 
 
-/** One line describing an entry, e.g. "Work: 120 sqft" or "Payment (UPI) - advance". */
-export function describeEntry(c: ContractRow, e: ContractEntryRow): string {
+/** One line describing an entry, e.g. "Work: 120 sqft @ 20" (the rate on its date) or "Payment (UPI) - advance". */
+export function describeEntry(c: ContractWithRates, e: ContractEntryRow): string {
   const note = e.note.trim() ? ` - ${e.note.trim()}` : '';
-  if (e.kind === 'work') return `Work: ${c.kind === 'rate' ? `${formatQty(e.quantity)} ${c.unit || 'unit'} @ ${formatQty(c.rate)}` : `${formatQty(e.quantity)}% of the job`}${note}`;
+  if (e.kind === 'work') return `Work: ${c.kind === 'rate' ? `${formatQty(e.quantity)} ${c.unit || 'unit'} @ ${formatQty(rateOn(c, e.date))}` : `${formatQty(e.quantity)}% of the job`}${note}`;
   if (e.kind === 'payment') return `Payment${e.mode ? ` (${paymentModeLabel(e.mode)})` : ''}${note}`;
   if (e.kind === 'advance') return `Advance (kharcha)${e.mode ? `, ${paymentModeLabel(e.mode)}` : ''}${note}`;
   return `Deduction${note}`;
 }
 
-/** The agreed terms in words, e.g. "₹18 per sqft, about 4,000 sqft" or "Lump sum ₹2,50,000". */
-export function describeTerms(c: ContractRow, money: (n: number) => string): string {
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** A date in a line of text: "1 Oct" this year, "1 Oct 2025" in another. */
+export function shortDate(iso: string, today = todayISO()): string {
+  const [y, m, d] = iso.split('-');
+  const day = `${Number(d)} ${MONTHS[Number(m) - 1] ?? m}`;
+  return y === today.slice(0, 4) ? day : `${day} ${y}`;
+}
+
+/** The rate changes in words, oldest first, e.g. ", ₹20 from 1 Oct, ₹22 from 1 Jan 2027"; '' when none. */
+const describeRateChanges = (c: ContractWithRates, money: (n: number) => string, today: string) =>
+  (c.rates ?? [])
+    .filter((r) => r.rate > 0)
+    .sort((a, b) => a.from_date.localeCompare(b.from_date))
+    .map((r) => `, ${money(r.rate)} from ${shortDate(r.from_date, today)}`)
+    .join('');
+
+/** The agreed terms in words, e.g. "₹18 per sqft, ₹20 from 1 Oct, about 4,000 sqft (₹80,000)" or "Lump sum ₹2,50,000". */
+export function describeTerms(c: ContractWithRates, money: (n: number) => string, today = todayISO()): string {
   const terms =
     c.kind === 'rate'
-      ? `${money(c.rate)} per ${c.unit || 'unit'}${c.est_quantity > 0 ? `, about ${formatQty(c.est_quantity)} ${c.unit || 'unit'} (${money(contractValue(c))})` : ''}`
+      ? `${money(c.rate)} per ${c.unit || 'unit'}${describeRateChanges(c, money, today)}${c.est_quantity > 0 ? `, about ${formatQty(c.est_quantity)} ${c.unit || 'unit'} (${money(contractValue(c))})` : ''}`
       : `Lump sum ${money(c.amount)}`;
   return c.retention_pct > 0 ? `${terms}; ${formatQty(c.retention_pct)}% retention` : terms;
 }
@@ -194,7 +254,7 @@ export interface ContractStatement {
 }
 
 /** Account statement for a contractor: every entry with a running balance, and totals at the end. */
-export function contractStatement(c: ContractRow, entries: ContractEntryRow[], opts: { from?: string; to?: string } = {}): ContractStatement {
+export function contractStatement(c: ContractWithRates, entries: ContractEntryRow[], opts: { from?: string; to?: string } = {}): ContractStatement {
   const own = entries
     .filter((e) => e.contract_id === c.id && (!opts.to || e.date <= opts.to))
     .sort((a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at));
@@ -225,7 +285,7 @@ export function contractStatement(c: ContractRow, entries: ContractEntryRow[], o
 }
 
 export interface LabourReportRow {
-  contract: ContractRow;
+  contract: ContractWithRates;
   /** Work done and paid within the period. */
   workDone: number;
   paid: number;
@@ -246,7 +306,7 @@ export interface LabourReport {
 
 /** Labour on one site for the site report: work done and paid per contract in the period. */
 export function buildLabourReport(
-  contracts: ContractRow[],
+  contracts: ContractWithRates[],
   entries: ContractEntryRow[],
   /** `address` absent: every contract given. */
   opts: { address?: string; from?: string; to?: string; categories?: string[] },

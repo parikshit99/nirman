@@ -4,6 +4,7 @@ import {
   buildItemDatabase,
   contractTermsProblem,
   kindLockedNote,
+  rateChangesLockedNote,
   fitRow,
   extractedMaterialSchema,
   extractedQuoteLineSchema,
@@ -21,6 +22,7 @@ import {
   type ReadAs,
   type CategoryRow,
   type ContractEntryRow,
+  type ContractRateRow,
   type ContractRow,
   type MaterialInput,
   type QuoteLineInput,
@@ -84,6 +86,8 @@ export interface Snapshot {
   hidden: HiddenMaterialRow[];
   contracts: ContractRow[];
   contractEntries: ContractEntryRow[];
+  /** Rate changes on labour contracts, by contract and date (attach them with `withRates`). */
+  contractRates: ContractRateRow[];
 }
 
 export interface ListMeta {
@@ -130,6 +134,9 @@ async function touch<T extends 'lists' | 'items' | 'learned_terms'>(tx: SqlExecu
 export const selectAll = <T extends DataTable>(table: T, order: string) =>
   `SELECT ${tableColumns[table].join(', ')} FROM ${table} ORDER BY ${order}`;
 
+/** The columns of a table, for a query that adds its own WHERE. */
+const selectWhere = (table: DataTable) => `SELECT ${tableColumns[table].join(', ')} FROM ${table}`;
+
 // ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
@@ -150,7 +157,8 @@ export async function loadSnapshot(db: Db): Promise<Snapshot> {
     const hidden = await tx.all<HiddenMaterialRow>(selectAll('hidden_materials', 'hidden_at'));
     const contracts = await tx.all<ContractRow>(selectAll('contracts', 'created_at DESC'));
     const contractEntries = await tx.all<ContractEntryRow>(selectAll('contract_entries', 'date, created_at'));
-    return { projects, lists, items, rates, learned, categories, jobs, quotes, quoteLines, hidden, contracts, contractEntries };
+    const contractRates = await tx.all<ContractRateRow>(selectAll('contract_rates', 'contract_id, from_date'));
+    return { projects, lists, items, rates, learned, categories, jobs, quotes, quoteLines, hidden, contracts, contractEntries, contractRates };
   });
 }
 
@@ -297,6 +305,7 @@ export async function deleteProject(db: Db, id: string) {
     await tx.run(`DELETE FROM items WHERE list_id IN (${lists})`, [id]);
     await tx.run('DELETE FROM lists WHERE project_id = ?', [id]);
     await tx.run('DELETE FROM contract_entries WHERE contract_id IN (SELECT id FROM contracts WHERE project_id = ?)', [id]);
+    await tx.run('DELETE FROM contract_rates WHERE contract_id IN (SELECT id FROM contracts WHERE project_id = ?)', [id]);
     await tx.run('DELETE FROM contracts WHERE project_id = ?', [id]);
     await tx.run(`UPDATE indexed_rates SET project_id = '' WHERE project_id = ?`, [id]);
     await tx.run('DELETE FROM projects WHERE id = ?', [id]);
@@ -1326,15 +1335,18 @@ export type ContractInput = Omit<ContractRow, 'id' | 'status' | 'retention_relea
 
 /**
  * Add a contract, or update the terms of an existing one (its entries are kept). Throws, saving nothing, when the
- * terms are below 0 or the kind would change under work already recorded (sqft would be read as %, or back).
+ * terms are below 0 or the kind would change under work already recorded (sqft would be read as %, or back) or under
+ * rate changes (a lump sum has none). `rate` is the starting rate: with rate changes saved, it is the rate of work
+ * before the first one.
  */
 export async function saveContract(db: Db, input: ContractInput, id?: string): Promise<string> {
   const problem = contractTermsProblem(input);
   if (problem) throw new Error(problem);
   return db.transaction(async (tx) => {
     const existing = id ? await getRow(tx, 'contracts', id) : undefined;
-    if (existing && existing.kind !== input.kind && (await tx.all("SELECT 1 FROM contract_entries WHERE contract_id = ? AND kind = 'work' LIMIT 1", [existing.id])).length) {
-      throw new Error(kindLockedNote(existing));
+    if (existing && existing.kind !== input.kind) {
+      if ((await tx.all("SELECT 1 FROM contract_entries WHERE contract_id = ? AND kind = 'work' LIMIT 1", [existing.id])).length) throw new Error(kindLockedNote(existing));
+      if ((await tx.all('SELECT 1 FROM contract_rates WHERE contract_id = ? AND rate > 0 LIMIT 1', [existing.id])).length) throw new Error(rateChangesLockedNote);
     }
     const ts = nowISO();
     const row: ContractRow = {
@@ -1377,6 +1389,7 @@ export async function setRetentionReleased(db: Db, id: string, date: string) {
 export async function deleteContract(db: Db, id: string) {
   await db.transaction(async (tx) => {
     await tx.run('DELETE FROM contract_entries WHERE contract_id = ?', [id]);
+    await tx.run('DELETE FROM contract_rates WHERE contract_id = ?', [id]);
     await tx.run('DELETE FROM contracts WHERE id = ?', [id]);
   });
 }
@@ -1397,6 +1410,38 @@ export async function saveContractEntry(db: Db, input: ContractEntryInput, id?: 
 
 export async function deleteContractEntry(db: Db, id: string) {
   await db.run('DELETE FROM contract_entries WHERE id = ?', [id]);
+}
+
+/**
+ * Change a rate contract's rate from a date: work dated then or later is valued at `rate`. A second change on the same
+ * date replaces the first (with a new id). Throws, saving nothing, when the rate is not above 0, the date is not
+ * YYYY-MM-DD, or the contract is missing or a lump sum.
+ */
+export async function saveContractRate(db: Db, contractId: string, rate: number, fromDate: string): Promise<string> {
+  if (!(rate > 0) || !Number.isFinite(rate)) throw new Error('Enter a rate above ₹0.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate)) throw new Error('Pick the date the new rate applies from.');
+  return db.transaction(async (tx) => {
+    const c = await getRow(tx, 'contracts', contractId);
+    if (!c) throw new Error('This contract was deleted.');
+    if (c.kind !== 'rate') throw new Error('Only a rate contract has rate changes.');
+    // Always a new id: the old row's id may be waiting to be deleted (Undo window), and that delete must miss this one.
+    await tx.run('DELETE FROM contract_rates WHERE contract_id = ? AND from_date = ?', [contractId, fromDate]);
+    const ts = nowISO();
+    const row: ContractRateRow = { id: newId(), contract_id: contractId, rate, from_date: fromDate, created_at: ts, updated_at: ts };
+    await writeRow(tx, 'contract_rates', row);
+    await writeRow(tx, 'contracts', { ...c, updated_at: ts });
+    return row.id;
+  });
+}
+
+/** Undo a rate change: its work goes back to the rate before it. */
+export async function deleteContractRate(db: Db, id: string) {
+  await db.run('DELETE FROM contract_rates WHERE id = ?', [id]);
+}
+
+/** A contract's rate changes, oldest first. */
+export async function listContractRates(db: Db, contractId: string): Promise<ContractRateRow[]> {
+  return db.all<ContractRateRow>(`${selectWhere('contract_rates')} WHERE contract_id = ? ORDER BY from_date`, [contractId]);
 }
 
 export async function clearAllData(tx: SqlExecutor, { seedDefaults = true } = {}) {

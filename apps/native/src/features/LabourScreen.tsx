@@ -3,7 +3,7 @@ import Fuse from 'fuse.js';
 import { useMemo, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
-import { contractTotals, pastEstimate, sumTotals, type ContractRow, type ContractTotals } from '@nirman/shared';
+import { contractTotals, pastEstimate, rateOn, sumTotals, type ContractRow, type ContractTotals, type ContractWithRates } from '@nirman/shared';
 import { prefs } from '@nirman/core';
 import { ActionFab, useHideOnScroll } from '../components/ActionFab';
 import { ContractForm } from '../components/ContractForm';
@@ -57,7 +57,7 @@ export function LabourScreen({ about }: { about: string }) {
   const [addressFilter, setAddressFilter] = useState('All');
   const [status, setStatus] = useState<StatusFilter>('active');
   /** Contract being added (no contract) or edited. */
-  const [contractForm, setContractForm] = useState<{ contract?: ContractRow } | null>(null);
+  const [contractForm, setContractForm] = useState<{ contract?: ContractWithRates } | null>(null);
   const [openContract, setOpenContract] = useState<string | null>(null);
 
   const q = search.trim();
@@ -102,6 +102,9 @@ export function LabourScreen({ about }: { about: string }) {
       categories={categoryNames}
       contractors={contractors}
       onSave={saveContract}
+      onSaveRate={async (rate, fromDate) => {
+        if (contractForm.contract) await actions.saveContractRate(contractForm.contract.id, rate, fromDate);
+      }}
       onClose={() => setContractForm(null)}
     />
   );
@@ -189,7 +192,7 @@ export function LabourScreen({ about }: { about: string }) {
   );
 }
 
-function ContractCard({ contract: x, totals: t, onOpen, onDelete }: { contract: ContractRow; totals: ContractTotals; onOpen(): void; onDelete(): void }) {
+function ContractCard({ contract: x, totals: t, onOpen, onDelete }: { contract: ContractWithRates; totals: ContractTotals; onOpen(): void; onDelete(): void }) {
   const c = useColors();
   const progress = t.progress === null ? null : Math.min(1, t.progress);
   return (
@@ -207,7 +210,7 @@ function ContractCard({ contract: x, totals: t, onOpen, onDelete }: { contract: 
           </Text>
         </View>
         <Text style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontSize: 12, fontWeight: '700', color: x.status === 'closed' ? c.gray500 : c.orange700, backgroundColor: x.status === 'closed' ? c.gray100 : c.orange50 }}>
-          {x.status === 'closed' ? 'Closed' : x.kind === 'rate' ? `₹${x.rate}/${x.unit || 'unit'}` : 'Lump sum'}
+          {x.status === 'closed' ? 'Closed' : x.kind === 'rate' ? `₹${rateOn(x)}/${x.unit || 'unit'}` : 'Lump sum'}
         </Text>
         <View style={{ marginTop: -10, marginRight: -10 }}>
           <TrashButton name={`the contract with ${x.contractor}`} onPress={onDelete} />

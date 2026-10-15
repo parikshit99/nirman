@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { balanceLabel, buildLabourReport, contractStatement, contractTermsProblem, kindLockedNote, contractTotals, describeEntry, describeTerms, pastEstimate, sumTotals, type ContractEntryRow, type ContractRow } from '../src/index.ts';
+import { balanceLabel, buildLabourReport, contractStatement, contractTermsProblem, kindLockedNote, rateChangesLockedNote, contractTotals, describeEntry, describeTerms, pastEstimate, sumTotals, type ContractEntryRow, type ContractRow } from '../src/index.ts';
 
 const ts = '2026-10-01T00:00:00.000Z';
 const plaster: ContractRow = {
@@ -155,5 +155,6 @@ describe('labour contracts', () => {
     expect(kindLockedNote(plaster)).toBe('Work is recorded in sqft, so this contract stays a rate contract.');
     expect(kindLockedNote({ ...plaster, unit: '' })).toBe('Work is recorded in unit, so this contract stays a rate contract.');
     expect(kindLockedNote(plumbing)).toBe('Work is recorded as % of the job, so this contract stays a lump sum.');
+    expect(rateChangesLockedNote).toBe('This contract has rate changes, so it stays a rate contract. Delete them to change it.');
   });
 });

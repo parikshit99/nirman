@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { balanceLabel, describeTerms, formatQty, formatRupees, variantLabel, type ContractRow, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
+import { balanceLabel, describeTerms, formatQty, formatRupees, variantLabel, type ContractWithRates, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
 import { appIcon } from './pdfIcon.ts';
 
@@ -331,7 +331,7 @@ function drawLabour(doc: jsPDF, labour: LabourReport, materials: number, y: numb
 const formatAmount = (n: number) => (n ? rupees(Math.round(n * 100) / 100) : '');
 
 /** A contractor's account: terms, each entry with a running balance, and the summary of what is due. */
-export function buildContractStatementPdf(c: ContractRow, st: ContractStatement, period: string): jsPDF {
+export function buildContractStatementPdf(c: ContractWithRates, st: ContractStatement, period: string): jsPDF {
   const doc = new jsPDF();
   drawTitle(doc, 'LABOUR STATEMENT', 20);
   const rows: [string, string][] = [['Contractor', [c.contractor, c.phone].filter(Boolean).join(' - ')]];

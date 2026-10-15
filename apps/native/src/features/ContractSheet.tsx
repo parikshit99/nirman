@@ -11,11 +11,12 @@ import {
   paymentModeLabel,
   pastEstimate,
   paymentModes,
+  shortDate,
   todayISO,
   workValue,
   type ContractEntryKind,
   type ContractEntryRow,
-  type ContractRow,
+  type ContractWithRates,
   isPaidOut,
 } from '@nirman/shared';
 import { UndoButton } from '../components/UndoButton';
@@ -28,7 +29,7 @@ import { Sheet } from '../components/ui/Sheet';
 import { plural } from '../lib/format';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
-import { rupeesWhole } from '../lib/format';
+import { rupees, rupeesWhole } from '../lib/format';
 import { StatementSheet } from './StatementSheet';
 
 const KIND_LABEL: Record<ContractEntryKind, string> = { work: 'Work done', payment: 'Payment', advance: 'Advance (kharcha)', deduction: 'Deduction' };
@@ -37,9 +38,9 @@ const KIND_LABEL: Record<ContractEntryKind, string> = { work: 'Work done', payme
  * One contract: its terms, what is owed, and every measurement, payment and deduction. `children` is a sheet opened
  * over it (the Edit terms form): a bottom sheet must sit inside this screen to show above it, and Back goes to it.
  */
-export function ContractSheet({ contractId, onEdit, onClose, children }: { contractId: string; onEdit(c: ContractRow): void; onClose(): void; children?: ReactNode }) {
+export function ContractSheet({ contractId, onEdit, onClose, children }: { contractId: string; onEdit(c: ContractWithRates): void; onClose(): void; children?: ReactNode }) {
   const c = useColors();
-  const { contracts, entriesFor, allEntriesFor, actions, pendingDeletes } = useAppState();
+  const { contracts, entriesFor, allEntriesFor, allRatesFor, actions, pendingDeletes } = useAppState();
   const dialogs = useDialogs();
   const contract = contracts.find((x) => x.id === contractId);
   const [entryForm, setEntryForm] = useState<{ kind: ContractEntryKind; entry?: ContractEntryRow } | null>(null);
@@ -51,6 +52,8 @@ export function ContractSheet({ contractId, onEdit, onClose, children }: { contr
   const t = contractTotals(contract, entries);
   const listed = [...allEntriesFor(contract.id)].sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at));
   const closed = contract.status === 'closed';
+  // Rate changes, oldest first; one waiting for Undo is shown struck through and no longer counts.
+  const rateChanges = contract.kind === 'rate' ? allRatesFor(contract.id) : [];
 
   const closeContract = async () => {
     const release = t.retention > 0;
@@ -103,7 +106,23 @@ export function ContractSheet({ contractId, onEdit, onClose, children }: { contr
           </Text>
           <Text style={{ fontSize: 14, color: c.gray700 }}>{contract.work || 'Work not described'}</Text>
           <Text style={{ fontSize: 12, color: c.gray500 }}>{[contract.address, contract.category, contract.start_date && `from ${contract.start_date}`].filter(Boolean).join(' · ')}</Text>
-          <Text style={{ fontSize: 12, color: c.gray500 }}>{describeTerms(contract, rupeesWhole)}</Text>
+          <Text style={{ fontSize: 12, color: c.gray500 }}>{describeTerms(contract, rupees)}</Text>
+          {rateChanges.map((r) => {
+            const pending = pendingDeletes.has(r.id);
+            const text = `${rupees(r.rate)} from ${shortDate(r.from_date)}`;
+            return (
+              <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, opacity: pending ? 0.4 : 1 }}>
+                <Text style={[{ flex: 1, fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray700 }, pending && { textDecorationLine: 'line-through' }]}>{text}</Text>
+                {pending ? (
+                  <UndoButton onUndo={() => actions.undoDelete(r.id)} label={`rate change ${text}`} />
+                ) : (
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Delete the rate change ${text}`} onPress={() => actions.deleteContractRateLater(r.id)} style={{ minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="delete-outline" size={16} color={c.red400} />
+                  </Pressable>
+                )}
+              </View>
+            );
+          })}
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           {!!contract.phone && (
@@ -224,7 +243,7 @@ export function ContractSheet({ contractId, onEdit, onClose, children }: { contr
 }
 
 /** Add or change one entry: work measured, a payment, or a deduction. */
-function EntryForm({ contract, kind, entry, onDone }: { contract: ContractRow; kind: ContractEntryKind; entry?: ContractEntryRow; onDone(): void }) {
+function EntryForm({ contract, kind, entry, onDone }: { contract: ContractWithRates; kind: ContractEntryKind; entry?: ContractEntryRow; onDone(): void }) {
   const c = useColors();
   const { actions, entriesFor } = useAppState();
   const dialogs = useDialogs();
@@ -234,7 +253,7 @@ function EntryForm({ contract, kind, entry, onDone }: { contract: ContractRow; k
   const [mode, setMode] = useState(entry?.mode || 'cash');
   const [note, setNote] = useState(entry?.note ?? '');
   const n = value.trim() ? parseAmount(value) : null;
-  const preview = isWork && n ? workValue(contract, { quantity: n }) : 0;
+  const preview = isWork && n ? workValue(contract, { quantity: n, date }) : 0;
   // A lump sum is never paid past 100%: an entry taking it there is most likely the total so far, not the new part.
   const doneBefore = isWork && contract.kind !== 'rate' ? entriesFor(contract.id).reduce((a, e) => a + (e.kind === 'work' && e.id !== entry?.id ? e.quantity : 0), 0) : 0;
   const past100 = isWork && contract.kind !== 'rate' && !!n && n > 0 && doneBefore + n > 100;

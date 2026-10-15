@@ -1,6 +1,6 @@
 import type { jsPDF } from 'jspdf';
 import type { SheetData } from 'write-excel-file/browser';
-import { balanceLabel, describeTerms, formatRupees, type ContractRow, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
+import { balanceLabel, describeTerms, formatRupees, type ContractWithRates, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
 import { madeByLine, pdfToBase64, type OrderSlipDetails } from './pdf.ts';
 
@@ -116,7 +116,7 @@ export function siteReportSheet(address: string, filters: string, report: SiteRe
 }
 
 /** A contractor's statement for Excel: terms, entries with running balance, then the summary. */
-export function contractStatementSheet(c: ContractRow, st: ContractStatement, period: string): SheetData {
+export function contractStatementSheet(c: ContractWithRates, st: ContractStatement, period: string): SheetData {
   const rupees = (n: number) => formatRupees(n, { whole: true, symbol: 'Rs. ' });
   const rows: SheetData = [[bold('Labour statement')], [madeByLine()], []];
   rows.push([bold('Contractor'), [c.contractor, c.phone].filter(Boolean).join(' - ')]);
