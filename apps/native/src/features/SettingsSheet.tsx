@@ -554,8 +554,8 @@ function DiagnosticsSection() {
     <View style={{ gap: 8 }}>
       <SectionTitle>Problems and diagnostics</SectionTitle>
       <Hint>
-        The app keeps a log on this phone of errors, AI readings, the steps you take and slow screens, including the items, rates and vendors involved, to help fix
-        problems. Photos and your API key are never recorded. {plural(log.length, 'entry', 'entries')}
+        The app keeps a log on this phone of errors, AI readings, the steps you take and slow screens, including the items, rates, vendors, addresses and phone numbers involved and
+        what you typed, to help fix problems. Photos and your API key are never recorded. {plural(log.length, 'entry', 'entries')}
         {errors ? `, ${plural(errors, 'error')}` : ''}.
       </Hint>
       <TextInput
@@ -563,7 +563,7 @@ function DiagnosticsSection() {
         value={note}
         onChangeText={setNote}
         multiline
-        placeholder="What happened? (optional; the report is public, so leave out private details)"
+        placeholder="What happened? (optional; the report is public)"
         placeholderTextColor={c.gray500}
         style={{ minHeight: 64, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderRadius: 10, borderColor: c.gray200, backgroundColor: c.white, color: c.brandDark, fontSize: 12, textAlignVertical: 'top' }}
       />
@@ -576,8 +576,8 @@ function DiagnosticsSection() {
         </Button>
       </View>
       <Hint>
-        Report a problem opens a public GitHub issue with the phone details, recent errors and counts. Your items, rates, vendors, addresses and phone numbers are left
-        out. Share log sends the full log, which includes them, to the app you pick: send it only to someone you trust.
+        Report a problem opens a public GitHub issue with the phone details and recent errors. Your items, rates, vendors, addresses and phone numbers are left out.
+        To send the full log privately, use Share log.
       </Hint>
       {log.length > 0 && (
         <View style={{ alignItems: 'flex-start' }}>

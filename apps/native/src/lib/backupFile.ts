@@ -23,5 +23,5 @@ export async function pickBackupFile(): Promise<Uint8Array | null> {
  * than the app keeps, e.g. two phone numbers in one field); empty when there are none.
  */
 export function shortenedNote(shortened: number): string {
-  return shortened > 0 ? `${plural(shortened, 'very long note, name or number', 'very long notes, names or numbers')} will be shortened to fit.` : '';
+  return shortened > 0 ? `${plural(shortened, 'value', 'values')} too long or empty will be shortened to fit or set to 0.` : '';
 }
