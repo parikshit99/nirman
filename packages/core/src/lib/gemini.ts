@@ -1,4 +1,4 @@
-import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type, type GenerateContentParameters } from '@google/genai';
 import {
   IMAGE_INSTRUCTION,
   QUOTE_IMAGE_INSTRUCTION,
@@ -13,6 +13,7 @@ import {
   type ExtractionRequest,
   type QuoteExtractionRequest,
 } from '@nirman/shared';
+import { recordGeminiUsage, tokensUsed, type GeminiCall } from './geminiUsage.ts';
 
 export interface Extractor {
   extract(req: ExtractionRequest): Promise<MaterialInput[]>;
@@ -115,6 +116,45 @@ export function classifyError(err: unknown): ExtractionError {
 
 const isUnknownModel = (err: unknown) => (err as { status?: number })?.status === 404;
 
+/** What Nirman reads from Gemini's answer. */
+export interface GeminiAnswer {
+  text?: string;
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number; totalTokenCount?: number };
+}
+
+/** The part of Google's client Nirman uses; tests pass a fake one. */
+export interface GeminiClient {
+  models: {
+    generateContent(params: GenerateContentParameters): Promise<GeminiAnswer>;
+    list(params?: { config?: { pageSize?: number } }): Promise<AsyncIterable<{ name?: string; displayName?: string; supportedActions?: string[] }>>;
+  };
+}
+
+/** Told about every request sent to Gemini (`recordGeminiUsage` by default). */
+export type UsageListener = (call: GeminiCall) => void;
+
+/**
+ * One request to Gemini, counted whether it is answered or not (a failed one has no tokens). Counting never
+ * stops a reading. Listing the models is not a request and isn't counted.
+ */
+async function generateCounted(ai: GeminiClient, onUsage: UsageListener, params: GenerateContentParameters): Promise<GeminiAnswer> {
+  const report = (call: GeminiCall) => {
+    try {
+      onUsage(call);
+    } catch {
+      // Counting is best effort.
+    }
+  };
+  try {
+    const answer = await ai.models.generateContent(params);
+    report({ model: params.model, ok: true, ...tokensUsed(answer.usageMetadata) });
+    return answer;
+  } catch (err) {
+    report({ model: params.model, ok: false, sent: 0, answered: 0 });
+    throw err;
+  }
+}
+
 /**
  * Pick the model to use when the configured one no longer exists (Google
  * retires preview models): the "flash latest" alias if offered, otherwise the
@@ -186,7 +226,7 @@ export async function listReadingModels(apiKey: string): Promise<ModelOption[]> 
   }
 }
 
-async function findReplacementModel(ai: GoogleGenAI): Promise<string | null> {
+async function findReplacementModel(ai: GeminiClient): Promise<string | null> {
   try {
     const models: { name?: string; supportedActions?: string[] }[] = [];
     for await (const m of await ai.models.list({ config: { pageSize: 100 } })) models.push(m);
@@ -199,12 +239,18 @@ async function findReplacementModel(ai: GoogleGenAI): Promise<string | null> {
 /**
  * @param onModelReplaced called when the configured model was unknown to Gemini
  *   and another one was used instead, so it can be saved for next time.
+ * @param onUsage told about every request, the one for a retired model included.
  */
-export function createGeminiExtractor(apiKey: string, model: string, onModelReplaced?: (model: string) => void): Extractor {
-  const ai = new GoogleGenAI({ apiKey });
+export function createGeminiExtractor(
+  apiKey: string,
+  model: string,
+  onModelReplaced?: (model: string) => void,
+  onUsage: UsageListener = recordGeminiUsage,
+  ai: GeminiClient = new GoogleGenAI({ apiKey }),
+): Extractor {
   let current = model;
   const call = (parts: Part[], systemInstruction: string, responseSchema: object) =>
-    ai.models.generateContent({
+    generateCounted(ai, onUsage, {
       model: current,
       contents: { parts },
       config: {
@@ -256,10 +302,8 @@ export function createGeminiExtractor(apiKey: string, model: string, onModelRepl
  * not. Returns the model that worked, which differs from `model` when that one
  * no longer exists and a replacement was found.
  */
-export async function testGeminiKey(apiKey: string, model: string): Promise<string> {
-  const ai = new GoogleGenAI({ apiKey });
-  const ping = (m: string) =>
-    ai.models.generateContent({ model: m, contents: 'Reply with OK.', config: { maxOutputTokens: 5, abortSignal: AbortSignal.timeout(20_000) } });
+export async function testGeminiKey(apiKey: string, model: string, onUsage: UsageListener = recordGeminiUsage, ai: GeminiClient = new GoogleGenAI({ apiKey })): Promise<string> {
+  const ping = (m: string) => generateCounted(ai, onUsage, { model: m, contents: 'Reply with OK.', config: { maxOutputTokens: 5, abortSignal: AbortSignal.timeout(20_000) } });
   try {
     try {
       await ping(model);

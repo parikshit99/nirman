@@ -2,6 +2,13 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 7.11 — See how much Gemini you've used
+
+**Settings**
+- **Gemini use**, under *AI reading (Gemini)*, shows how many requests this phone sent to Gemini today and how many tokens they used.
+- Tap it to see each of the last 60 days, or the last 13 months (tap a month to see each model). Requests that failed are counted too.
+- It is counted on this phone only and isn't in backups. *Open Google AI Studio* shows Google's own figures for your key.
+
 ## 7.5 — Saved lists of every project
 
 **Saved**

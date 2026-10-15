@@ -159,6 +159,8 @@ Nirman has no server or account yet (until the sync phases of [react-native-plan
 | Report a problem | The on-phone log: steps, item names, rates, vendors; never photos or the key | On *Report a problem* or *Share log* | A GitHub issue, or any app |
 | Update | Nothing goes out; the new APK comes in | When the user downloads it | GitHub release (sign-in needed while the repo is private) |
 
+The count of Gemini requests and tokens (*Settings → Gemini use*, since 7.11) stays on the phone: it is not in backups or problem reports.
+
 ## A-07 Shipping an update
 
 How a change reaches phones. CI is `.github/workflows/ci.yml`; the checks to run before pushing are in [Code guideline](Code%20guideline.md).

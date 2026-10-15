@@ -7,6 +7,7 @@ What Nirman stores and how, written so the data can be read by any future versio
 - **Phone:** one SQLite database, the file `databases/nirmaanSQLite.db` (via `expo-sqlite`; the name comes from the 6.x app, whose file is opened in place).
 - **Tests:** the same schema in an in-memory database run by sql.js.
 - **Diagnostic log:** not in the database or backups; the last 400 entries (errors, AI reading results, steps, timings, with no bill contents) are kept in the app's small key-value store (`expo-sqlite/kv-store`, set up in `apps/native/src/lib/coreSetup.ts`) under `nirmaan_diagnostics`.
+- **Gemini use** (*Settings → Gemini use*, since 7.11): not in the database, backups or problem reports. The key-value store above keeps it under `geminiUsage`: JSON of IST day (`YYYY-MM-DD`) → model → `{ requests, failed, sent, answered }` (`sent` is Gemini's `promptTokenCount`, `answered` its `totalTokenCount` minus that). Every request to Gemini counts, failed ones with no tokens; days older than 400 are dropped (`packages/core/src/lib/geminiUsage.ts`).
 - **Gemini API key:** not in the database. It is kept in the phone's secure storage and is never included in backups.
 
 The `nirmaan` names are the original internal ids. They stay unchanged so existing installs keep their data.

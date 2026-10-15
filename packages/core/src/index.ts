@@ -8,6 +8,7 @@ export * from './data/pendingDeletes.ts';
 export * from './data/backup.ts';
 export * from './jobs/worker.ts';
 export * from './lib/gemini.ts';
+export * from './lib/geminiUsage.ts';
 export * from './lib/diagnostics.ts';
 export * from './lib/settings.ts';
 export * from './lib/prefs.ts';

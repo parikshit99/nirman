@@ -1,7 +1,8 @@
 import { boxesToRows, matchQuoteLines, namesForReading, parseBill, todayISO, variantLabel, type BillReading, type LearnedTermRow, type MaterialInput, type TextBox } from '@nirman/shared';
 import { completeJob, completeQuoteJob, getJobImages, knownMaterials, learningMap, matchMaterials, listItems, saveTrainingSample, setJobStatus, type Job } from '../data/repo.ts';
 import type { Db } from '../data/sql.ts';
-import { classifyError, createGeminiExtractor, type Extractor } from '../lib/gemini.ts';
+import { classifyError, createGeminiExtractor, type Extractor, type UsageListener } from '../lib/gemini.ts';
+import { recordGeminiUsage } from '../lib/geminiUsage.ts';
 import { log, scrub } from '../lib/diagnostics.ts';
 import { loadConversions } from '../lib/conversionSettings.ts';
 import type { Settings } from '../lib/settings.ts';
@@ -60,11 +61,13 @@ export class JobWorker {
   private again = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private backoff = 0;
+  /** Gemini tokens used by the entry being read, for its log entry; null until Gemini is asked. */
+  private tokens: number | null = null;
 
   constructor(
     private db: Db,
     private getSettings: () => Settings,
-    private makeExtractor: (apiKey: string, model: string, onModelReplaced?: (model: string) => void) => Extractor = createGeminiExtractor,
+    private makeExtractor: (apiKey: string, model: string, onModelReplaced?: (model: string) => void, onUsage?: UsageListener) => Extractor = createGeminiExtractor,
     /** Called when Gemini no longer knew the configured model and another was used. */
     private onModelReplaced?: (model: string) => void,
     /** Reads the text on a photo on the phone; null where that isn't available. */
@@ -127,7 +130,12 @@ export class JobWorker {
     if (readingMode === 'gemini' && !this.status.online) return;
 
     this.setStatus({ processing: true });
-    const extractor = useGemini ? this.makeExtractor(geminiApiKey, geminiModel, this.onModelReplaced) : null;
+    // Every request is counted for Settings → Gemini use, and its tokens noted in the reading's log entry.
+    const onUsage: UsageListener = (call) => {
+      recordGeminiUsage(call);
+      this.tokens = (this.tokens ?? 0) + call.sent + call.answered;
+    };
+    const extractor = useGemini ? this.makeExtractor(geminiApiKey, geminiModel, this.onModelReplaced, onUsage) : null;
     try {
       let waiting: string | null = null;
       for (const job of pending) waiting = (await this.process(job, extractor)) ?? waiting;
@@ -169,8 +177,14 @@ export class JobWorker {
     const started = performance.now();
     const facts: Record<string, string | number | boolean> = { kind: job.quote_id ? 'quote' : 'entry', textChars: job.text.length };
     const input = job.text.trim() ? `in: ${job.text.trim().slice(0, 300)}` : '';
+    this.tokens = null;
     const logReading = (outcome: string, extra: Record<string, string | number | boolean> = {}, out = '') =>
-      log('ai', `reading ${outcome}`, { ...facts, ms: Math.round(performance.now() - started), model: this.getSettings().geminiModel, ...extra }, [input, out].filter(Boolean).join('\n    '));
+      log(
+        'ai',
+        `reading ${outcome}`,
+        { ...facts, ms: Math.round(performance.now() - started), model: this.getSettings().geminiModel, ...(this.tokens !== null ? { tokens: this.tokens } : {}), ...extra },
+        [input, out].filter(Boolean).join('\n    '),
+      );
     try {
       const images = await getJobImages(this.db, job.id);
       facts.photos = images.length;

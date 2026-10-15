@@ -8,16 +8,19 @@ import {
   backupFilename,
   clearLog,
   describeLastBackup,
+  geminiUsageToday,
   getLog,
   issueUrl,
   listReadingModels,
   loadConversions,
   logAsText,
   logStep,
+  onGeminiUsage,
   recordBackup,
   resetConversions,
   saveConversions,
   testGeminiKey,
+  usageSummary,
   type ModelOption,
   type ReadingMode,
 } from '@nirman/core';
@@ -27,7 +30,7 @@ import { useDialogs } from '../components/ui/Dialogs';
 import { Field, Label, NumberField } from '../components/ui/fields';
 import { Icon } from '../components/ui/Icon';
 import { Select } from '../components/ui/Select';
-import { Sheet, SheetHeader } from '../components/ui/Sheet';
+import { Sheet, SheetHeader, SheetOption } from '../components/ui/Sheet';
 import { Tabs } from '../components/ui/Tabs';
 import { pickBackupFile } from '../lib/backupFile';
 import { latestNotes } from '../lib/changelog';
@@ -38,6 +41,7 @@ import { look, onLookChange, setAccent, setThemeChoice, setThemeStyle, themeChoi
 import { useAppState } from '../state/AppState';
 import { paletteFor, useColors } from '../theme';
 import { useCircleReveal } from '../components/CircleReveal';
+import { GeminiUseSheet } from './GeminiUseSheet';
 
 /**
  * Gemini key, how bills are read, appearance, backup, and what is on this phone. On first launch it is a short
@@ -46,37 +50,41 @@ import { useCircleReveal } from '../components/CircleReveal';
  */
 export function SettingsSheet({ onClose, firstRun, onWhatsNew }: { onClose(): void; firstRun?: 'welcome' | 'key-again'; onWhatsNew?(): void }) {
   const c = useColors();
+  const [geminiUse, setGeminiUse] = useState(false);
   return (
-    <Sheet kind="screen" onClose={onClose} label={firstRun ? 'Welcome' : 'Settings'} gap={24}>
-      <SheetHeader icon="settings" title={firstRun === 'key-again' ? 'Nirman is updated' : firstRun ? 'Welcome' : 'Settings'} onClose={onClose} />
-      {firstRun === 'welcome' && (
-        <Hint>
-          Everything you record is stored only on this phone and works offline. Printed bills, typed lists and clear vendor quotes are read on the phone. For handwritten
-          bills and unclear quotes, add your own Google Gemini API key below. You can skip this and add it later from Settings.
-        </Hint>
-      )}
-      {firstRun === 'key-again' && (
-        <View style={{ gap: 8 }}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: c.gray800 }}>Paste your Gemini key again (needed once after this update).</Text>
-          <Hint>All your purchase lists, BOQs, contracts and rates are here as before. Only the key has to be pasted again. The app works without it; bills are then read on the phone.</Hint>
-        </View>
-      )}
-      <ApiKeySection onSaved={firstRun ? onClose : undefined} />
-      {firstRun ? (
-        <Button variant="secondary" block onPress={onClose}>
-          Skip for now
-        </Button>
-      ) : (
-        <>
-          <AppearanceSection />
-          <ReadingSection />
-          <BackupSection />
-          <ConversionsSection />
-          <DiagnosticsSection />
-          <StorageSection onWhatsNew={onWhatsNew} />
-        </>
-      )}
-    </Sheet>
+    <>
+      <Sheet kind="screen" onClose={onClose} label={firstRun ? 'Welcome' : 'Settings'} gap={24} backEnabled={!geminiUse}>
+        <SheetHeader icon="settings" title={firstRun === 'key-again' ? 'Nirman is updated' : firstRun ? 'Welcome' : 'Settings'} onClose={onClose} />
+        {firstRun === 'welcome' && (
+          <Hint>
+            Everything you record is stored only on this phone and works offline. Printed bills, typed lists and clear vendor quotes are read on the phone. For handwritten
+            bills and unclear quotes, add your own Google Gemini API key below. You can skip this and add it later from Settings.
+          </Hint>
+        )}
+        {firstRun === 'key-again' && (
+          <View style={{ gap: 8 }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: c.gray800 }}>Paste your Gemini key again (needed once after this update).</Text>
+            <Hint>All your purchase lists, BOQs, contracts and rates are here as before. Only the key has to be pasted again. The app works without it; bills are then read on the phone.</Hint>
+          </View>
+        )}
+        <ApiKeySection onSaved={firstRun ? onClose : undefined} onGeminiUse={firstRun ? undefined : () => setGeminiUse(true)} />
+        {firstRun ? (
+          <Button variant="secondary" block onPress={onClose}>
+            Skip for now
+          </Button>
+        ) : (
+          <>
+            <AppearanceSection />
+            <ReadingSection />
+            <BackupSection />
+            <ConversionsSection />
+            <DiagnosticsSection />
+            <StorageSection onWhatsNew={onWhatsNew} />
+          </>
+        )}
+      </Sheet>
+      {geminiUse && <GeminiUseSheet onClose={() => setGeminiUse(false)} />}
+    </>
   );
 }
 
@@ -104,8 +112,10 @@ function LinkButton({ children, onPress, danger, label, disabled }: { children: 
   );
 }
 
-function ApiKeySection({ onSaved }: { onSaved?(): void }) {
+function ApiKeySection({ onSaved, onGeminiUse }: { onSaved?(): void; onGeminiUse?(): void }) {
   const c = useColors();
+  // Today's requests, updated as they are counted (Test key below, or a reading meanwhile).
+  const today = useSyncExternalStore(onGeminiUsage, () => usageSummary(geminiUsageToday()));
   const { settings, actions } = useAppState();
   const [key, setKey] = useState(settings.geminiApiKey);
   const [model, setModel] = useState(settings.geminiModel);
@@ -207,6 +217,7 @@ function ApiKeySection({ onSaved }: { onSaved?(): void }) {
           Save
         </Button>
       </View>
+      {onGeminiUse && <SheetOption icon="data-usage" label="Gemini use" about={`Today: ${today}`} onPress={onGeminiUse} />}
     </View>
   );
 }
