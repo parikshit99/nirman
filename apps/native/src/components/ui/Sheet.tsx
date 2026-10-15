@@ -1,5 +1,5 @@
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
-import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, type ComponentType, type ReactNode } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Pressable } from './Pressable';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -50,6 +50,7 @@ interface SheetProps {
  */
 export function Sheet({ kind = 'sheet', onClose, onBack, backEnabled = true, busy = false, closeOnBackdrop = false, scroll = true, open = true, label, padding = 16, gap = 12, children }: SheetProps) {
   const c = useColors();
+  const Overlay = useContext(SheetOverlay);
   const handleBack = busy ? undefined : (onBack ?? onClose);
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
@@ -93,11 +94,18 @@ export function Sheet({ kind = 'sheet', onClose, onBack, backEnabled = true, bus
               <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>{body()}</View>
             </SlideScreen>
           )}
+          {open && Overlay && <Overlay />}
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </Modal>
   );
 }
+
+/**
+ * Drawn on top of each open dialog and screen. A Modal is its own window above the app, so Dialogs puts its
+ * Snackbar here: toasts and the Undo strip show on the topmost window instead of behind it (#116, #122).
+ */
+export const SheetOverlay = createContext<ComponentType | null>(null);
 
 /** Lets SheetHeader's close button play the screen's slide-out before it closes. */
 const SheetMotion = createContext<{ leave(then: () => void): void } | null>(null);
