@@ -1,6 +1,6 @@
 # Building the app on the owner's PC
 
-CI's app build (the `native` job: the APK, about 6 to 11 minutes on GitHub) can run on the owner's Windows 11 PC instead, where it costs no Actions minutes. The PC has more cores than GitHub's free runners (2 for a private repo), and its caches (Gradle, ccache, the Android SDK) stay on its disk instead of being downloaded every run. `test` and `publish` always stay on GitHub.
+CI's app build (the `native` job: the APK, about 6 to 11 minutes on GitHub) can run on the owner's Windows 11 PC instead. For a public repository GitHub's runners are free too, so the gain is speed: the PC is faster when it has more cores than GitHub's runner (4), and its caches (Gradle, ccache, the Android SDK) stay on its disk instead of being downloaded every run. `test` and `publish` always stay on GitHub.
 
 The job runs in Ubuntu inside WSL2, so the CI scripts work unchanged. Uploading caches to GitHub is skipped on a self-hosted runner (`runner.environment`).
 
@@ -15,7 +15,7 @@ The repository variable `NATIVE_RUNNER` decides where `native` runs (*Settings �
 
 **While the PC is off or asleep, the build waits** (and fails after 24 hours), and nothing is published. Before a trip, delete the variable so CI goes back to GitHub.
 
-**The repository is public**, so anyone can open a pull request. CI never sends a pull request from a fork to the PC (`ci.yml`, `native`: only pushes, manual runs and branches of this repository), because that would run a stranger's code there. Keep it that way, and keep *Settings → Actions → General → Fork pull request workflows* on *Require approval for all external contributors*.
+**A pull request from a fork always builds on GitHub**, whatever `NATIVE_RUNNER` says: the repository is public, and a stranger's code must never run on the PC. See *Safety* for what keeps it that way.
 
 ## Setting up the PC (once)
 
@@ -76,8 +76,12 @@ Add the repository variable `NATIVE_RUNNER` = `self-hosted` (*Settings → Secre
 
 ## Safety
 
-- The repository is private, so only its collaborators' pushes run on the PC. If it is ever made public, delete `NATIVE_RUNNER` and remove the runners first: a public repo's pull requests could run code on the PC.
-- The release signing key reaches the PC as a repo secret during a build, is written to the runner's temporary folder for signing, and is deleted straight after (`.github/scripts/sign-apk.sh`).
+The repository is public, so anyone can fork it and open a pull request. Two guards keep a stranger's code off the PC; keep both:
+- **CI sends only this repository's own runs to the PC:** pushes to `main`, manual runs and pull requests from its own branches. A pull request from a fork builds on GitHub's machines (`ci.yml`, the `runs-on` of `native`). CI uses the `pull_request` trigger. Never add `pull_request_target`: it runs for a fork's pull request without approval, and this check would send that run to the PC.
+- **A fork's pull request runs only once you approve it.** It can change `ci.yml` itself, this check included. Keep *Settings → Actions → General → Approval for running fork pull request workflows from contributors* on *Require approval for all external contributors*, and approve a run only after checking that the pull request changes nothing in `.github/`.
+
+On the PC:
+- The release signing key reaches it as a repo secret during a build, is written to the runner's temporary folder for signing, and is deleted straight after (`.github/scripts/sign-apk.sh`).
 - The runners run as your WSL user, inside WSL, not as a Windows administrator.
 
 ## Removing it

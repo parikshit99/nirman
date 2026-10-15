@@ -9,7 +9,7 @@ An Android app for tracking construction materials on site. You photograph bills
 - **projects**, each with its own purchase lists, BOQs and labour contracts;
 - a **material price database** built from everything you record.
 
-Everything is stored **only on your phone**. There is no server or account. The app keeps a small diagnostic log (errors, AI reading results, steps taken, slow screens; never bill contents, prices, addresses or keys), which leaves the phone only when you send it from *Settings → Report a problem* or *Share log*.
+Everything is stored **only on your phone**. There is no server or account. To help fix problems, the app keeps a diagnostic log on the phone: errors, AI readings, the steps you take and slow screens, with what recent steps worked on, such as the text you typed or dictated, item names, rates, vendors, addresses and phone numbers; never photos or your API key. *Settings → Report a problem* opens a public GitHub issue for you to check and submit. It has only your note, the phone's details, recent errors and where they happened, and the names, times and counts of recent steps, readings and slow screens: no item names, rates, vendors, addresses or phone numbers. The full log leaves the phone only with *Share log*, sent to whoever you pick.
 
 **[⬇ Download the latest APK](https://github.com/parikshit99/nirman/releases/download/latest/nirman.apk)**: rebuilt automatically every time a change is merged into `main`.
 

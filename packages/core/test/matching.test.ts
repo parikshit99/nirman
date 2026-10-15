@@ -38,6 +38,18 @@ describe('matching lines as they are read (#89)', () => {
     expect(undone).toMatchObject({ item_name: 'Mount air', unit: 'pcs', quantity: 3, unit_price: 250, read_as: '' });
   });
 
+  it('saves a matched line read too long to keep as it was read, without the Undo (never cut JSON)', async () => {
+    const db = await freshDb();
+    await addItems(db, DRAFT_IDS.audit, [line('Mountair', 'piece', 2, 240)]);
+    const long = { ...line('mount-air', 'Pcs', 1, 245), brand: 'b'.repeat(900), spec: 's'.repeat(900), ordered_as: 'o'.repeat(900) };
+    const [stored] = await addTypedItems(db, DRAFT_IDS.audit, [long]);
+    expect(String(stored.read_as).length).toBeGreaterThan(2000);
+    const typed = (await loadSnapshot(db)).items.find((i) => i.original_term === 'mount-air')!;
+    expect(typed).toMatchObject({ item_name: 'Mountair', read_as: '' });
+    await undoMatch(db, typed.id);
+    expect((await loadSnapshot(db)).items.find((i) => i.id === typed.id)?.item_name).toBe('Mountair');
+  });
+
   it('matches lines typed by hand the same way', async () => {
     const db = await freshDb();
     await addItems(db, DRAFT_IDS.audit, [line('Mountair', 'piece', 2, 240)]);

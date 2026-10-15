@@ -1,6 +1,8 @@
 import {
   VARIANT_FIELDS,
   applyLearning,
+  buildItemDatabase,
+  fitRow,
   extractedMaterialSchema,
   extractedQuoteLineSchema,
   materialKey,
@@ -102,9 +104,14 @@ function nowISO(): string {
 // Generic row helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Insert or replace a row. It is fitted to its table first (fitRow: text cut to its limit, NaN and Infinity as 0),
+ * so every backup the app writes restores.
+ */
 export async function writeRow<T extends DataTable>(tx: SqlExecutor, table: T, row: RowTypes[T]) {
   const cols = tableColumns[table];
-  const values = cols.map((c) => (row as Record<string, SqlValue>)[c] ?? null);
+  const fitted = fitRow(table, row).row as Record<string, SqlValue>;
+  const values = cols.map((c) => fitted[c] ?? null);
   await tx.run(`INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, values);
 }
 
@@ -275,11 +282,13 @@ export async function setProjectStatus(db: Db, id: string, status: ProjectRow['s
 }
 
 /**
- * Delete a project with all its lists, BOQs (and their vendor quotes) and labour contracts. Prices it
- * added to Rates stay. A new "My site" is made if it was the last project.
+ * Delete a project with all its lists, BOQs (and their vendor quotes) and labour contracts. Its prices stay in
+ * Rates: the prices of its purchase lines are first kept as added rates (keepProjectRates), and rates it already
+ * had stay without a project. A new "My site" is made if it was the last project.
  */
 export async function deleteProject(db: Db, id: string) {
   await db.transaction(async (tx) => {
+    await keepProjectRates(tx, id);
     const lists = `SELECT id FROM lists WHERE project_id = ?`;
     await deleteQuotesWhere(tx, `boq_id IN (${lists})`, [id]);
     await deleteJobsWhere(tx, `list_id IN (${lists})`, [id]);
@@ -292,6 +301,51 @@ export async function deleteProject(db: Db, id: string) {
     await pruneBillPhotos(tx);
     await ensureProjectRows(tx);
   });
+}
+
+/**
+ * Before a project is deleted: each price its purchase lines give Rates (its saved purchase lists and open purchase
+ * list, not BOQs) becomes an added rate, so Rates shows the same prices without the lines. A rate takes what Rates
+ * used for its line: the material after learned corrections, the date, and when the price was recorded as
+ * `indexed_at` (so a material deleted from Rates stays deleted, and comes back with it if restored); the vendor (or
+ * Unknown), brand, model, size and colour, and the list's work type and site address, with no project. A price
+ * already there as an added rate (same material, variant, date, rate and vendor) is not added again.
+ */
+async function keepProjectRates(tx: SqlExecutor, projectId: string) {
+  const lists = await tx.all<ListRow>(selectAll('lists', 'created_at DESC'));
+  const purchases = new Map(lists.filter((l) => l.project_id === projectId && l.kind === 'audit').map((l) => [l.id, l]));
+  if (!purchases.size) return;
+  const items = await tx.all<ItemRow>(selectAll('items', 'created_at DESC, id'));
+  const learning = learningMap(await tx.all<LearnedTermRow>(selectAll('learned_terms', 'id')));
+  // A price as Rates tells them apart (a line's own price point is keyed the same way in buildItemDatabase).
+  const pointOf = (r: IndexedRateRow) => {
+    const { item_name, unit } = applyLearning(learning, r);
+    return JSON.stringify([materialKey(item_name, unit), variantKey(r), r.date, r.price, (r.vendor || 'Unknown').trim().toLowerCase()]);
+  };
+  const existing = new Set((await tx.all<IndexedRateRow>(selectAll('indexed_rates', 'indexed_at'))).map(pointOf));
+  const byId = new Map(items.map((i) => [i.id, i]));
+  // Rates' own rules pick the lines it counted (priced, named, not left out, not the open list's copy of a saved line),
+  // with the date and recorded time it gave each; the lists and items are in the order the app shows them.
+  for (const entry of buildItemDatabase(lists, items, [], learning)) {
+    for (const point of entry.priceHistory) {
+      const item = point.itemId ? byId.get(point.itemId) : undefined;
+      const list = item && purchases.get(item.list_id);
+      if (!item || !list || !Number.isFinite(point.price)) continue;
+      const rate: IndexedRateRow = {
+        id: newId(),
+        ...applyLearning(learning, item),
+        date: point.date,
+        price: point.price,
+        vendor: item.vendor || 'Unknown',
+        ...variantOf(item),
+        category: list.category,
+        address: list.address,
+        project_id: '',
+        indexed_at: point.timestamp,
+      };
+      if (!existing.has(pointOf(rate))) await writeRow(tx, 'indexed_rates', rate);
+    }
+  }
 }
 
 /** Move a saved list or BOQ (with its vendor quotes) to another project. */
@@ -381,8 +435,9 @@ export async function addTypedItems(db: Db, listId: string, materials: MaterialI
 export type ItemPatch = Partial<Pick<ItemRow, 'item_name' | 'quantity' | 'unit' | 'unit_price' | 'vendor' | 'date' | 'delivered_at' | 'ordered_as' | 'rates_excluded' | VariantField>>;
 
 /**
- * Save an edited item. When the name or unit changed, remember the correction
- * for its original term so future extractions and the database use it.
+ * Save an edited item. Its total is worked out again only when the quantity or rate changed, so a billed total (with
+ * GST or rounding) survives other corrections. When the name or unit changed, remember the correction for its
+ * original term so future extractions and the database use it.
  */
 export async function updateItem(db: Db, id: string, patch: ItemPatch) {
   await db.transaction(async (tx) => {
@@ -391,10 +446,10 @@ export async function updateItem(db: Db, id: string, patch: ItemPatch) {
     const next = { ...item, ...patch };
     next.quantity = Number(next.quantity) || 0;
     next.unit_price = Number(next.unit_price) || 0;
-    next.total_amount = next.quantity * next.unit_price;
+    if (next.quantity !== item.quantity || next.unit_price !== item.unit_price) next.total_amount = next.quantity * next.unit_price;
     await touch(tx, 'items', next);
 
-    const term = normalizeTerm(item.original_term || item.item_name);
+    const term = termOf(item);
     if (term && (next.item_name !== item.item_name || next.unit !== item.unit)) {
       await touch(tx, 'learned_terms', { id: term, item_name: next.item_name, unit: next.unit, updated_at: '' });
     }
@@ -472,7 +527,9 @@ export async function saveDraftToHistory(db: Db, draftId: string, meta: ListMeta
 
 /** Put one vendor on every line of a list, e.g. when the bill was read with the buyer's name as vendor. */
 export async function setListVendor(db: Db, listId: string, vendor: string) {
-  await db.run('UPDATE items SET vendor = ?, updated_at = ? WHERE list_id = ?', [vendor.trim(), nowISO(), listId]);
+  // Written without writeRow, so fitted here the same way.
+  const { row } = fitRow('items', { vendor: vendor.trim() });
+  await db.run('UPDATE items SET vendor = ?, updated_at = ? WHERE list_id = ?', [row.vendor, nowISO(), listId]);
 }
 
 export async function updateListMeta(db: Db, id: string, meta: ListMeta) {
@@ -544,8 +601,14 @@ export interface MaterialRef {
   unit: string;
 }
 
-/** The word a row was read from; learned corrections are keyed by it. */
-const termOf = (row: { item_name: string; original_term?: string }) => normalizeTerm(row.original_term || row.item_name);
+/**
+ * The word a row was read from; learned corrections are keyed by it. Taken from the row as it is saved (fitRow), so the
+ * key stays within learned_terms' limit even for a line stored before saving fitted rows.
+ */
+const termOf = (row: { item_name: string; original_term?: string }) => {
+  const saved = fitRow('items', { item_name: row.item_name, original_term: row.original_term ?? '' }).row;
+  return normalizeTerm(saved.original_term || saved.item_name);
+};
 
 /** Saved-list items (and the open purchase list) and added rates that make up the given materials. */
 async function materialRowsTx(tx: SqlExecutor, keys: Set<string>) {
@@ -817,7 +880,8 @@ export async function deleteIndexedRate(db: Db, id: string) {
 }
 
 export async function addCategory(db: Db, name: string) {
-  const trimmed = name.trim();
+  // The id is made from the name as saved (fitRow), so it stays within its own limit.
+  const trimmed = fitRow('categories', { name: name.trim() }).row.name.trim();
   if (!trimmed) return;
   await db.transaction(async (tx) => {
     const id = trimmed.toLowerCase();
@@ -1185,6 +1249,7 @@ export async function updateQuote(db: Db, id: string, patch: Partial<Pick<QuoteR
 
 export type QuoteLinePatch = Partial<Pick<QuoteLineRow, 'boq_item_id' | 'item_name' | 'quantity' | 'unit' | 'unit_price' | VariantField>>;
 
+/** Correct a quote line; its total is worked out again only when the quantity or rate changed (it keeps the vendor's own). */
 export async function updateQuoteLine(db: Db, id: string, patch: QuoteLinePatch) {
   await db.transaction(async (tx) => {
     const line = await getRow(tx, 'quote_lines', id);
@@ -1192,7 +1257,7 @@ export async function updateQuoteLine(db: Db, id: string, patch: QuoteLinePatch)
     const next = { ...line, ...patch };
     next.quantity = Number(next.quantity) || 0;
     next.unit_price = Number(next.unit_price) || 0;
-    next.total_amount = next.quantity * next.unit_price;
+    if (next.quantity !== line.quantity || next.unit_price !== line.unit_price) next.total_amount = next.quantity * next.unit_price;
     await writeRow(tx, 'quote_lines', next);
   });
 }
@@ -1236,7 +1301,7 @@ export async function confirmQuote(db: Db, id: string) {
         address: boqList?.address ?? '',
         project_id: boqList?.project_id ?? '',
       });
-      const term = normalizeTerm(line.original_term);
+      const term = line.original_term ? termOf(line) : '';
       if (item && unitMatches && term && term !== normalizeTerm(item.item_name)) {
         await touch(tx, 'learned_terms', { id: term, item_name: item.item_name, unit: item.unit, updated_at: '' });
       }
