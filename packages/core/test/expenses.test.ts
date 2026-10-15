@@ -104,6 +104,19 @@ describe('site expenses', () => {
     expect((await loadSnapshot(target)).expenses).toEqual((await loadSnapshot(db)).expenses);
   });
 
+  it('moves an expense of a project missing from the backup into a project, so it still shows', async () => {
+    const db = await freshDb();
+    await saveExpense(db, rent(await projectOf(db)));
+    const backup = await exportBackup(db);
+    backup.expenses[0].project_id = 'gone';
+
+    const target = await freshDb();
+    await restoreBackup(target, parseBackup(JSON.stringify(backup)));
+    const snapshot = await loadSnapshot(target);
+    expect(snapshot.expenses).toHaveLength(1);
+    expect(snapshot.projects.map((p) => p.id)).toContain(snapshot.expenses[0].project_id);
+  });
+
   it('restores a backup from 7.5 (version 14, the sample file) with no expenses and everything else', async () => {
     const file = parseBackupFile(new TextEncoder().encode(sampleV14));
     expect(file.backup.version).toBe(14);

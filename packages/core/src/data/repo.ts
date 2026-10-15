@@ -215,6 +215,10 @@ async function ensureProjectRows(tx: SqlExecutor) {
       if (!known.has(row.project_id)) await tx.run(`UPDATE ${table} SET project_id = ? WHERE id = ?`, [await projectFor(row.address, row.created_at), row.id]);
     }
   }
+  // Expenses have no site address: one whose project is unknown (a hand-edited backup) goes to the project without one.
+  for (const row of await tx.all<{ id: string; created_at: string; project_id: string }>('SELECT id, created_at, project_id FROM expenses ORDER BY created_at')) {
+    if (!known.has(row.project_id)) await tx.run('UPDATE expenses SET project_id = ? WHERE id = ?', [await projectFor('', row.created_at), row.id]);
+  }
   // Rates from confirmed quotes: the project of their site, where there is one.
   for (const rate of await tx.all<{ id: string; address: string }>(`SELECT id, address FROM indexed_rates WHERE project_id = '' AND address != ''`)) {
     const id = byAddress.get(siteKey(rate.address));
