@@ -142,10 +142,12 @@ flowchart LR
   C --> PY[Payments]
   C --> AD["Advances (kharcha)"]
   C --> DD[Deductions]
-  WM & PY & AD & DD --> BAL[Balance due<br/>retention held;<br/>Paid ahead in red if paid<br/>more than the work]
+  WM & PY & AD & DD --> BAL[Balance due<br/>retention held;<br/>Paid ahead in red if paid<br/>more than the work,<br/>Overpaid once closed]
   BAL --> CL[Close contract<br/>releases the retention]
   BAL --> ST[Statement · Site report<br/>PDF, Excel or JPG]
 ```
+
+A lump sum never earns more than its amount: work entries past 100% add nothing (the form warns when one would). A rate job is owed on everything measured, past its estimate too. Totals over several contracts (the Labour tab, the site report) show what is due and what was paid ahead separately, never one netted against the other.
 
 Labour entries never feed Rates. The project's site report brings purchases and labour together.
 

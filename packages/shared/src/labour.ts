@@ -16,13 +16,20 @@ export function workValue(c: Pick<ContractRow, 'kind' | 'rate' | 'amount'>, e: P
 /** Agreed value: the lump sum, or estimated quantity × rate (0 when no estimate). */
 export const contractValue = (c: ContractRow) => (c.kind === 'rate' ? c.est_quantity * c.rate : c.amount);
 
+/**
+ * Work counted for a total of work entries worth `value`: a lump sum never earns more than its amount, however much
+ * past 100% the entries add up to; a rate job is owed on everything measured, past the estimate too.
+ */
+const counted = (c: Pick<ContractRow, 'kind' | 'amount'>, value: number) => (c.kind === 'rate' ? value : Math.min(value, Math.max(0, c.amount)));
+
 export interface ContractTotals {
   /** Agreed or estimated value of the whole job. */
   value: number;
-  /** Quantity measured (rate) or % done (lump sum). */
+  /** Quantity measured (rate) or % done (lump sum), as entered: may be past the estimate or 100%. */
   doneQty: number;
-  /** Share of the job done, 0–1, or null when there is no estimate. */
+  /** Share of the job done (1 = all of it, more when measured past it), or null when there is no estimate. */
   progress: number | null;
+  /** Value of the work, a lump sum's capped at its amount. */
   workDone: number;
   /** Held back from the work done; 0 once released. */
   retention: number;
@@ -60,6 +67,7 @@ export function contractTotals(c: ContractRow, entries: ContractEntryRow[], upTo
     } else deductions += e.amount;
     if (e.date > lastDate) lastDate = e.date;
   }
+  workDone = counted(c, workDone);
   const released = !!c.retention_released_at && (!upTo || c.retention_released_at <= upTo);
   const retention = released ? 0 : (workDone * (c.retention_pct || 0)) / 100;
   const payable = workDone - retention - deductions;
@@ -79,10 +87,44 @@ export function contractTotals(c: ContractRow, entries: ContractEntryRow[], upTo
   };
 }
 
-/** Totals over several contracts (e.g. one site), summed field by field. */
-export function sumTotals(list: ContractTotals[]): Pick<ContractTotals, 'value' | 'workDone' | 'retention' | 'deductions' | 'paid' | 'payable' | 'balance'> {
+/** What is owed across contracts, without netting one contractor's overpayment against another's dues. */
+export interface DuesSplit {
+  /** Sum of the balances still due (the positive ones). */
+  due: number;
+  /** Sum of what was paid ahead of the work (the negative balances, as a positive amount). */
+  paidAhead: number;
+}
+
+const splitDues = (balances: number[]): DuesSplit => ({
+  due: round2(balances.reduce((a, b) => a + Math.max(0, b), 0)),
+  paidAhead: round2(balances.reduce((a, b) => a - Math.min(0, b), 0)),
+});
+
+/** Totals over several contracts (e.g. one site), summed field by field, plus what is due and paid ahead. */
+export function sumTotals(list: ContractTotals[]): Pick<ContractTotals, 'value' | 'workDone' | 'retention' | 'deductions' | 'paid' | 'payable' | 'balance'> & DuesSplit {
   const sum = (f: keyof ContractTotals) => round2(list.reduce((a, t) => a + (t[f] as number), 0));
-  return { value: sum('value'), workDone: sum('workDone'), retention: sum('retention'), deductions: sum('deductions'), paid: sum('paid'), payable: sum('payable'), balance: sum('balance') };
+  return {
+    value: sum('value'),
+    workDone: sum('workDone'),
+    retention: sum('retention'),
+    deductions: sum('deductions'),
+    paid: sum('paid'),
+    payable: sum('payable'),
+    balance: sum('balance'),
+    ...splitDues(list.map((t) => t.balance)),
+  };
+}
+
+/** What a balance is called: "Balance due", "Paid ahead of work" (or "Overpaid" once the contract is closed), "Balance". */
+export function balanceLabel(c: Pick<ContractRow, 'status'>, balance: number): string {
+  if (balance < 0) return c.status === 'closed' ? 'Overpaid' : 'Paid ahead of work';
+  return balance > 0 ? 'Balance due' : 'Balance';
+}
+
+/** "Measured 5,000 of about 4,000 sqft" for a rate job measured past its estimate (the rate is owed on all of it); otherwise null. */
+export function pastEstimate(c: ContractRow, t: Pick<ContractTotals, 'doneQty'>): string | null {
+  if (c.kind !== 'rate' || !(c.est_quantity > 0) || t.doneQty <= c.est_quantity) return null;
+  return `Measured ${formatQty(t.doneQty)} of about ${formatQty(c.est_quantity)} ${c.unit || 'unit'}`;
 }
 
 const PAYMENT_MODES: Record<string, string> = { cash: 'Cash', upi: 'UPI', bank: 'Bank transfer', cheque: 'Cheque' };
@@ -133,9 +175,16 @@ export function contractStatement(c: ContractRow, entries: ContractEntryRow[], o
     .sort((a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at));
   let balance = 0;
   let opening: number | null = null;
+  /** Work entered so far, before the lump-sum cap. */
+  let entered = 0;
   const rows: StatementRow[] = [];
   for (const e of own) {
-    const work = e.kind === 'work' ? workValue(c, e) : 0;
+    let work = 0;
+    if (e.kind === 'work') {
+      // Only what is left of a lump sum counts: an entry past 100% adds nothing.
+      work = counted(c, entered + workValue(c, e)) - counted(c, entered);
+      entered += workValue(c, e);
+    }
     const deduction = e.kind === 'deduction' ? e.amount : 0;
     const paid = isPaidOut(e.kind) ? e.amount : 0;
     if (opts.from && e.date < opts.from) {
@@ -163,7 +212,10 @@ export interface LabourReport {
   rows: LabourReportRow[];
   workDone: number;
   paid: number;
+  /** Net of every balance; `due` and `paidAhead` keep them apart. */
   balance: number;
+  due: number;
+  paidAhead: number;
 }
 
 /** Labour on one site for the site report: work done and paid per contract in the period. */
@@ -178,19 +230,26 @@ export function buildLabourReport(
   for (const c of contracts) {
     if (opts.address !== undefined && c.address !== opts.address) continue;
     if (wanted.size && !wanted.has((c.category || 'Uncategorised').toLowerCase())) continue;
+    let before = 0;
     let workDone = 0;
     let paid = 0;
     let any = false;
     for (const e of entries) {
-      if (e.contract_id !== c.id || (opts.from && e.date < opts.from) || (opts.to && e.date > opts.to)) continue;
+      if (e.contract_id !== c.id || (opts.to && e.date > opts.to)) continue;
+      if (opts.from && e.date < opts.from) {
+        if (e.kind === 'work') before += workValue(c, e);
+        continue;
+      }
       any = true;
       if (e.kind === 'work') workDone += workValue(c, e);
       else if (isPaidOut(e.kind)) paid += e.amount;
     }
     if (!any && (opts.from || opts.to)) continue;
+    // A lump sum's work in the period is only what was left of it at the start.
+    workDone = counted(c, before + workDone) - counted(c, before);
     rows.push({ contract: c, workDone: round2(workDone), paid: round2(paid), balance: contractTotals(c, entries).balance });
   }
   rows.sort((a, b) => b.workDone - a.workDone || a.contract.contractor.localeCompare(b.contract.contractor));
   const sum = (f: 'workDone' | 'paid' | 'balance') => round2(rows.reduce((a, r) => a + r[f], 0));
-  return { rows, workDone: sum('workDone'), paid: sum('paid'), balance: sum('balance') };
+  return { rows, workDone: sum('workDone'), paid: sum('paid'), balance: sum('balance'), ...splitDues(rows.map((r) => r.balance)) };
 }

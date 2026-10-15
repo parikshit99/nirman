@@ -1,6 +1,6 @@
 import type { jsPDF } from 'jspdf';
 import type { SheetData } from 'write-excel-file/browser';
-import { describeTerms, formatRupees, type ContractRow, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
+import { balanceLabel, describeTerms, formatRupees, type ContractRow, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
 import { madeByLine, pdfToBase64, type OrderSlipDetails } from './pdf.ts';
 
@@ -98,7 +98,10 @@ export function siteReportSheet(address: string, filters: string, report: SiteRe
   if (hasLabour) {
     rows.push([], [bold('Labour')], ['Contractor', 'Work', 'Work type', 'Work done', 'Paid', 'Balance now'].map(bold));
     for (const r of labour!.rows) rows.push([r.contract.contractor, r.contract.work, r.contract.category, money(r.workDone), money(r.paid), money(r.balance)]);
-    rows.push([null, null, bold('Labour total'), { ...money(labour!.workDone), fontWeight: 'bold' }, { ...money(labour!.paid), fontWeight: 'bold' }, { ...money(labour!.balance), fontWeight: 'bold' }]);
+    // What is due and what was paid ahead stay apart: one contractor's overpayment is not another's dues paid.
+    rows.push([null, null, bold('Labour total'), { ...money(labour!.workDone), fontWeight: 'bold' }, { ...money(labour!.paid), fontWeight: 'bold' }, null]);
+    rows.push([null, null, null, null, bold('Due'), { ...money(labour!.due), fontWeight: 'bold' }]);
+    if (labour!.paidAhead > 0) rows.push([null, null, null, null, bold('Paid ahead'), { ...money(labour!.paidAhead), fontWeight: 'bold' }]);
     rows.push([bold('GRAND TOTAL (materials + labour work done)'), null, null, null, null, { ...money(report.total + labour!.workDone), fontWeight: 'bold' }]);
   }
   rows.push([], [bold('All lines')]);
@@ -127,7 +130,7 @@ export function contractStatementSheet(c: ContractRow, st: ContractStatement, pe
   if (c.retention_pct > 0) rows.push([null, `Less retention ${c.retention_pct}%${c.retention_released_at ? ' (released)' : ' (held)'}`, null, null, null, money(t.retention)]);
   if (t.deductions) rows.push([null, 'Less deductions', null, null, null, money(t.deductions)]);
   rows.push([null, 'Less paid', null, null, null, money(t.paid)]);
-  rows.push([null, bold(t.balance < 0 ? 'Paid ahead of work' : 'Balance due'), null, null, null, { ...money(Math.abs(t.balance)), fontWeight: 'bold' }]);
+  rows.push([null, bold(t.balance ? balanceLabel(c, t.balance) : 'Balance due'), null, null, null, { ...money(Math.abs(t.balance)), fontWeight: 'bold' }]);
   return rows;
 }
 

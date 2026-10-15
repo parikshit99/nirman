@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildLabourReport, contractStatement, contractTotals, describeEntry, describeTerms, type ContractEntryRow, type ContractRow } from '../src/index.ts';
+import { balanceLabel, buildLabourReport, contractStatement, contractTotals, describeEntry, describeTerms, pastEstimate, sumTotals, type ContractEntryRow, type ContractRow } from '../src/index.ts';
 
 const ts = '2026-10-01T00:00:00.000Z';
 const plaster: ContractRow = {
@@ -70,5 +70,57 @@ describe('labour contracts', () => {
     expect(civil.rows).toHaveLength(1);
     expect(civil.rows[0]).toMatchObject({ workDone: 27000, paid: 30000, balance: 7050 });
     expect(buildLabourReport([plaster], entries, { address: 'Elsewhere' }).rows).toHaveLength(0);
+  });
+
+  it('never counts a lump sum past 100% of the amount, but keeps the true % done (#117)', () => {
+    const job = { ...plumbing, id: 'c9' };
+    const over = [
+      entry('c9', 'work', '2026-09-01', 40),
+      entry('c9', 'work', '2026-09-10', 70),
+      entry('c9', 'payment', '2026-09-11', 200000),
+      entry('c9', 'work', '2026-09-20', 100),
+      entry('c9', 'payment', '2026-09-21', 100000),
+    ];
+    const t = contractTotals(job, over);
+    expect(t).toMatchObject({ workDone: 250000, doneQty: 210, payable: 250000, paid: 300000, balance: -50000 });
+    expect(t.progress).toBeCloseTo(2.1);
+    // The statement counts only what is left of the job: 40% = 1,00,000, then 60% (1,50,000), then nothing.
+    const st = contractStatement(job, over);
+    expect(st.rows.map((r) => r.work)).toEqual([100000, 150000, 0, 0, 0]);
+    expect(st.rows.at(-1)!.balance).toBe(-50000);
+    expect(contractStatement(job, over, { from: '2026-09-15' }).opening).toBe(50000);
+    // The site report too, over all time and for a period.
+    expect(buildLabourReport([job], over, {})).toMatchObject({ workDone: 250000, balance: -50000 });
+    expect(buildLabourReport([job], over, { from: '2026-09-05' }).workDone).toBe(150000);
+    expect(buildLabourReport([job], over, { from: '2026-09-15' }).workDone).toBe(0);
+  });
+
+  it('owes the rate on all of a job measured past its estimate, and says so (#117)', () => {
+    const past = [entry('c1', 'work', '2026-09-10', 5000)];
+    const t = contractTotals({ ...plaster, retention_pct: 0 }, past);
+    expect(t).toMatchObject({ workDone: 90000, balance: 90000, doneQty: 5000 });
+    expect(pastEstimate(plaster, t)).toBe('Measured 5,000 of about 4,000 sqft');
+    expect(pastEstimate(plaster, contractTotals(plaster, entries))).toBeNull();
+    expect(pastEstimate({ ...plaster, est_quantity: 0 }, t)).toBeNull();
+    expect(pastEstimate(plumbing, contractTotals(plumbing, [entry('c2', 'work', '2026-09-10', 120)]))).toBeNull();
+  });
+
+  it('never nets one contractor paid ahead against another who is due (#117)', () => {
+    const owed = { ...plaster, id: 'c7', retention_pct: 0, est_quantity: 0 };
+    const ahead = { ...plaster, id: 'c8', contractor: 'Mahesh', retention_pct: 0, est_quantity: 0 };
+    const both = [entry('c7', 'work', '2026-09-10', 2000), entry('c7', 'payment', '2026-09-11', 6000), entry('c8', 'advance', '2026-09-12', 20000)];
+    const totals = [contractTotals(owed, both), contractTotals(ahead, both)];
+    expect(totals.map((t) => t.balance)).toEqual([30000, -20000]);
+    expect(sumTotals(totals)).toMatchObject({ balance: 10000, due: 30000, paidAhead: 20000 });
+    expect(buildLabourReport([owed, ahead], both, {})).toMatchObject({ balance: 10000, due: 30000, paidAhead: 20000 });
+    expect(sumTotals([totals[0]])).toMatchObject({ due: 30000, paidAhead: 0 });
+  });
+
+  it('names the balance, and says Overpaid once a contract paid ahead is closed (#117)', () => {
+    expect(balanceLabel(plaster, 100)).toBe('Balance due');
+    expect(balanceLabel(plaster, 0)).toBe('Balance');
+    expect(balanceLabel(plaster, -100)).toBe('Paid ahead of work');
+    expect(balanceLabel({ ...plaster, status: 'closed' }, -100)).toBe('Overpaid');
+    expect(balanceLabel({ ...plaster, status: 'closed' }, 100)).toBe('Balance due');
   });
 });

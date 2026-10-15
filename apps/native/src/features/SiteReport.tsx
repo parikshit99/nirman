@@ -159,6 +159,8 @@ export function SiteReport({ onClose }: { onClose(): void }) {
             {empty && <Text style={{ fontSize: 12, color: c.gray500, textAlign: 'center' }}>Nothing matches.{deliveredOnly ? ' Tick deliveries in Saved → Deliveries, or include all saved purchases.' : ''}</Text>}
           </View>
         )}
+        {/* The share sheet goes inside this screen, or it opens behind it (#116). */}
+        {sharing && <ShareSheet title="site report" onShare={share} preview={() => buildSiteReportPdf(address, filters, report, labour)} onClose={() => setSharing(false)} />}
       </Sheet>
       {previewing && (
         <DocumentPreview
@@ -172,7 +174,6 @@ export function SiteReport({ onClose }: { onClose(): void }) {
           onClose={() => setPreviewing(false)}
         />
       )}
-      {sharing && <ShareSheet title="site report" onShare={share} preview={() => buildSiteReportPdf(address, filters, report, labour)} onClose={() => setSharing(false)} />}
     </>
   );
 }

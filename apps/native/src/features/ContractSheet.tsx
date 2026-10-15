@@ -2,12 +2,14 @@ import { useState, type ReactNode } from 'react';
 import { Linking, Text, View } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
 import {
+  balanceLabel,
   contractTotals,
   describeEntry,
   describeTerms,
   fieldLimits,
   parseAmount,
   paymentModeLabel,
+  pastEstimate,
   paymentModes,
   todayISO,
   workValue,
@@ -31,8 +33,11 @@ import { StatementSheet } from './StatementSheet';
 
 const KIND_LABEL: Record<ContractEntryKind, string> = { work: 'Work done', payment: 'Payment', advance: 'Advance (kharcha)', deduction: 'Deduction' };
 
-/** One contract: its terms, what is owed, and every measurement, payment and deduction. */
-export function ContractSheet({ contractId, onEdit, onClose }: { contractId: string; onEdit(c: ContractRow): void; onClose(): void }) {
+/**
+ * One contract: its terms, what is owed, and every measurement, payment and deduction. `children` is a sheet opened
+ * over it (the Edit terms form): a bottom sheet must sit inside this screen to show above it, and Back goes to it.
+ */
+export function ContractSheet({ contractId, onEdit, onClose, children }: { contractId: string; onEdit(c: ContractRow): void; onClose(): void; children?: ReactNode }) {
   const c = useColors();
   const { contracts, entriesFor, actions, pendingDeletes } = useAppState();
   const dialogs = useDialogs();
@@ -75,138 +80,138 @@ export function ContractSheet({ contractId, onEdit, onClose }: { contractId: str
   );
 
   return (
-    <>
-      <Sheet kind="screen" label={`Contract with ${contract.contractor}`} onClose={onClose} backEnabled={!entryForm && !statementOpen} gap={12}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text accessibilityRole="header" style={{ fontSize: 18, fontWeight: '700', color: c.gray900 }}>
-              {contract.contractor}
-            </Text>
-            <Text style={{ fontSize: 14, color: c.gray700 }}>{contract.work || 'Work not described'}</Text>
-            <Text style={{ fontSize: 12, color: c.gray500 }}>{[contract.address, contract.category, contract.start_date && `from ${contract.start_date}`].filter(Boolean).join(' · ')}</Text>
-            <Text style={{ fontSize: 12, color: c.gray500 }}>{describeTerms(contract, rupeesWhole)}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {!!contract.phone && (
-              <Pressable accessibilityRole="button" accessibilityLabel={`Call ${contract.contractor}`} onPress={() => void Linking.openURL(`tel:${contract.phone}`)} style={{ minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: c.green50 }}>
-                <Icon name="call" size={16} color={c.green700} />
-              </Pressable>
-            )}
-            <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={{ minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="close" size={22} color={c.gray500} />
-            </Pressable>
-          </View>
-        </View>
-
-        <View accessibilityLabel="Contract totals" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {stat('Work done', rupeesWhole(t.workDone), t.progress !== null ? `${Math.round(t.progress * 100)}% of ${rupeesWhole(t.value)}` : undefined)}
-          {stat('Paid', rupeesWhole(t.paid))}
-          {stat(
-            t.balance < 0 ? 'Paid ahead of work' : t.balance > 0 ? 'Balance due' : 'Balance',
-            <Text style={{ color: t.balance < 0 ? c.red600 : t.balance > 0 ? c.gray900 : c.green700 }}>{t.balance ? rupeesWhole(Math.abs(t.balance)) : 'Settled'}</Text>,
-          )}
-          {t.advances > 0 && stat('Advances (kharcha)', rupeesWhole(t.advances), 'in Paid')}
-          {contract.retention_pct > 0 &&
-            stat(
-              'Retention',
-              rupeesWhole(t.retention),
-              contract.retention_released_at ? (
-                <Text style={{ textDecorationLine: 'underline' }} onPress={() => actions.setRetentionReleased(contract.id, '')}>
-                  released {contract.retention_released_at} · hold again
-                </Text>
-              ) : (
-                <Text style={{ textDecorationLine: 'underline', color: c.orange700 }} onPress={() => actions.setRetentionReleased(contract.id, todayISO())}>
-                  held · release now
-                </Text>
-              ),
-            )}
-          {t.deductions > 0 && stat('Deductions', rupeesWhole(t.deductions))}
-        </View>
-
-        {entryForm ? (
-          <EntryForm contract={contract} kind={entryForm.kind} entry={entryForm.entry} onDone={() => setEntryForm(null)} />
-        ) : (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            <Button variant="primary" icon="construction" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => setEntryForm({ kind: 'work' })}>
-              Work
-            </Button>
-            <Button icon="volunteer-activism" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => setEntryForm({ kind: 'advance' })}>
-              Advance
-            </Button>
-            <Button icon="payments" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => setEntryForm({ kind: 'payment' })}>
-              Payment
-            </Button>
-            <Button icon="remove-circle-outline" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => setEntryForm({ kind: 'deduction' })}>
-              Deduct
-            </Button>
-          </View>
-        )}
-
-        <View style={{ gap: 4 }}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: c.gray500 }}>Entries ({entries.length})</Text>
-          {listed.length === 0 ? (
-            <Text style={{ fontSize: 12, color: c.gray500, paddingVertical: 12 }}>Nothing recorded yet. Add work as it is measured, each advance (kharcha) given before measuring, and each payment.</Text>
-          ) : (
-            <View style={{ borderWidth: 1, borderColor: c.gray100, borderRadius: 12 }}>
-              {listed.map((e, i) => {
-                const pending = pendingDeletes.has(e.id);
-                const value = e.kind === 'work' ? workValue(contract, e) : e.amount;
-                return (
-                  <View key={e.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: i ? 1 : 0, borderTopColor: c.gray100, opacity: pending ? 0.4 : 1 }}>
-                    <Pressable accessibilityRole="button" accessibilityLabel={`Edit ${KIND_LABEL[e.kind]} of ${e.date}`} disabled={pending} onPress={() => setEntryForm({ kind: e.kind, entry: e })} style={{ flex: 1, minWidth: 0, minHeight: 40, justifyContent: 'center' }}>
-                      <Text numberOfLines={2} style={[{ fontSize: 12, color: c.gray800 }, pending && { textDecorationLine: 'line-through' }]}>
-                        {describeEntry(contract, e)}
-                      </Text>
-                      <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>{e.date}</Text>
-                    </Pressable>
-                    <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '700', color: e.kind === 'work' ? c.gray800 : isPaidOut(e.kind) ? c.green700 : c.red600 }}>
-                      {e.kind === 'work' ? '+' : '−'}
-                      {rupeesWhole(value)}
-                    </Text>
-                    {pending ? (
-                      <UndoButton onUndo={() => actions.undoDelete(e.id)} label={KIND_LABEL[e.kind]} />
-                    ) : (
-                      <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${KIND_LABEL[e.kind]} of ${e.date}`} onPress={() => actions.deleteContractEntryLater(e.id)} style={{ minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center', marginRight: -8 }}>
-                        <Icon name="delete-outline" size={16} color={c.red400} />
-                      </Pressable>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-          )}
-        </View>
-
-        {!!contract.notes && (
-          <Text selectable style={{ fontSize: 12, color: c.gray600, padding: 8, borderRadius: 8, backgroundColor: c.gray50 }}>
-            {contract.notes}
+    <Sheet kind="screen" label={`Contract with ${contract.contractor}`} onClose={onClose} backEnabled={!entryForm && !statementOpen && !children} gap={12}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text accessibilityRole="header" style={{ fontSize: 18, fontWeight: '700', color: c.gray900 }}>
+            {contract.contractor}
           </Text>
-        )}
+          <Text style={{ fontSize: 14, color: c.gray700 }}>{contract.work || 'Work not described'}</Text>
+          <Text style={{ fontSize: 12, color: c.gray500 }}>{[contract.address, contract.category, contract.start_date && `from ${contract.start_date}`].filter(Boolean).join(' · ')}</Text>
+          <Text style={{ fontSize: 12, color: c.gray500 }}>{describeTerms(contract, rupeesWhole)}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {!!contract.phone && (
+            <Pressable accessibilityRole="button" accessibilityLabel={`Call ${contract.contractor}`} onPress={() => void Linking.openURL(`tel:${contract.phone}`)} style={{ minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: c.green50 }}>
+              <Icon name="call" size={16} color={c.green700} />
+            </Pressable>
+          )}
+          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={{ minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="close" size={22} color={c.gray500} />
+          </Pressable>
+        </View>
+      </View>
 
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 4 }}>
-          <Button icon="share" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => setStatementOpen(true)}>
-            Statement
+      <View accessibilityLabel="Contract totals" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {stat('Work done', rupeesWhole(t.workDone), pastEstimate(contract, t) ?? (t.progress !== null ? `${Math.round(t.progress * 100)}% of ${rupeesWhole(t.value)}` : undefined))}
+        {stat('Paid', rupeesWhole(t.paid))}
+        {stat(
+          balanceLabel(contract, t.balance),
+          <Text style={{ color: t.balance < 0 ? c.red600 : t.balance > 0 ? c.gray900 : c.green700 }}>{t.balance ? rupeesWhole(Math.abs(t.balance)) : 'Settled'}</Text>,
+        )}
+        {t.advances > 0 && stat('Advances (kharcha)', rupeesWhole(t.advances), 'in Paid')}
+        {contract.retention_pct > 0 &&
+          stat(
+            'Retention',
+            rupeesWhole(t.retention),
+            contract.retention_released_at ? (
+              <Text style={{ textDecorationLine: 'underline' }} onPress={() => actions.setRetentionReleased(contract.id, '')}>
+                released {contract.retention_released_at} · hold again
+              </Text>
+            ) : (
+              <Text style={{ textDecorationLine: 'underline', color: c.orange700 }} onPress={() => actions.setRetentionReleased(contract.id, todayISO())}>
+                held · release now
+              </Text>
+            ),
+          )}
+        {t.deductions > 0 && stat('Deductions', rupeesWhole(t.deductions))}
+      </View>
+
+      {entryForm ? (
+        <EntryForm contract={contract} kind={entryForm.kind} entry={entryForm.entry} onDone={() => setEntryForm(null)} />
+      ) : (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <Button variant="primary" icon="construction" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => setEntryForm({ kind: 'work' })}>
+            Work
           </Button>
-          <Button icon="edit" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => onEdit(contract)}>
-            Edit terms
+          <Button icon="volunteer-activism" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => setEntryForm({ kind: 'advance' })}>
+            Advance
           </Button>
-          <Button style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => (closed ? actions.setContractStatus(contract.id, 'active') : closeContract())}>
-            {closed ? 'Reopen' : 'Close contract'}
+          <Button icon="payments" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => setEntryForm({ kind: 'payment' })}>
+            Payment
           </Button>
-          <Button variant="dangerOutline" icon="delete-outline" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={deleteContract}>
-            Delete
+          <Button icon="remove-circle-outline" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => setEntryForm({ kind: 'deduction' })}>
+            Deduct
           </Button>
         </View>
-      </Sheet>
+      )}
+
+      <View style={{ gap: 4 }}>
+        <Text style={{ fontSize: 12, fontWeight: '700', color: c.gray500 }}>Entries ({entries.length})</Text>
+        {listed.length === 0 ? (
+          <Text style={{ fontSize: 12, color: c.gray500, paddingVertical: 12 }}>Nothing recorded yet. Add work as it is measured, each advance (kharcha) given before measuring, and each payment.</Text>
+        ) : (
+          <View style={{ borderWidth: 1, borderColor: c.gray100, borderRadius: 12 }}>
+            {listed.map((e, i) => {
+              const pending = pendingDeletes.has(e.id);
+              const value = e.kind === 'work' ? workValue(contract, e) : e.amount;
+              return (
+                <View key={e.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: i ? 1 : 0, borderTopColor: c.gray100, opacity: pending ? 0.4 : 1 }}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Edit ${KIND_LABEL[e.kind]} of ${e.date}`} disabled={pending} onPress={() => setEntryForm({ kind: e.kind, entry: e })} style={{ flex: 1, minWidth: 0, minHeight: 40, justifyContent: 'center' }}>
+                    <Text numberOfLines={2} style={[{ fontSize: 12, color: c.gray800 }, pending && { textDecorationLine: 'line-through' }]}>
+                      {describeEntry(contract, e)}
+                    </Text>
+                    <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>{e.date}</Text>
+                  </Pressable>
+                  <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '700', color: e.kind === 'work' ? c.gray800 : isPaidOut(e.kind) ? c.green700 : c.red600 }}>
+                    {e.kind === 'work' ? '+' : '−'}
+                    {rupeesWhole(value)}
+                  </Text>
+                  {pending ? (
+                    <UndoButton onUndo={() => actions.undoDelete(e.id)} label={KIND_LABEL[e.kind]} />
+                  ) : (
+                    <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${KIND_LABEL[e.kind]} of ${e.date}`} onPress={() => actions.deleteContractEntryLater(e.id)} style={{ minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center', marginRight: -8 }}>
+                      <Icon name="delete-outline" size={16} color={c.red400} />
+                    </Pressable>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </View>
+
+      {!!contract.notes && (
+        <Text selectable style={{ fontSize: 12, color: c.gray600, padding: 8, borderRadius: 8, backgroundColor: c.gray50 }}>
+          {contract.notes}
+        </Text>
+      )}
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 4 }}>
+        <Button icon="share" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => setStatementOpen(true)}>
+          Statement
+        </Button>
+        <Button icon="edit" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => onEdit(contract)}>
+          Edit terms
+        </Button>
+        <Button style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => (closed ? actions.setContractStatus(contract.id, 'active') : closeContract())}>
+          {closed ? 'Reopen' : 'Close contract'}
+        </Button>
+        <Button variant="dangerOutline" icon="delete-outline" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={deleteContract}>
+          Delete
+        </Button>
+      </View>
+      {/* Bottom sheets go inside this screen, or they open behind it (#116). */}
       {statementOpen && <StatementSheet contract={contract} entries={entries} onClose={() => setStatementOpen(false)} />}
-    </>
+      {children}
+    </Sheet>
   );
 }
 
 /** Add or change one entry: work measured, a payment, or a deduction. */
 function EntryForm({ contract, kind, entry, onDone }: { contract: ContractRow; kind: ContractEntryKind; entry?: ContractEntryRow; onDone(): void }) {
   const c = useColors();
-  const { actions } = useAppState();
+  const { actions, entriesFor } = useAppState();
   const dialogs = useDialogs();
   const isWork = kind === 'work';
   const [date, setDate] = useState(entry?.date ?? todayISO());
@@ -215,6 +220,9 @@ function EntryForm({ contract, kind, entry, onDone }: { contract: ContractRow; k
   const [note, setNote] = useState(entry?.note ?? '');
   const n = value.trim() ? parseAmount(value) : null;
   const preview = isWork && n ? workValue(contract, { quantity: n }) : 0;
+  // A lump sum is never paid past 100%: an entry taking it there is most likely the total so far, not the new part.
+  const doneBefore = isWork && contract.kind !== 'rate' ? entriesFor(contract.id).reduce((a, e) => a + (e.kind === 'work' && e.id !== entry?.id ? e.quantity : 0), 0) : 0;
+  const past100 = isWork && contract.kind !== 'rate' && !!n && n > 0 && doneBefore + n > 100;
 
   const save = async () => {
     if (n === null || n <= 0) return dialogs.alert(isWork ? 'Enter the quantity done' : 'Enter the amount', value.trim() ? `“${value}” is not a number.` : undefined);
@@ -242,6 +250,11 @@ function EntryForm({ contract, kind, entry, onDone }: { contract: ContractRow; k
           <DateField label="Date" value={date} onChange={setDate} />
         </View>
       </View>
+      {past100 && (
+        <Text accessibilityLiveRegion="polite" style={{ fontSize: 12, color: c.orange700 }}>
+          This takes the job past 100%. Enter only the part done since the last entry.
+        </Text>
+      )}
       {isWork && preview > 0 && <Text style={{ fontSize: 12, color: c.gray600 }}>Worth {rupeesWhole(preview)}</Text>}
       {isPaidOut(kind) && (
         <View accessibilityLabel="Paid by" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
