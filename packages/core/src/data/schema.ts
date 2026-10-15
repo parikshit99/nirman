@@ -241,6 +241,22 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE items ADD COLUMN read_as TEXT NOT NULL DEFAULT '';
   `,
+  // 7.14: rent, transport, food and other money spent on a project that is neither material nor labour.
+  `
+  CREATE TABLE IF NOT EXISTS expenses (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    date TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    amount REAL NOT NULL DEFAULT 0,
+    paid_to TEXT NOT NULL DEFAULT '',
+    mode TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS expenses_project_idx ON expenses (project_id);
+  `,
 ];
 
 /** Default categories sort before anything the user adds. */

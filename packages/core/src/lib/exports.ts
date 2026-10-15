@@ -1,6 +1,22 @@
 import type { jsPDF } from 'jspdf';
 import type { SheetData } from 'write-excel-file/browser';
-import { describeTerms, formatRupees, type ContractRow, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
+import {
+  EXPENSES_FILTERED_NOTE,
+  NO_EXPENSES_MATCH,
+  describeTerms,
+  formatRupees,
+  paymentModeLabel,
+  siteReportGrandTotal,
+  siteReportParts,
+  type ContractRow,
+  type ContractStatement,
+  type ExpenseReport,
+  type ItemRow,
+  type LabourReport,
+  type ListRow,
+  type QuoteComparison,
+  type SiteReport,
+} from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
 import { madeByLine, pdfToBase64, type OrderSlipDetails } from './pdf.ts';
 
@@ -85,21 +101,33 @@ export function comparisonSheet(boq: ListRow, comparison: QuoteComparison): Shee
   return rows;
 }
 
-/** Site report for Excel: the per-material summary, then every line. */
-export function siteReportSheet(address: string, filters: string, report: SiteReport, labour?: LabourReport): SheetData {
+/** Site report for Excel: the per-material summary, labour and expenses, then every purchase line. */
+export function siteReportSheet(address: string, filters: string, report: SiteReport, labour?: LabourReport, expenses?: ExpenseReport): SheetData {
   const rows: SheetData = [[bold('Site report')], [address], [filters], [madeByLine()], []];
   rows.push(['Work type', 'Material', 'Quantity', 'Unit', 'Avg rate', 'Amount', 'Vendors', 'Bills'].map(bold));
   for (const c of report.categories) {
     for (const m of c.materials) rows.push([c.name, m.name, m.quantity, m.unit, m.avgRate ? money(m.avgRate) : null, money(m.amount), m.vendors.join(', '), m.bills]);
     rows.push([bold(`${c.name} total`), null, null, null, null, { ...money(c.amount), fontWeight: 'bold' }, null, null]);
   }
-  const hasLabour = !!labour?.rows.length;
-  rows.push([bold(hasLabour ? 'MATERIALS TOTAL' : 'GRAND TOTAL'), null, null, null, null, { ...money(report.total), fontWeight: 'bold' }, null, null]);
+  const { hasLabour, showExpenses, withExpenses, grandParts } = siteReportParts(labour, expenses);
+  const grandRow = () => [bold(`GRAND TOTAL (${grandParts})`), null, null, null, null, { ...money(siteReportGrandTotal(report, labour, expenses)), fontWeight: 'bold' as const }];
+  rows.push([bold(hasLabour || withExpenses ? 'MATERIALS TOTAL' : 'GRAND TOTAL'), null, null, null, null, { ...money(report.total), fontWeight: 'bold' }, null, null]);
   if (hasLabour) {
     rows.push([], [bold('Labour')], ['Contractor', 'Work', 'Work type', 'Work done', 'Paid', 'Balance now'].map(bold));
     for (const r of labour!.rows) rows.push([r.contract.contractor, r.contract.work, r.contract.category, money(r.workDone), money(r.paid), money(r.balance)]);
     rows.push([null, null, bold('Labour total'), { ...money(labour!.workDone), fontWeight: 'bold' }, { ...money(labour!.paid), fontWeight: 'bold' }, { ...money(labour!.balance), fontWeight: 'bold' }]);
-    rows.push([bold('GRAND TOTAL (materials + labour work done)'), null, null, null, null, { ...money(report.total + labour!.workDone), fontWeight: 'bold' }]);
+    if (!withExpenses) rows.push(grandRow());
+  }
+  if (showExpenses && !withExpenses) rows.push([], [EXPENSES_FILTERED_NOTE]);
+  if (withExpenses) {
+    rows.push([], [bold('Expenses')], ['Date', 'Kind', 'Paid to', 'Mode', 'Note', 'Amount'].map(bold));
+    if (!expenses!.lineCount) rows.push([NO_EXPENSES_MATCH]);
+    for (const k of expenses!.kinds) {
+      for (const e of k.lines) rows.push([e.date, k.label, e.paid_to, e.mode ? paymentModeLabel(e.mode) : '', e.note, money(e.amount)]);
+      rows.push([bold(`${k.label} total`), null, null, null, null, { ...money(k.amount), fontWeight: 'bold' }]);
+    }
+    rows.push([bold('Expenses total'), null, null, null, null, { ...money(expenses!.total), fontWeight: 'bold' }]);
+    rows.push(grandRow());
   }
   rows.push([], [bold('All lines')]);
   rows.push(['Date', 'Work type', 'Item', 'Brand', 'Model / code', 'Size / spec', 'Color', 'Qty', 'Unit', 'Ordered as', 'Rate', 'Amount', 'Vendor', 'List', 'Delivered on'].map(bold));

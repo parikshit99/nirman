@@ -19,6 +19,7 @@ import { Tabs } from '../components/ui/Tabs';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 import { ContractSheet } from './ContractSheet';
+import { ExpenseForm, ExpensesCard, ExpensesSheet } from './ExpensesSheet';
 import { useSiteReport } from './SiteReport';
 import { rupeesWhole } from '../lib/format';
 
@@ -56,6 +57,9 @@ export function LabourScreen({ about }: { about: string }) {
   /** Contract being added (no contract) or edited. */
   const [contractForm, setContractForm] = useState<{ contract?: ContractRow } | null>(null);
   const [openContract, setOpenContract] = useState<string | null>(null);
+  const [expensesOpen, setExpensesOpen] = useState(false);
+  /** Add expense from the + menu: the form alone, over the tab. */
+  const [addingExpense, setAddingExpense] = useState(false);
 
   const q = search.trim();
   const contracts = useMemo(() => {
@@ -89,6 +93,9 @@ export function LabourScreen({ about }: { about: string }) {
   const header = (
     <View style={{ gap: 12, paddingTop: 12 }}>
       <Text style={{ marginHorizontal: 16, fontSize: 12, lineHeight: 17, color: c.gray600 }}>{about}</Text>
+      <View style={{ marginHorizontal: 16 }}>
+        <ExpensesCard onOpen={() => setExpensesOpen(true)} />
+      </View>
       {contracts.length > 0 && (
         <View accessibilityLabel="Totals for the contracts shown" style={{ flexDirection: 'row', gap: 8, marginHorizontal: 16 }}>
           <View style={box}>
@@ -150,7 +157,15 @@ export function LabourScreen({ about }: { about: string }) {
           </View>
         )}
       />
-      <ActionFab label="New contract" onPress={() => setContractForm({})} actions={hasSites ? [{ icon: 'assignment', label: 'Site report', tone: 'primary', onPress: siteReport.open }] : []} actionsLabel="Site report" hidden={fabHidden} />
+      <ActionFab
+        label="New contract"
+        onPress={() => setContractForm({})}
+        actions={[{ icon: 'receipt-long', label: 'Add expense', onPress: () => setAddingExpense(true) }, ...(hasSites ? [{ icon: 'assignment' as const, label: 'Site report', tone: 'primary' as const, onPress: siteReport.open }] : [])]}
+        actionsLabel="Add expense or site report"
+        hidden={fabHidden}
+      />
+      {expensesOpen && <ExpensesSheet onClose={() => setExpensesOpen(false)} />}
+      {addingExpense && <ExpenseForm onClose={() => setAddingExpense(false)} />}
       {openContract && <ContractSheet contractId={openContract} onEdit={(contract) => setContractForm({ contract })} onClose={() => setOpenContract(null)} />}
       {contractForm && (
         <ContractForm

@@ -191,7 +191,7 @@ describe('backup', () => {
   it('still restores version 13 backups, whose lines have no read_as, and keeps it from version 14', async () => {
     const db = await populated();
     const backup = await exportBackup(db);
-    expect(backup.version).toBe(14);
+    expect(backup.version).toBe(15);
     const v13 = { ...backup, version: 13, items: backup.items.map(({ read_as: _r, ...rest }) => rest) };
     const parsed = parseBackup(JSON.stringify(v13));
     expect(parsed.items.every((i) => i.read_as === '')).toBe(true);

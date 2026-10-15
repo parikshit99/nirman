@@ -6,7 +6,7 @@ An Android app for tracking construction materials on site. You photograph bills
 
 - a **purchase log** with rates, totals and vendors;
 - **Bills of Quantities** for vendor quotes, with each vendor's reply matched back to the BOQ and compared;
-- **projects**, each with its own purchase lists, BOQs and labour contracts;
+- **projects**, each with its own purchase lists, BOQs, labour contracts and expenses;
 - a **material price database** built from everything you record.
 
 Everything is stored **only on your phone**. There is no server or account. To help fix problems, the app keeps a diagnostic log on the phone: errors, AI readings, the steps you take and slow screens, with what recent steps worked on, such as the text you typed or dictated, item names, rates, vendors, addresses and phone numbers; never photos or your API key. *Settings → Report a problem* opens a public GitHub issue for you to check and submit. It has only your note, the phone's details, recent errors and where they happened, and the names, times and counts of recent steps, readings and slow screens: no item names, rates, vendors, addresses or phone numbers. The full log leaves the phone only with *Share log*, sent to whoever you pick.
@@ -27,6 +27,7 @@ Everything is stored **only on your phone**. There is no server or account. To h
 - **Share in any format.** *Share* on a purchase list, BOQ or quote comparison offers a PDF, an Excel sheet (.xlsx) or a picture (JPG) of each page, then opens the phone's share sheet. *Preview* shows the PDF first. A BOQ can also go out as an **order slip**: items and quantities without rates, with delivery address, date and receiver.
 - **Share into the app.** In WhatsApp (or any app), share a bill photo or a text message to *Nirman* and choose Purchases, BOQ or a vendor quote for a saved BOQ; the photos are put into that entry, ready to read.
 - **Labour contracts.** The *Labour* tab keeps each contractor's job, site and terms (rate per unit or lump sum, optional retention), with work measured, payments and deductions. It shows the balance due and shares a statement (PDF, Excel or JPG); site reports include labour.
+- **Site expenses.** Rent, transport, food and tea, electricity and water, permits and fees, and other costs of a project, from the *Expenses* card on the Labour tab. Site reports add them, with a subtotal for each kind, to the grand total.
 - **Deliveries and site reports.** Tick each purchase or BOQ line when it reaches the site, on the open list or later with *Delivered* on a saved list. *Saved → Site report* lists everything bought for the open project, for all time or any dates, for some or all work types, and optionally only what was delivered, as a PDF, Excel sheet or JPG.
 - **Bill photos.** Photographed bills are kept with the lines read from them: *Bill* on a line, or the small pictures of the bills on a saved list, shows them, to check the reading.
 - **Backup.** *Settings → Save backup* shares one `.zip` file with everything, bill photos included; save it to Google Drive, WhatsApp or email. The app reminds you after a week without one. *Restore* on any phone brings it all back (older `.json` backups still restore, without photos). Queued, unread entries are not included.
