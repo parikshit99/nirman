@@ -40,6 +40,8 @@ export const extractedMaterialSchema = z.object({
   ordered_as: z.string().catch(''),
   /** Set when reading matched it to a material in Rates: the line as read (JSON of ReadAs). */
   read_as: z.string().optional().catch(undefined),
+  /** Gemini only: which of the names sent to it this line is (or NO_RATES_NAME). Used for matching, never stored. */
+  rates_name: z.string().optional().catch(undefined),
 });
 export type ExtractedMaterial = z.infer<typeof extractedMaterialSchema>;
 /** A material to add: like ExtractedMaterial, but optional fields (e.g. brand) may be left out. */

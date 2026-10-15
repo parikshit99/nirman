@@ -206,6 +206,8 @@ export interface MatchableLine {
   brand?: string;
   spec?: string;
   ordered_as?: string;
+  /** The known name Gemini says this line is, if any (see NO_RATES_NAME). */
+  rates_name?: string;
 }
 
 /** A known name counts as the same material from this similarity up (one letter off, or spaced differently). */
@@ -213,8 +215,8 @@ const SURE = 0.8;
 const round = (n: number, places: number) => Math.round(n * 10 ** places) / 10 ** places;
 
 /**
- * One name and unit for a line just read: a learned name first, else the closest material already in Rates (sure
- * matches only, in a unit that converts), else the starter catalog. The brand and grade in the name go to their own
+ * One name and unit for a line just read: a learned name first, else the material in Rates Gemini said it is, else the
+ * closest material already in Rates (sure matches only, in a unit that converts), else the starter catalog. The brand and grade in the name go to their own
  * fields. Quantity and rate are converted when the unit changes; the total stays as billed. `readAs` is set when the
  * name or unit changed, so the line can show what it was matched from and undo it.
  */
@@ -237,9 +239,17 @@ export function standardizeLine<T extends MatchableLine>(line: T, known: KnownMa
   const names = [line.item_name, brand?.rest, catalog?.name].filter((n): n is string => !!n && !!n.trim());
   const fits = (k: KnownMaterial) => noUnit(unit) || unitFactor(unit, k.unit) !== null;
 
-  let target: { name: string; unit: string } | null = null;
+  // Gemini chose which material in Rates this is, by meaning ("MS angle" is "Angle iron"): that wins over letters,
+  // when the name is one in Rates and its unit converts. Otherwise it is ignored.
+  const said = line.rates_name?.trim().toLowerCase();
+  // A starter catalog name (also sent to Gemini) counts too, in its own unit when the bill's converts to it.
+  const fromCatalog = said ? CATALOG.find((c) => c.name.toLowerCase() === said && (!c.unit || fits({ name: c.name, unit: c.unit }))) : undefined;
+  const named = said
+    ? (known.find((k) => k.name.trim().toLowerCase() === said && fits(k)) ?? (fromCatalog ? { name: fromCatalog.name, unit: fromCatalog.unit || unit } : undefined))
+    : undefined;
+  let target: { name: string; unit: string } | null = named ? { name: named.name, unit: named.unit } : null;
   let best = 0;
-  for (const k of known) {
+  for (const k of named ? [] : known) {
     if (!fits(k)) continue;
     const score = Math.max(...names.map((n) => nameSimilarity(n, k.name)));
     // Ties go to the unit as read, then to the material bought most often.
@@ -248,7 +258,7 @@ export function standardizeLine<T extends MatchableLine>(line: T, known: KnownMa
       target = { name: k.name, unit: k.unit };
     }
   }
-  if (best < SURE) target = null;
+  if (!named && best < SURE) target = null;
   if (!target && catalog) target = { name: catalog.name, unit: catalog.unit && (noUnit(unit) || unitFactor(unit, catalog.unit) !== null) ? catalog.unit : unit };
   if (!target) return { line: unit === line.unit ? line : { ...line, unit } };
 

@@ -272,21 +272,29 @@ export class JobWorker {
         }
         return null;
       }
+      const materials = namesForReading(known);
       const items = await extractor.extract({
         text: job.text,
         images,
         category: job.category || undefined,
         capture_date: job.capture_date || todayISO(),
         learning,
-        materials: namesForReading(known),
+        materials,
         conversions: loadConversions(),
       });
       if (items.length === 0) {
         await setJobStatus(this.db, job.id, 'failed', 'No items detected. Make sure the photo or text is clear, then retry.');
         logReading('empty');
       } else {
+        // How many lines Gemini named as one of the materials sent (a count only; the names stay out of `data`).
+        const sent = new Set(materials.map((m) => m.name));
+        const geminiNamed = items.filter((i) => typeof i.rates_name === 'string' && sent.has(i.rates_name)).length;
         await finish(items, 'gemini', phone?.ocrText);
-        logReading('ok', { engine: 'gemini', lines: items.length, converted: items.filter((i) => i.ordered_as).length, phoneConfidence: phone?.confidence ?? -1 }, describeItems(items));
+        logReading(
+          'ok',
+          { engine: 'gemini', lines: items.length, converted: items.filter((i) => i.ordered_as).length, geminiNamed, phoneConfidence: phone?.confidence ?? -1 },
+          describeItems(items),
+        );
       }
       return null;
     } catch (err) {

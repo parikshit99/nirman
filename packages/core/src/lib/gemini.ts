@@ -1,6 +1,7 @@
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import {
   IMAGE_INSTRUCTION,
+  NO_RATES_NAME,
   QUOTE_IMAGE_INSTRUCTION,
   QUOTE_TEXT_INSTRUCTION,
   TEXT_INSTRUCTION,
@@ -63,6 +64,24 @@ const RESPONSE_SCHEMA = {
     required: ['item_name', 'original_term', 'quantity', 'unit'],
   },
 };
+
+/**
+ * The reply's shape for a bill. With known names sent, each line must also say which of them it is, or NO_RATES_NAME:
+ * an enum of exactly those names, so Gemini can't answer a name that isn't one. Without names there is no such field.
+ */
+export function extractionSchema(names: string[]) {
+  const choices = [...new Set(names.filter((n) => n.trim() && n !== NO_RATES_NAME))];
+  if (!choices.length) return RESPONSE_SCHEMA;
+  const { items } = RESPONSE_SCHEMA;
+  return {
+    ...RESPONSE_SCHEMA,
+    items: {
+      ...items,
+      properties: { ...items.properties, rates_name: { type: Type.STRING, format: 'enum', enum: [...choices, NO_RATES_NAME] } },
+      required: [...items.required, 'rates_name'],
+    },
+  };
+}
 
 const QUOTE_SCHEMA = {
   type: Type.ARRAY,
@@ -236,7 +255,7 @@ export function createGeminiExtractor(apiKey: string, model: string, onModelRepl
       const output = await generate(
         contentParts(req.text, req.images, IMAGE_INSTRUCTION, TEXT_INSTRUCTION),
         buildSystemInstruction({ learning: req.learning, materials: req.materials, category: req.category, captureDate: req.capture_date }),
-        RESPONSE_SCHEMA,
+        extractionSchema((req.materials ?? []).map((m) => m.name)),
       );
       return parseExtractionOutput(output, req.conversions);
     },
