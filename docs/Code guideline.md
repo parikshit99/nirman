@@ -61,12 +61,14 @@ These rules protect installed phones. Breaking one can lose someone's work.
 
 ## Diagnostics
 
-- `packages/core/src/lib/diagnostics.ts` keeps the on-phone log.
-- **What a step may carry:** what it worked on (action arguments, AI input text and output lines, so item names, rates, vendors and addresses may appear), to help reproduce bugs. The owner allowed this, and the repo is private.
-- **What it must never carry:**
+- `packages/core/src/lib/diagnostics.ts` keeps the on-phone log (the last 400 entries).
+- **On the phone, a step may carry details** (`detail`): what it worked on (action arguments, AI input text and output lines), so item names, rates, vendors, addresses and phone numbers may appear. This helps reproduce bugs; the owner allowed it for the log on the phone.
+- **Step names and `data` never hold user text.** A step's name is a fixed label (it goes into the public problem report), and `data` holds numbers and short labels only (counts, sizes, times, a model name, where an error happened).
+- **The log must never carry:**
   - Photos. `describe()` replaces encoded data with a size.
   - The API key. `scrub()` removes it.
-- **How it reaches us:** users send it with *Settings → Report a problem* (a pre-filled GitHub issue labelled `bug`) or *Share log*. Read those issues' logs when debugging. There are no automatic crash reports.
+- **The problem report is public, so it never carries details.** *Settings → Report a problem* opens a pre-filled GitHub issue labelled `bug` on the public repository, with the user's note, the phone's details, recent errors and where in the code they happened, and the names, times and counts of recent steps, AI readings and slow screens. Nothing else the user typed, photographed or saved goes in: no `detail`, item names, rates, vendors, addresses or phone numbers.
+- **The full log** leaves the phone only with *Share log*, sent to whoever the user picks. Read the issue first; when it isn't enough, ask the user to send you the log that way, not to post it on the issue. There are no automatic crash reports.
 
 ## Coding conventions
 

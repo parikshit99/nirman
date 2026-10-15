@@ -200,6 +200,54 @@ describe('backup', () => {
     expect((await loadSnapshot(target)).items.every((i) => i.read_as === '{"item_name":"Cemnt"}')).toBe(true);
   });
 
+  it('restores a backup whose text is longer than the app keeps, shortening it and saying how many values', async () => {
+    const db = await populated();
+    const backup = await exportBackup(db);
+    const phone = '98765 43210, 91234 56789 (site supervisor)';
+    const long = {
+      ...backup,
+      contracts: backup.contracts.map((c) => ({ ...c, phone: `${phone} `.repeat(3) })),
+      items: backup.items.map((i, n) => (n === 0 ? { ...i, vendor: 'v'.repeat(250), date: '15 September 2026 (Tuesday)', quantity: null } : i)),
+      contract_entries: backup.contract_entries.map((e) => ({ ...e, note: 'n'.repeat(600) })),
+      learned_terms: [{ id: 'b'.repeat(450), item_name: 'Cement', unit: 'Bag', updated_at: backup.exported_at }],
+    };
+    const file = parseBackupFile(new TextEncoder().encode(JSON.stringify(long)));
+    expect(file.shortened).toBe(5);
+    expect(file.backup.contracts[0].phone).toHaveLength(100);
+    expect(file.backup.items[0]).toMatchObject({ vendor: 'v'.repeat(200), date: '15 September 2026 (T', quantity: 0 });
+    expect(file.backup.learned_terms[0].id).toHaveLength(450);
+    const target = await freshDb();
+    await restoreBackup(target, file.backup, file.photos);
+    expect((await loadSnapshot(target)).contractEntries[0].note).toHaveLength(500);
+    // A backup that fits says so.
+    expect(parseBackupFile((await exportBackupZip(db)).bytes).shortened).toBe(0);
+    // Ids are never cut: one too long still makes the file damaged.
+    expect(() => parseBackup(JSON.stringify({ ...backup, items: [{ ...backup.items[0], id: 'x'.repeat(300) }] }))).toThrow(/damaged \(items\.0\.id/);
+  });
+
+  it('saves what was typed in fitted, so the backup restores', async () => {
+    const db = await freshDb();
+    const id = await saveContract(db, {
+      project_id: await projectOf(db),
+      contractor: 'Ramesh', phone: `98765 43210, 91234 56789 (site supervisor), ${'9'.repeat(80)}`, address: '', category: 'Civil', work: 'Plaster', kind: 'lump_sum',
+      rate: 0, unit: '', est_quantity: 0, amount: Infinity, retention_pct: 0, start_date: '', notes: '',
+    });
+    await saveContractEntry(db, { contract_id: id, kind: 'payment', date: '2026-10-02', quantity: 0, amount: 5000, mode: 'cash', note: 'n'.repeat(700) });
+    await addItems(db, DRAFT_IDS.audit, [{ ...cement, vendor: 'v'.repeat(300), date: '15th of September, 2026' }]);
+    const file = parseBackupFile((await exportBackupZip(db)).bytes);
+    expect(file.shortened).toBe(0);
+    expect([file.backup.contracts[0].phone.length, file.backup.contracts[0].amount, file.backup.contract_entries[0].note.length]).toEqual([100, 0, 500]);
+    expect([file.backup.items[0].vendor.length, file.backup.items[0].date]).toEqual([200, '15th of September, 2']);
+  });
+
+  it('checks a backup as it saves it, and does not finish one that would not restore', async () => {
+    const db = await populated();
+    await db.run(`INSERT INTO learned_terms (id, item_name, unit, updated_at) VALUES (?, 'Cement', 'Bag', '2026-10-01T00:00:00.000Z')`, ['w'.repeat(1001)]);
+    const chunks: Uint8Array[] = [];
+    await expect(writeBackupZip(db, (c) => chunks.push(c))).rejects.toThrow(BackupError);
+    await expect(exportBackupZip(db)).rejects.toThrow(/would not restore \(learned_terms\.\d+\.id: /);
+  });
+
   it('still restores version 2 backups, which have no hidden materials', async () => {
     const db = await populated();
     const { hidden_materials: _h, ...v2 } = await exportBackup(db);

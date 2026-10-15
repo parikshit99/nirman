@@ -108,7 +108,7 @@ export const itemRowSchema = z.object({
   photo_id: z.string().max(100).default(''),
   /** 1: its price was cleared from Rates for good (Settings → Deleted from Rates → Clear); the line itself stays. */
   rates_excluded: z.number().int().min(0).max(1).default(0),
-  /** The line as read (JSON: name, unit, quantity, rate, brand, spec, ordered as) when it was matched to a material in Rates; blank otherwise. */
+  /** The line as read (JSON: name, unit, quantity, rate, brand, spec, ordered as) when it was matched to a material in Rates; blank otherwise, or when too long to keep (fitRow). */
   read_as: z.string().max(2000).default(''),
   created_at: isoTimestamp,
   updated_at: isoTimestamp,
@@ -134,14 +134,15 @@ export type IndexedRateRow = z.infer<typeof indexedRateRowSchema>;
 
 /** id is the normalised source term (see normalizeTerm). */
 export const learnedTermRowSchema = z.object({
-  id,
+  /** The original word lower-cased: up to an original_term's 500, or twice that where lower-casing adds a letter (İ → i̇). */
+  id: z.string().min(1).max(1000),
   item_name: z.string().max(500),
   unit: z.string().max(50),
   updated_at: isoTimestamp,
 });
 export type LearnedTermRow = z.infer<typeof learnedTermRowSchema>;
 
-/** id is the lower-cased category name. */
+/** id is the lower-cased category name (made from the name as saved, so at most twice its 100: İ → i̇). */
 export const categoryRowSchema = z.object({
   id,
   name: z.string().min(1).max(100),
@@ -182,7 +183,8 @@ export type QuoteLineRow = z.infer<typeof quoteLineRowSchema>;
 
 /** A material hidden from the price database (Data tab and price checks); id is its materialKey. */
 export const hiddenMaterialRowSchema = z.object({
-  id: z.string().min(1).max(1200),
+  /** materialKey of a name (500) and unit (50) as JSON: long enough even if every character is escaped (\u0001 takes 6). */
+  id: z.string().min(1).max(6 * (500 + 50) + 7),
   name: z.string().max(500),
   unit: z.string().max(50),
   hidden_at: isoTimestamp,
@@ -201,7 +203,8 @@ export const contractRowSchema = z.object({
   /** The project it belongs to; blank only in backups made before projects (assigned on restore). */
   project_id: z.string().max(200).default(''),
   contractor: z.string().max(200),
-  phone: z.string().max(40),
+  /** Room for two numbers and a name, e.g. "98765 43210, 91234 56789 (site supervisor)". */
+  phone: z.string().max(100),
   address: z.string().max(500),
   /** Work category, as for purchase lists (Civil, Electrical, …). */
   category: z.string().max(100),
@@ -286,6 +289,83 @@ export interface RowTypes {
   hidden_materials: HiddenMaterialRow;
   contracts: ContractRow;
   contract_entries: ContractEntryRow;
+}
+
+// ---------------------------------------------------------------------------
+// Limits: what a row may hold, so every backup the app writes restores
+// ---------------------------------------------------------------------------
+
+/** The type inside default(), nullable() and optional(). */
+function unwrap(schema: z.ZodTypeAny): z.ZodTypeAny {
+  if (schema instanceof z.ZodDefault) return unwrap(schema.removeDefault());
+  if (schema instanceof z.ZodNullable || schema instanceof z.ZodOptional) return unwrap(schema.unwrap());
+  return schema;
+}
+
+/** Each table's text limits and number columns, read once from its row schema. */
+const columnRules = Object.fromEntries(
+  dataTables.map((table) => {
+    const limits: Record<string, number> = {};
+    const numbers: string[] = [];
+    for (const [column, schema] of Object.entries(rowSchemas[table].shape as z.ZodRawShape)) {
+      const type = unwrap(schema);
+      if (type instanceof z.ZodString && type.maxLength !== null) limits[column] = type.maxLength;
+      else if (type instanceof z.ZodNumber) numbers.push(column);
+    }
+    return [table, { limits: Object.freeze(limits), numbers }];
+  }),
+) as Record<DataTable, { limits: Readonly<Record<string, number>>; numbers: string[] }>;
+
+/**
+ * The most characters each text column of a table may hold, `{ column: max }`, from its row schema (the one place
+ * limits are set). For inputs' maxLength. Columns with no limit (dates, timestamps) are not listed.
+ */
+export function fieldLimits(table: DataTable): Readonly<Record<string, number>> {
+  return columnRules[table].limits;
+}
+
+/** Ids and references (id, list_id, project_id…): cut short, they would point at nothing, so they never are. */
+const isKey = (column: string) => column === 'id' || column.endsWith('_id');
+
+/**
+ * Columns holding JSON: cut short it could not be read, so one over its limit is blanked instead. items.read_as is
+ * the line as read (unlimited until it is fitted), so no limit could always hold it; blank, the match just can't be undone.
+ */
+const JSON_COLUMNS: Partial<Record<DataTable, string[]>> = { items: ['read_as'] };
+
+/** The first `max` characters as zod counts them (UTF-16 units), without splitting an emoji in two. */
+function cutText(text: string, max: number): string {
+  const cut = text.slice(0, max);
+  const last = cut.charCodeAt(cut.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
+}
+
+/**
+ * A row made to fit its table, as saving and restoring do: text longer than its column allows is cut to the limit
+ * (JSON over its limit is blanked, as cut JSON can't be read), and numbers JSON can't hold (NaN, Infinity; a backup
+ * file has null in their place) become 0. Ids and references are never cut: their limits are above anything the app
+ * makes. `shortened` counts the values changed.
+ */
+export function fitRow<R extends object>(table: DataTable, row: R): { row: R; shortened: number } {
+  const { limits, numbers } = columnRules[table];
+  const values = row as Record<string, unknown>;
+  const fitted: Record<string, unknown> = {};
+  let shortened = 0;
+  for (const [column, max] of Object.entries(limits)) {
+    const value = values[column];
+    if (typeof value === 'string' && value.length > max && !isKey(column)) {
+      fitted[column] = JSON_COLUMNS[table]?.includes(column) ? '' : cutText(value, max);
+      shortened++;
+    }
+  }
+  for (const column of numbers) {
+    const value = values[column];
+    if (value === null || (typeof value === 'number' && !Number.isFinite(value))) {
+      fitted[column] = 0;
+      shortened++;
+    }
+  }
+  return { row: shortened ? { ...row, ...fitted } : row, shortened };
 }
 
 // ---------------------------------------------------------------------------

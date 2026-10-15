@@ -36,6 +36,22 @@ describe('diagnostic log', () => {
     expect(detail).toContain('kB]');
     logStep('addItems', undefined, detail);
     expect(logAsText()).toContain('Sharma Traders');
-    expect(decodeURIComponent(issueUrl('parikshit99/nirman').split('&body=')[1])).toContain('OPC Cement 53');
+    // The full log (Share log) has it; the public problem report never does.
+    expect(decodeURIComponent(issueUrl('parikshit99/nirman').split('&body=')[1])).not.toContain('OPC Cement 53');
+  });
+
+  it('puts only names, data and error messages in the public problem report, never what a step worked on', () => {
+    clearLog();
+    logStep('saveContract', { ms: 120 }, describeValue([{ contractor: 'Ramesh Kumar', phone: '98765 43210', address: 'Plot 7, Sector 44' }]));
+    log('ai', 'reading ok', { engine: 'gemini', lines: 2 }, 'in: 15 bori cement\n    out: OPC Cement 15 Bag @380 Sharma Traders');
+    logError(new TypeError('x is undefined'), 'saveDraftToHistory', describeValue([{ title: 'Tower A', address: 'DLF Phase 3' }]));
+    const body = decodeURIComponent(issueUrl('parikshit99/nirman', 'Crashed on save').split('&body=')[1]);
+    for (const text of ['Ramesh', '98765', 'Sector 44', 'bori', 'Sharma', '@380', 'Tower A', 'DLF']) expect(body).not.toContain(text);
+    for (const text of ['Crashed on save', 'saveContract ms=120', 'reading ok engine=gemini lines=2', 'TypeError: x is undefined', 'where=saveDraftToHistory']) expect(body).toContain(text);
+    expect(body).toMatch(/This issue is public/);
+    expect(body).toMatch(/no items, rates, vendors or addresses/);
+    expect(body).toMatch(/Share log/);
+    // Share log keeps everything.
+    for (const text of ['Ramesh', 'Sharma Traders', 'DLF Phase 3']) expect(logAsText()).toContain(text);
   });
 });

@@ -680,3 +680,139 @@ describe('transaction', () => {
     expect(await db.all('SELECT COUNT(*) AS n FROM t')).toEqual([{ n: 2 }]);
   });
 });
+
+describe('fitted on saving', () => {
+  it('fits text written without writeRow (one vendor for a list) and keys made from text', async () => {
+    const db = await freshDb();
+    await addItems(db, DRAFT_IDS.audit, [cement]);
+    await setListVendor(db, DRAFT_IDS.audit, ` ${'Gupta '.repeat(60)}`);
+    expect((await loadSnapshot(db)).items[0].vendor).toHaveLength(200);
+
+    await addCategory(db, 'İ'.repeat(150));
+    const category = (await loadSnapshot(db)).categories.find((c) => c.name.startsWith('İ'))!;
+    expect([category.name.length, category.id.length]).toEqual([100, 200]);
+
+    // A line stored before saving fitted rows: its correction is keyed by the word as it is saved now.
+    await db.run(`UPDATE items SET original_term = ?`, ['w'.repeat(1500)]);
+    const [item] = (await loadSnapshot(db)).items;
+    await updateItem(db, item.id, { item_name: 'OPC Cement' });
+    const snap = await loadSnapshot(db);
+    expect(snap.items[0].original_term).toHaveLength(500);
+    expect(snap.learned.map((l) => l.id)).toEqual(['w'.repeat(500)]);
+    expect(buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned)).map((e) => e.name)).toEqual(['OPC Cement']);
+  });
+});
+
+describe('totals that match the bill', () => {
+  it('keeps a billed total through edits that leave quantity and rate alone', async () => {
+    const db = await freshDb();
+    await addItems(db, DRAFT_IDS.audit, [{ ...cement, quantity: 50, unit_price: 380, total_amount: 22420, vendor: 'Sharma Tradres' }]);
+    const [item] = (await loadSnapshot(db)).items;
+    // The editor sends every field back, quantity and rate unchanged.
+    await updateItem(db, item.id, { item_name: 'Cement', quantity: 50, unit: 'Bag', unit_price: 380, vendor: 'Sharma Traders', brand: 'ACC' });
+    expect((await loadSnapshot(db)).items[0]).toMatchObject({ vendor: 'Sharma Traders', brand: 'ACC', total_amount: 22420 });
+    await updateItem(db, item.id, { quantity: 40 });
+    expect((await loadSnapshot(db)).items[0].total_amount).toBe(15200);
+    await updateItem(db, item.id, { unit_price: 390 });
+    expect((await loadSnapshot(db)).items[0].total_amount).toBe(15600);
+  });
+
+  it('keeps a vendor’s quoted total unless the quantity or rate changes', async () => {
+    const db = await freshDb();
+    await addItems(db, DRAFT_IDS.boq, [{ ...cement, unit_price: 0 }]);
+    const boqId = await saveDraftToHistory(db, DRAFT_IDS.boq, meta);
+    await enqueueQuote(db, { boqId, vendor: 'Gupta', quoteDate: '2026-10-03', text: '', images: ['IMG'] });
+    let snap = await loadSnapshot(db);
+    await completeQuoteJob(db, snap.jobs[0].id, [{ boq_sr: 1, original_term: 'bori', item_name: 'Cement', quantity: 15, unit: 'Bag', unit_price: 380, total_amount: 6726, note: '' }], [snap.items[0].id]);
+    const [line] = (await loadSnapshot(db)).quoteLines;
+    await updateQuoteLine(db, line.id, { item_name: 'OPC Cement', quantity: 15, unit_price: 380, boq_item_id: null });
+    expect((await loadSnapshot(db)).quoteLines[0]).toMatchObject({ item_name: 'OPC Cement', total_amount: 6726 });
+    await updateQuoteLine(db, line.id, { unit_price: 400 });
+    snap = await loadSnapshot(db);
+    expect(snap.quoteLines[0].total_amount).toBe(6000);
+  });
+});
+
+describe('deleting a project keeps its prices in Rates', () => {
+  const rates = (snap: Awaited<ReturnType<typeof loadSnapshot>>, hidden: Record<string, string> = {}) =>
+    buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned), hidden).map((e) => [
+      e.name,
+      e.unit,
+      e.priceHistory.map((p) => [p.date, p.price, p.vendor, p.variant.brand, p.site ?? '']).sort(),
+      [...e.categories].sort(),
+    ]);
+
+  it('keeps each priced purchase line as an added rate, under the same material and date', async () => {
+    const db = await freshDb();
+    const home = await projectOf(db);
+    const tower = await saveProject(db, { name: 'Tower B', address: 'Sector 50' });
+    const towerDraft = findDraft((await loadSnapshot(db)).lists, tower, 'audit')!.id;
+    await addItems(db, towerDraft, [
+      cement,
+      { ...cement, vendor: 'Gupta' }, // the same price from another vendor stays a price of its own
+      { ...sand, brand: 'Local' }, // no date: Rates dated it the day it was saved
+      { ...cement, item_name: 'Steel', unit: 'kg', unit_price: 0 }, // no price
+    ]);
+    await saveDraftToHistory(db, towerDraft, { ...meta, address: 'Sector 50', category: 'Civil' });
+    // A word corrected later: the kept rate is under the corrected name.
+    const bori = (await loadSnapshot(db)).items.find((i) => i.vendor === 'Sharma')!;
+    await updateItem(db, bori.id, { item_name: 'OPC Cement' });
+    // The open purchase list counts too, and a line left out of Rates doesn't; nor do BOQs.
+    const openDraft = findDraft((await loadSnapshot(db)).lists, tower, 'audit')!.id;
+    await addItems(db, openDraft, [{ ...cement, item_name: 'Bricks', original_term: 'eent', unit: 'Nos', unit_price: 9, vendor: '', date: '2026-10-05' }, { ...cement, item_name: 'Tiles', unit_price: 50 }]);
+    const tiles = (await loadSnapshot(db)).items.find((i) => i.item_name === 'Tiles')!;
+    await updateItem(db, tiles.id, { rates_excluded: 1 });
+    await addItems(db, findDraft((await loadSnapshot(db)).lists, tower, 'boq')!.id, [{ ...cement, item_name: 'Paint', unit_price: 300 }]);
+    // A price added on its own before (Index rate) is not added twice.
+    await indexRates(db, [{ ...sand, brand: 'Local', date: (await loadSnapshot(db)).lists.find((l) => l.status === 'saved')!.created_at.slice(0, 10) }]);
+
+    const before = await loadSnapshot(db);
+    const expected = rates(before).filter(([name]) => name !== 'Paint');
+    await deleteProject(db, tower);
+    const after = await loadSnapshot(db);
+    expect(after.projects.map((p) => p.id)).toEqual([home]);
+    expect(after.items).toHaveLength(0);
+    expect(rates(after).map(([name, unit, points, cats]) => [name, unit, (points as unknown[][]).map((p) => p.slice(0, 4)), cats])).toEqual(
+      expected.map(([name, unit, points, cats]) => [name, unit, (points as unknown[][]).map((p) => p.slice(0, 4)), cats]),
+    );
+    expect(after.rates.map((r) => [r.item_name, r.vendor, r.address, r.category, r.project_id]).sort()).toEqual([
+      ['Bricks', 'Unknown', '', '', ''],
+      ['OPC Cement', 'Gupta', 'Sector 50', 'Civil', ''],
+      ['OPC Cement', 'Sharma', 'Sector 50', 'Civil', ''],
+      ['Sand', 'Unknown', '', '', ''], // the one indexed before
+    ]);
+    const saved = before.lists.find((l) => l.status === 'saved')!;
+    const bricks = before.items.find((i) => i.item_name === 'Bricks')!;
+    expect(after.rates.find((r) => r.vendor === 'Gupta')!.indexed_at).toBe(saved.created_at);
+    expect(after.rates.find((r) => r.item_name === 'Bricks')).toMatchObject({ indexed_at: bricks.created_at, date: '2026-10-05', unit: 'Nos' });
+  });
+
+  it('keeps a material deleted from Rates deleted, and brings its prices back if it is restored', async () => {
+    const db = await freshDb();
+    const tower = await saveProject(db, { name: 'Tower B', address: '' });
+    const towerDraft = findDraft((await loadSnapshot(db)).lists, tower, 'audit')!.id;
+    await addItems(db, towerDraft, [cement]);
+    await saveDraftToHistory(db, towerDraft, meta);
+    const ref = { key: materialKey('Cement', 'Bag'), name: 'Cement', unit: 'Bag' };
+    await hideMaterial(db, ref);
+    await deleteProject(db, tower);
+    const snap = await loadSnapshot(db);
+    const hidden = Object.fromEntries(snap.hidden.map((h) => [h.id, h.hidden_at]));
+    expect(snap.rates).toHaveLength(1);
+    expect(buildItemDatabase(snap.lists, snap.items, snap.rates, learningMap(snap.learned), hidden)).toHaveLength(0);
+    await unhideMaterial(db, ref.key);
+    const back = await loadSnapshot(db);
+    expect(buildItemDatabase(back.lists, back.items, back.rates, learningMap(back.learned)).map((e) => [e.name, e.latestPrice])).toEqual([['Cement', 500]]);
+  });
+
+  it('keeps the open list’s copy of a saved line once', async () => {
+    const db = await freshDb();
+    const tower = await saveProject(db, { name: 'Tower B', address: '' });
+    const towerDraft = findDraft((await loadSnapshot(db)).lists, tower, 'audit')!.id;
+    await addItems(db, towerDraft, [cement]);
+    await saveDraftToHistory(db, towerDraft, meta);
+    await addItems(db, towerDraft, [cement]);
+    await deleteProject(db, tower);
+    expect((await loadSnapshot(db)).rates).toHaveLength(1);
+  });
+});

@@ -10,6 +10,8 @@ Android app (React Native, Expo) for tracking construction purchases, BOQs, vend
 
 **The app** is `apps/native` (React Native, Expo) since 7.0; the old Capacitor app was removed in Phase 8 of [docs/react-native-plan.md](docs/react-native-plan.md). Next: the sync phases there (Supabase and a web version on GitHub Pages). ERP features (vendors, payments, orders, plan vs actual, closing stock) are planned in [docs/ERP plan.md](docs/ERP%20plan.md).
 
+**The team** (agents in `.claude/agents/`): the main session is the tech lead. It plans, assigns work, integrates it, commits, opens pull requests and drives CI to green. The others: `product-manager` (specs, acceptance criteria, the backlog in `docs/`), `core-engineer` (`packages/core`, `packages/shared`), `app-engineer` (`apps/native`), `qa-engineer` (failing tests first, then lint, tests and build), `security-reviewer` and `code-reviewer` (read-only reviews before every pull request), `tech-writer` (README, `docs/`, CHANGELOG), `release-engineer` (CI, signing, releases). The order: spec → failing test → fix → checks → both reviews → pull request. Only the tech lead commits or pushes.
+
 Rules that always apply:
 - Run `npm run lint`, `npm test` and `npm run build` before every push.
 - Decide the version size of every change (Code guideline, *Versions*). Fixes need nothing; a feature bumps the minor number in `apps/native/package.json` and adds a CHANGELOG section.

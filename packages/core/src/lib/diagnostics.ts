@@ -3,9 +3,11 @@ import { platform } from '../platform.ts';
 /**
  * A diagnostic log kept on the phone: errors, AI readings, the steps people
  * take and slow screens, with what each step was given (item names, rates,
- * vendors, AI input and output) so a problem can be reproduced. Photos are
- * left out and the API key is always removed. It leaves the phone only when
- * the user sends it (Settings → Report a problem, to the private repo, or Share log).
+ * vendors, addresses, AI input and output) so a problem can be reproduced.
+ * Photos are left out and the API key is always removed.
+ * Settings → Report a problem opens an issue on the PUBLIC GitHub repo, so it
+ * carries only the phone details, error messages and the names and `data` of
+ * recent entries, never `detail`. The full log leaves the phone only with Share log.
  */
 export type LogKind = 'error' | 'ai' | 'step' | 'perf';
 
@@ -15,9 +17,9 @@ export interface LogEntry {
   kind: LogKind;
   /** Short description, e.g. "saveDraftToHistory" or "TypeError: x is undefined". */
   msg: string;
-  /** Numbers and short labels only. */
+  /** Numbers and short labels only, never text a user typed or a bill held: it goes into public problem reports. */
   data?: Record<string, string | number | boolean>;
-  /** What the step worked on, e.g. the arguments of an action or the AI's reading. */
+  /** What the step worked on, e.g. the arguments of an action or the AI's reading. Only in Share log, never in a problem report. */
   detail?: string;
 }
 
@@ -107,8 +109,9 @@ export function clearLog() {
 /** App version, phone and screen, from the app (`configureCore`). */
 export const deviceSummary = (): Record<string, string> => platform.deviceInfo();
 
-const line = (e: LogEntry) =>
-  `${e.t.slice(5, 19).replace('T', ' ')} ${e.kind.padEnd(5)} ${e.msg}${e.data ? ` ${Object.entries(e.data).map(([k, v]) => `${k}=${v}`).join(' ')}` : ''}${e.detail ? `\n    ${e.detail}` : ''}`;
+/** One entry as text; `withDetail` false leaves out what it worked on (for the public problem report). */
+const line = (e: LogEntry, withDetail = true) =>
+  `${e.t.slice(5, 19).replace('T', ' ')} ${e.kind.padEnd(5)} ${e.msg}${e.data ? ` ${Object.entries(e.data).map(([k, v]) => `${k}=${v}`).join(' ')}` : ''}${withDetail && e.detail ? `\n    ${e.detail}` : ''}`;
 
 /** Plain-text log for sharing: device details, then every entry (times in UTC). */
 export function logAsText(): string {
@@ -117,18 +120,21 @@ export function logAsText(): string {
     `Nirman diagnostics — ${new Date().toISOString()}`,
     ...Object.entries(d).map(([k, v]) => `${k}: ${v}`),
     '',
-    ...load().map(line),
+    ...load().map((e) => line(e)),
   ].join('\n');
 }
 
-/** A GitHub issue pre-filled with the device, recent errors and the last steps; fits in a URL. */
+/**
+ * A GitHub issue pre-filled with the device, recent errors and the last steps; fits in a URL. The repo is public, so
+ * entries go in without their `detail` (items, rates, vendors, addresses): names, data and error messages only.
+ */
 export function issueUrl(repo: string, note = ''): string {
   const d = deviceSummary();
   const all = load();
   const errors = all.filter((e) => e.kind === 'error').slice(-8);
   const ai = all.filter((e) => e.kind === 'ai').slice(-5);
   const recent = all.filter((e) => e.kind === 'step' || e.kind === 'perf').slice(-15);
-  const block = (title: string, list: LogEntry[]) => (list.length ? `\n### ${title}\n\`\`\`\n${list.map(line).join('\n')}\n\`\`\`\n` : '');
+  const block = (title: string, list: LogEntry[]) => (list.length ? `\n### ${title}\n\`\`\`\n${list.map((e) => line(e, false)).join('\n')}\n\`\`\`\n` : '');
   const build = () =>
     [
       '### What happened?',
@@ -141,7 +147,7 @@ export function issueUrl(repo: string, note = ''): string {
       block('Recent errors', errors),
       block('Recent AI readings', ai),
       block('Last steps (UTC)', recent),
-      '_Sent from Nirman → Settings → Report a problem. Steps include what they worked on (items, rates, vendors); photos and the API key are left out. Full log: Settings → Share log._',
+      '_Sent from Nirman → Settings → Report a problem. This issue is public: it has the phone details, errors and the names of recent steps, but no items, rates, vendors or addresses, and never photos or the API key. The full log stays on the phone and is sent only with Settings → Share log._',
     ].join('\n');
   // GitHub rejects very long URLs; drop the oldest entries, steps first, until it fits.
   let body = build();

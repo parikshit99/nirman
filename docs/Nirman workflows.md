@@ -99,6 +99,7 @@ flowchart LR
   B[Saved purchase lists<br/>every project] --> DB
   C[Confirmed vendor quotes<br/>stored as added rates] --> DB
   D[Today's price<br/>added by hand in Rates] --> DB
+  E[Purchases of a deleted project<br/>kept as added rates] --> DB
   DB[[Rates · buildItemDatabase<br/>− lines left out of Rates<br/>− materials deleted, up to that day<br/>→ learned names merge spellings<br/>→ grouped by brand / size / colour]]
   DB --> L[Last paid check on each line<br/>higher red, lower green ±2%]
   DB --> RT[Rates tab<br/>trend, range, vendors, filters, edit]
@@ -109,6 +110,7 @@ flowchart LR
 
 - **Last paid** and the quote comparison check this project's last price first. Only when this site has none is another site's price shown, with its address ("Last paid at Dwarka"). Since 5.1.
 - A price check never compares a line with itself.
+- **Deleting a project** keeps its prices in Rates. Each of its purchase lines with a rate (except those left out of Rates) is kept as an added rate, with its work type and site address. These and its confirmed quotes' rates are then left with no project, or go to another project with the same site address if there is one. Its lists, BOQs, quotes and contracts are deleted.
 - **Merging** two materials in Rates (since 7.1) converts quantities and rates between units of one kind (MT, quintal, kg; brass, cft, cum; sqm, sqft), keeping totals. Units that don't convert (Bag and kg) are merged without converting, and the dialog says so.
 
 ## A-04 BOQ and vendor quotes
@@ -156,8 +158,9 @@ Nirman has no server or account yet (until the sync phases of [react-native-plan
 | Gemini reading | The photo or text of one entry, learned names, material names in Rates (up to 150, since 7.1), the BOQ lines for a quote | Automatically, for entries the phone can't read with confidence (or always, if chosen) | Google Gemini, with the user's own key |
 | Share | A PDF, Excel sheet or JPG the user previewed | On Share | Any app from the share sheet |
 | Backup | Everything as one `.zip`, bill photos included; not entries waiting to be read | On *Save backup*; a reminder after a week | Wherever the user saves it |
-| Report a problem | The on-phone log: steps, item names, rates, vendors; never photos or the key | On *Report a problem* or *Share log* | A GitHub issue, or any app |
-| Update | Nothing goes out; the new APK comes in | When the user downloads it | GitHub release (sign-in needed while the repo is private) |
+| Report a problem | The user's note, the phone's details (app version, Android version, model, screen size), recent errors and where in the code they happened, and the names, times and counts of recent steps, AI readings and slow screens. No item names, rates, vendors, addresses or phone numbers | On *Report a problem*, once the user submits the issue | A public GitHub issue |
+| Share log | The full on-phone log: errors, AI readings and steps, with what they worked on (typed text, item names, rates, vendors, addresses, phone numbers); never photos or the key | On *Share log* | Whoever the user picks in the share sheet |
+| Update | Nothing goes out; the new APK comes in | When the user downloads it | GitHub release (public, no sign-in) |
 
 ## A-07 Shipping an update
 
@@ -170,7 +173,7 @@ flowchart LR
   CI --> NB[native: build + sign<br/>apps/native, arm64]
   TS & NB -- all pass, on main --> PB[publish: latest release<br/>+ v‹version›, keeps 5]
   PB --> PHN[Users download nirman.apk,<br/>installs over, data kept]
-  PHN -. Report a problem .-> ISS[GitHub issue labelled bug,<br/>with the log] -.-> BR
+  PHN -. Report a problem .-> ISS[Public GitHub issue labelled bug,<br/>phone, errors, step names] -.-> BR
 ```
 
 How the build is signed and released:
