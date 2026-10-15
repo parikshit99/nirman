@@ -9,8 +9,17 @@ export interface SharedPayload {
 
 export type HapticType = 'tap' | 'tick' | 'confirm' | 'reject';
 
-/** Where the app was asked to open from outside it: the app shortcuts "New bill" and "New BOQ". */
-export type Launch = 'bill' | 'boq';
+/** Where the app was asked to open from outside it: the app shortcuts "New bill" and "New BOQ", and the widget's "Add bill" and Purchases. */
+export type Launch = 'bill' | 'boq' | 'purchases';
+
+/** The open project's figures for the home screen widget "Today's spend" (`todaySpend`). */
+export interface WidgetFigures {
+  project: string;
+  /** The day they are for, YYYY-MM-DD in IST. */
+  day: string;
+  spent: number;
+  bills: number;
+}
 
 declare class NirmanNativeModule extends NativeModule<{ shared: () => void; launch: () => void }> {
   /** Full path of a file in the app's databases folder (where the Capacitor app keeps its database). */
@@ -36,8 +45,10 @@ declare class NirmanNativeModule extends NativeModule<{ shared: () => void; laun
   systemAccent(): string | null;
   /** The share that started or reached the app, once; listen for "shared" to hear of a new one. */
   takeShared(): SharedPayload | null;
-  /** Where the app shortcut that started or reached the app asked to go, once; listen for "launch" to hear of a new one. */
+  /** Where the app shortcut or widget that started or reached the app asked to go, once; listen for "launch" to hear of a new one. */
   takeLaunch(): Launch | null;
+  /** Keeps today's figures for the home screen widget and redraws it (the widget never runs JS). */
+  setWidget(figures: WidgetFigures): void;
 }
 
 export default requireNativeModule<NirmanNativeModule>('Nirman');

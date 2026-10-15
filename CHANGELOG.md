@@ -2,6 +2,14 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 7.10 — Today's spend on your home screen
+
+**Everywhere**
+- **Add the *Today's spend* widget** to your home screen (long press an empty spot → *Widgets* → *Nirman*). It shows the open project, what was spent on it today and how many bills, for example *6 bills · 15 Oct*.
+- **Add bill** on the widget opens Purchases with the entry form ready, like the *New bill* shortcut. Tap anywhere else on it to open Purchases.
+- It counts every purchase line of the open project dated today, on the open list and saved lists. A line without a bill date counts on the day it was added.
+- It changes when you add or delete a bill or switch project. Each morning it starts again at ₹0.
+
 ## 7.9 — Shortcuts on the app icon
 
 **Everywhere**

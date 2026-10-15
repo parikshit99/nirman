@@ -11,6 +11,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { DialogProvider } from './components/ui/Dialogs';
 import { restoreBeforeStart, startApp, type StartResult } from './data/startup';
 import { LabourScreen } from './features/LabourScreen';
+import { HomeWidgetSync } from './features/HomeWidget';
 import { LaunchHost, useDropLaunches } from './features/LaunchHost';
 import { ListScreen } from './features/ListScreen';
 import { ProjectsHost } from './features/ProjectsSheet';
@@ -128,6 +129,7 @@ function Boot() {
   }
   return (
     <AppStateProvider services={result.services} initial={result.initial}>
+      <HomeWidgetSync />
       <ProjectsHost>
         <QuotesHost>
           <SiteReportHost>

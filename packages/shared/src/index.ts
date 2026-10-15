@@ -8,3 +8,4 @@ export * from './quoteMatch.ts';
 export * from './catalog.ts';
 export * from './palette.ts';
 export * from './format.ts';
+export * from './spend.ts';

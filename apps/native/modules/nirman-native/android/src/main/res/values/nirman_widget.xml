@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The home screen widget's words and colours (the app's own, from src/theme.ts); values-night has the dark ones. -->
+<resources>
+  <string name="nirman_widget_label">Today\'s spend</string>
+  <string name="nirman_widget_description">Today\'s spend on the open project, and a button to add a bill.</string>
+  <string name="nirman_widget_spent_today">Spent today</string>
+  <string name="nirman_widget_add_bill">Add bill</string>
+  <string name="nirman_widget_open_app">Open Nirman to see today\'s spend</string>
+  <!-- white, brandDark, gray500, brandPrimary, onPrimary -->
+  <color name="nirman_widget_background">#FFFFFFFF</color>
+  <color name="nirman_widget_text">#FF121212</color>
+  <color name="nirman_widget_text_secondary">#FF6A7282</color>
+  <color name="nirman_widget_accent">#FFFF7A00</color>
+  <color name="nirman_widget_on_accent">#FFFFFFFF</color>
+</resources>

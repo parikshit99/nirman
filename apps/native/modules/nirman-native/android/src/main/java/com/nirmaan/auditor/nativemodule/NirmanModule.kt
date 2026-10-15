@@ -27,6 +27,8 @@ import expo.modules.kotlin.Promise
 import expo.modules.kotlin.functions.Queues
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.kotlin.records.Field
+import expo.modules.kotlin.records.Record
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -34,7 +36,7 @@ import java.io.FileOutputStream
 /**
  * Nirman's own Android code, ported from the 6.x app's Capacitor plugins
  * (TextReaderPlugin, SharedFilesPlugin, HapticsPlugin) with the same logic,
- * plus where the Capacitor app keeps its database and the app shortcuts.
+ * plus where the Capacitor app keeps its database, the app shortcuts and the home screen widget (NirmanWidget).
  */
 class NirmanModule : Module() {
   private val context: Context
@@ -45,7 +47,7 @@ class NirmanModule : Module() {
   /** The last share from another app, kept until the app takes it. */
   private var pendingShare: Map<String, Any>? = null
 
-  /** Where an app shortcut asked to go ("bill", "boq"), kept until the app takes it. */
+  /** Where an app shortcut or the widget asked to go ("bill", "boq", "purchases"), kept until the app takes it. */
   private var pendingLaunch: String? = null
 
   override fun definition() = ModuleDefinition {
@@ -224,12 +226,20 @@ class NirmanModule : Module() {
     // A shortcut opens the app with one of LAUNCHES' actions. Like a share, it is kept until the
     // app takes it, so one that starts the app is not lost; "launch" says a new one arrived.
 
-    /** Where the app shortcut that started or reached the app asked to go ("bill", "boq"), once; or null. */
+    /** Where the app shortcut or widget that started or reached the app asked to go ("bill", "boq", "purchases"), once; or null. */
     Function("takeLaunch") {
       takeStartIntent()
       val launch = pendingLaunch
       pendingLaunch = null
       launch
+    }
+
+    // --- Home screen widget ------------------------------------------------------------------
+    // "Today's spend" (NirmanWidget) never runs JS: the app sends it the open project's figures when they change.
+
+    /** Keeps today's figures for the widget and redraws it: `{ project, day (YYYY-MM-DD, IST), spent, bills }`. */
+    Function("setWidget") { figures: WidgetFigures ->
+      NirmanWidget.save(context.applicationContext, figures.project, figures.day, figures.spent, figures.bills)
     }
 
     OnNewIntent { intent ->
@@ -312,6 +322,14 @@ class NirmanModule : Module() {
     }
   }
 
+  /** The widget's figures, sent by the app. */
+  class WidgetFigures : Record {
+    @Field val project: String = ""
+    @Field val day: String = ""
+    @Field val spent: Double = 0.0
+    @Field val bills: Int = 0
+  }
+
   private data class Shortcut(val id: String, val action: String, val shortLabel: String, val longLabel: String, val icon: Int)
 
   private fun handleShare(intent: Intent?): Boolean {
@@ -380,11 +398,11 @@ class NirmanModule : Module() {
     private const val SHORTCUTS_TAG = "Shortcuts"
     private const val MAX_FILES = 10
 
-    /** The app's own actions, used by the app shortcuts; the app opens on the screen each names. */
+    /** The app's own actions, used by the app shortcuts and the widget; the app opens on the screen each names. */
     const val ACTION_NEW_BILL = "com.nirmaan.auditor.action.NEW_BILL"
     const val ACTION_NEW_BOQ = "com.nirmaan.auditor.action.NEW_BOQ"
 
     /** Each action and what `takeLaunch` gives the app for it. */
-    val LAUNCHES = mapOf(ACTION_NEW_BILL to "bill", ACTION_NEW_BOQ to "boq")
+    val LAUNCHES = mapOf(ACTION_NEW_BILL to "bill", ACTION_NEW_BOQ to "boq", NirmanWidget.ACTION_OPEN_PURCHASES to "purchases")
   }
 }

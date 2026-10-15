@@ -51,6 +51,7 @@ Use these when a screen or feature needs them, rather than a home-made version:
 - **System pickers and sheets:** the share sheet, the Photo Picker, the camera, the date picker, the document picker.
 - **Notifications** for work that finishes while the app is closed or in the background (queued bills read, a backup reminder), on a channel the user can turn off in Android's settings. Ask for the notification permission when the feature is first used, not at launch.
 - **App shortcuts** (long press on the launcher icon): *New bill* and *New BOQ* (already there). They are set in `NirmanModule.kt` (no config plugin) and handled by `LaunchHost`, which goes to the tab and opens its Add sheet, but leaves the app as it is while any `Sheet` is shown (`anySheetShown()`). A new one gets an action in `LAUNCHES`, an icon `nirman_*` in the module's `res/drawable` and a target in `LaunchHost`.
+- **Home screen widget** *Today's spend* (already there): `NirmanWidget.kt` with `res/layout/nirman_widget.xml`, colours in the module's `values`/`values-night` (the app's own, so it follows dark mode). It never runs JS: `HomeWidgetSync` sends it `todaySpend` with `setWidget`; its taps are `LAUNCHES` actions handled by `LaunchHost`.
 - **Share into the app** (already there), and Android's text selection menu (copy, share) on text worth copying.
 - **Pull to refresh** (`RefreshControl`) only where a list can change from outside (later, with sync).
 - **Per-app language** (Android 13+) when the app is translated.

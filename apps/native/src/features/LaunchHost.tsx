@@ -8,6 +8,7 @@ import { goToTab, type TabName } from '../navigation';
 const TARGETS: Record<Launch, { tab: TabName; add?: ListKind }> = {
   bill: { tab: 'Purchases', add: 'audit' },
   boq: { tab: 'BOQ', add: 'boq' },
+  purchases: { tab: 'Purchases' },
 };
 
 const LaunchContext = createContext<{ addFor: { kind: ListKind; id: number } | null; used(): void } | null>(null);
@@ -15,8 +16,8 @@ const LaunchContext = createContext<{ addFor: { kind: ListKind; id: number } | n
 let nextId = 1;
 
 /**
- * The app opened from outside it, e.g. the app shortcuts "New bill" and "New BOQ" (long press on the app icon): goes
- * to that tab of the open project and opens its entry form (`useLaunchAdd`). If a sheet, dialog or screen is showing
+ * The app opened from outside it, e.g. the app shortcuts "New bill" and "New BOQ" (long press on the app icon) or the
+ * home screen widget: goes to that tab of the open project and opens its entry form (`useLaunchAdd`) if it asked for one. If a sheet, dialog or screen is showing
  * (one being filled in, the welcome), the app only comes to the front and it stays as it is.
  */
 export function LaunchHost({ children }: { children: ReactNode }) {
