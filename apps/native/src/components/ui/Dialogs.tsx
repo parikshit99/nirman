@@ -8,7 +8,7 @@ import { haptic } from '../../lib/haptics';
 import { DURATION, EASE_IN, EASE_OUT } from '../../lib/motion';
 import { useColors } from '../../theme';
 import { Button } from './Button';
-import { Sheet } from './Sheet';
+import { Sheet, SheetOverlay } from './Sheet';
 
 export interface Dialogs {
   alert(title: string, message?: string): Promise<void>;
@@ -38,6 +38,38 @@ export interface Bulletin {
   message: string;
   undo?: () => void;
   ms: number;
+  /** When it goes (Date.now() time), so moving to another window keeps the time left. */
+  until: number;
+}
+
+/**
+ * Each open dialog or screen (its own window) registers a host for the Snackbar; it shows in the one opened last,
+ * else in the app's own window above the tab bar.
+ */
+interface SnackbarHosts {
+  toast: Bulletin | null;
+  top?: number;
+  done(): void;
+  add(id: number): void;
+  remove(id: number): void;
+}
+
+const HostsContext = createContext<SnackbarHosts | null>(null);
+let nextHost = 1;
+
+/** The Snackbar inside a dialog's or screen's window; Sheet draws it through `SheetOverlay`. */
+function HostedSnackbar() {
+  const hosts = useContext(HostsContext);
+  // Taken while rendering, so a screen opened inside another (rendered after it) gets the higher number.
+  const [id] = useState(() => nextHost++);
+  const add = hosts?.add;
+  const remove = hosts?.remove;
+  useEffect(() => {
+    add?.(id);
+    return () => remove?.(id);
+  }, [id, add, remove]);
+  if (!hosts || hosts.top !== id) return null;
+  return <Snackbar toast={hosts.toast} onDone={hosts.done} above={16} />;
 }
 
 interface Asking {
@@ -58,6 +90,12 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   // Questions waiting their turn: one dialog shows at a time.
   const [asking, setAsking] = useState<Asking[]>([]);
   const [toast, setToast] = useState<Bulletin | null>(null);
+  const [hostIds, setHostIds] = useState<number[]>([]);
+  const done = useCallback(() => setToast(null), []);
+  const add = useCallback((id: number) => setHostIds((h) => [...h, id]), []);
+  const remove = useCallback((id: number) => setHostIds((h) => h.filter((x) => x !== id)), []);
+  const top = hostIds.length ? Math.max(...hostIds) : undefined;
+  const hosts = useMemo<SnackbarHosts>(() => ({ toast, top, done, add, remove }), [toast, top, done, add, remove]);
 
   const api = useMemo<Dialogs>(
     () => ({
@@ -76,11 +114,11 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       prompt: (title, defaultValue = '') => new Promise<string | null>((resolve) => setPrompting({ title, value: defaultValue, resolve })),
       toast: (message) => {
         haptic('confirm');
-        setToast({ id: Date.now(), message, ms: TOAST_MS });
+        setToast({ id: Date.now(), message, ms: TOAST_MS, until: Date.now() + TOAST_MS });
       },
       undoable: (message, undo, ms = 10_000) => {
         haptic('confirm');
-        setToast({ id: Date.now(), message, undo, ms });
+        setToast({ id: Date.now(), message, undo, ms, until: Date.now() + ms });
       },
     }),
     [],
@@ -99,18 +137,22 @@ export function DialogProvider({ children }: { children: ReactNode }) {
 
   return (
     <DialogContext.Provider value={api}>
-      {children}
-      {current && (
-        <Sheet key={current.id} kind="dialog" closeOnBackdrop onClose={() => answer(null)} label={current.title} padding={24} gap={16}>
-          <AskBody asking={current} onAnswer={answer} />
-        </Sheet>
-      )}
-      {prompting && (
-        <Sheet kind="dialog" closeOnBackdrop onClose={() => closePrompt(null)} label={prompting.title}>
-          <PromptBody title={prompting.title} initial={prompting.value} onDone={closePrompt} />
-        </Sheet>
-      )}
-      <Snackbar toast={toast} onDone={() => setToast(null)} />
+      <HostsContext.Provider value={hosts}>
+        <SheetOverlay.Provider value={HostedSnackbar}>
+          {children}
+          {current && (
+            <Sheet key={current.id} kind="dialog" closeOnBackdrop onClose={() => answer(null)} label={current.title} padding={24} gap={16}>
+              <AskBody asking={current} onAnswer={answer} />
+            </Sheet>
+          )}
+          {prompting && (
+            <Sheet kind="dialog" closeOnBackdrop onClose={() => closePrompt(null)} label={prompting.title}>
+              <PromptBody title={prompting.title} initial={prompting.value} onDone={closePrompt} />
+            </Sheet>
+          )}
+          {top === undefined && <Snackbar toast={toast} onDone={done} above={88} />}
+        </SheetOverlay.Provider>
+      </HostsContext.Provider>
     </DialogContext.Provider>
   );
 }
@@ -164,10 +206,11 @@ function PromptBody({ title, initial, onDone }: { title: string; initial: string
 }
 
 /**
- * Slides up above the tab bar, as Telegram's bulletins do, and slides away by itself. With `undo`, it has an Undo
- * button and a ring counting the seconds left; a new strip replaces the one showing.
+ * Slides up as Telegram's bulletins do (`above` the tab bar, or the bottom edge on a dialog or screen) and slides
+ * away by itself. With `undo`, it has an Undo button and a ring counting the seconds left; a new strip replaces the
+ * one showing. Moved to another window, it carries on with the time left.
  */
-function Snackbar({ toast, onDone }: { toast: Bulletin | null; onDone(): void }) {
+function Snackbar({ toast, onDone, above }: { toast: Bulletin | null; onDone(): void; above: number }) {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const y = useSharedValue(1);
@@ -176,18 +219,24 @@ function Snackbar({ toast, onDone }: { toast: Bulletin | null; onDone(): void })
   const done = useCallback(onDone, [onDone]);
   useEffect(() => {
     if (!toast) return;
-    y.value = 1;
-    y.value = withTiming(0, { duration: DURATION.normal, easing: EASE_OUT });
-    left.value = 1;
-    left.value = withTiming(0, { duration: toast.ms, easing: Easing.linear });
-    const end = Date.now() + toast.ms;
-    setSeconds(Math.ceil(toast.ms / 1000));
+    const end = toast.until;
+    const remaining = Math.max(0, end - Date.now());
+    // Only a new strip slides in; one moving here from a window that closed just stays.
+    if (remaining > toast.ms - 150) {
+      y.value = 1;
+      y.value = withTiming(0, { duration: DURATION.normal, easing: EASE_OUT });
+    } else {
+      y.value = 0;
+    }
+    left.value = remaining / toast.ms;
+    left.value = withTiming(0, { duration: remaining, easing: Easing.linear });
+    setSeconds(Math.ceil(remaining / 1000));
     const tick = setInterval(() => setSeconds(Math.max(0, Math.ceil((end - Date.now()) / 1000))), 250);
     const timer = setTimeout(() => {
       y.value = withTiming(1, { duration: DURATION.quick, easing: EASE_IN }, (finished) => {
         if (finished) runOnJS(done)();
       });
-    }, toast.ms);
+    }, remaining);
     return () => {
       clearTimeout(timer);
       clearInterval(tick);
@@ -198,7 +247,7 @@ function Snackbar({ toast, onDone }: { toast: Bulletin | null; onDone(): void })
   if (!toast) return null;
   const undo = toast.undo;
   return (
-    <Animated.View pointerEvents="box-none" accessibilityLiveRegion="polite" style={[styles.snackWrap, { bottom: 88 + insets.bottom }, slide]}>
+    <Animated.View pointerEvents="box-none" accessibilityLiveRegion="polite" style={[styles.snackWrap, { bottom: above + insets.bottom }, slide]}>
       <View style={[styles.snack, { backgroundColor: c.gray900 }]}>
         {undo && (
           <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
