@@ -3,7 +3,7 @@ import Fuse from 'fuse.js';
 import { useMemo, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
-import { contractTotals, sumTotals, type ContractRow, type ContractTotals } from '@nirman/shared';
+import { contractTotals, pastEstimate, sumTotals, type ContractRow, type ContractTotals } from '@nirman/shared';
 import { prefs } from '@nirman/core';
 import { ActionFab, useHideOnScroll } from '../components/ActionFab';
 import { ContractForm } from '../components/ContractForm';
@@ -31,11 +31,14 @@ const STATUS_TABS: { id: StatusFilter; label: string }[] = [
   { id: 'all', label: 'All' },
 ];
 
-/** Balance due, or a warning when more was paid than the work measured is worth. */
-export function BalanceText({ balance, align }: { balance: number; align?: 'right' }) {
+/**
+ * Balance due, or a warning when more was paid than the work measured is worth ("Overpaid" once the contract is
+ * closed), or what the contractor owes when deductions are more than the work (`owes`).
+ */
+export function BalanceText({ balance, closed, owes, align }: { balance: number; closed?: boolean; owes?: boolean; align?: 'right' }) {
   const c = useColors();
   const style = { textAlign: align, fontWeight: '700' as const, fontSize: 12, fontVariant: ['tabular-nums' as const] };
-  if (balance < 0) return <Text style={[style, { color: c.red600 }]}>Paid ahead {rupeesWhole(-balance)}</Text>;
+  if (balance < 0) return <Text style={[style, { color: c.red600 }]}>{owes ? 'Contractor owes' : closed ? 'Overpaid' : 'Paid ahead'} {rupeesWhole(-balance)}</Text>;
   return <Text style={[style, { color: balance > 0 ? c.red600 : c.green700 }]}>{balance > 0 ? `Due ${rupeesWhole(balance)}` : 'Settled'}</Text>;
 }
 
@@ -43,7 +46,7 @@ export function BalanceText({ balance, align }: { balance: number; align?: 'righ
 export function LabourScreen({ about }: { about: string }) {
   const c = useColors();
   const state = useAppState();
-  const { actions, contracts: everyContract, entriesFor, pendingDeletes, categoryNames, allAddresses, projects, projectId, project, uniqueAddresses } = state;
+  const { actions, contracts: everyContract, entriesFor, allEntriesFor, pendingDeletes, categoryNames, allAddresses, projects, projectId, project, uniqueAddresses } = state;
   const siteReport = useSiteReport();
   const dialogs = useDialogs();
   // A contract swiped away (or deleted in its sheet) leaves at once; the strip at the bottom offers Undo.
@@ -84,6 +87,25 @@ export function LabourScreen({ about }: { about: string }) {
     dialogs.undoable(`Deleted the contract with ${contract.contractor}`, () => actions.undoDelete(contract.id));
   };
 
+  const form = contractForm && (
+    <ContractForm
+      contract={contractForm.contract}
+      // Entries waiting for Undo are still saved, so they keep the kind too.
+      hasWork={!!contractForm.contract && allEntriesFor(contractForm.contract.id).some((e) => e.kind === 'work')}
+      defaults={{
+        address: addressFilter !== 'All' ? addressFilter : project?.address || prefs.get('nirmaan_contract_site', ''),
+        category: categoryFilter !== 'All' ? categoryFilter : categoryNames[0] || 'Civil',
+        project_id: projectId,
+      }}
+      projects={projectOptions}
+      addresses={allAddresses}
+      categories={categoryNames}
+      contractors={contractors}
+      onSave={saveContract}
+      onClose={() => setContractForm(null)}
+    />
+  );
+
   const hasSites = all.length > 0 || uniqueAddresses.length > 0;
   const box = { flex: 1, padding: 8, alignItems: 'center' as const, borderRadius: 8, borderWidth: 1, borderColor: c.gray100, backgroundColor: c.gray50 };
   const header = (
@@ -101,7 +123,10 @@ export function LabourScreen({ about }: { about: string }) {
           </View>
           <View style={box}>
             <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>Balance</Text>
-            <BalanceText balance={totals.balance} />
+            {/* Due, paid ahead and owed stay apart: one contractor's overpayment doesn't settle another's dues. */}
+            {(totals.due > 0 || (!totals.paidAhead && !totals.owes)) && <BalanceText balance={totals.due} />}
+            {totals.paidAhead > 0 && <BalanceText balance={-totals.paidAhead} />}
+            {totals.owes > 0 && <BalanceText balance={-totals.owes} owes />}
           </View>
         </View>
       )}
@@ -135,6 +160,8 @@ export function LabourScreen({ about }: { about: string }) {
       <FlashList
         data={contracts}
         keyExtractor={(x) => x.id}
+        // Cards update when an entry is deleted (waiting for Undo) or comes back.
+        extraData={entriesFor}
         contentContainerStyle={{ paddingBottom: 96 }}
         onScroll={(e) => onListScroll(e.nativeEvent.contentOffset.y)}
         scrollEventThrottle={32}
@@ -151,23 +178,13 @@ export function LabourScreen({ about }: { about: string }) {
         )}
       />
       <ActionFab label="New contract" onPress={() => setContractForm({})} actions={hasSites ? [{ icon: 'assignment', label: 'Site report', tone: 'primary', onPress: siteReport.open }] : []} actionsLabel="Site report" hidden={fabHidden} />
-      {openContract && <ContractSheet contractId={openContract} onEdit={(contract) => setContractForm({ contract })} onClose={() => setOpenContract(null)} />}
-      {contractForm && (
-        <ContractForm
-          contract={contractForm.contract}
-          defaults={{
-            address: addressFilter !== 'All' ? addressFilter : project?.address || prefs.get('nirmaan_contract_site', ''),
-            category: categoryFilter !== 'All' ? categoryFilter : categoryNames[0] || 'Civil',
-            project_id: projectId,
-          }}
-          projects={projectOptions}
-          addresses={allAddresses}
-          categories={categoryNames}
-          contractors={contractors}
-          onSave={saveContract}
-          onClose={() => setContractForm(null)}
-        />
+      {openContract && (
+        <ContractSheet contractId={openContract} onEdit={(contract) => setContractForm({ contract })} onClose={() => setOpenContract(null)}>
+          {/* Inside the contract's screen, so the sheet opens over it, not behind it (#116). */}
+          {contractForm?.contract && form}
+        </ContractSheet>
       )}
+      {contractForm && !contractForm.contract && form}
     </View>
   );
 }
@@ -202,8 +219,12 @@ function ContractCard({ contract: x, totals: t, onOpen, onDelete }: { contract: 
             <View style={{ height: '100%', width: `${progress * 100}%`, backgroundColor: c.orange500 }} />
           </View>
           <Text style={{ fontSize: 12, color: c.gray500, marginTop: 2 }}>
-            {Math.round((t.progress ?? 0) * 100)}% done
-            {x.kind === 'rate' && ` · ${t.doneQty.toLocaleString('en-IN')} of ${x.est_quantity.toLocaleString('en-IN')} ${x.unit}`}
+            {pastEstimate(x, t) ?? (
+              <>
+                {Math.round((t.progress ?? 0) * 100)}% done
+                {x.kind === 'rate' && ` · ${t.doneQty.toLocaleString('en-IN')} of ${x.est_quantity.toLocaleString('en-IN')} ${x.unit}`}
+              </>
+            )}
           </Text>
         </View>
       )}
@@ -214,7 +235,7 @@ function ContractCard({ contract: x, totals: t, onOpen, onDelete }: { contract: 
         <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>
           Paid <Text style={{ fontWeight: '700', color: c.gray800 }}>{rupeesWhole(t.paid)}</Text>
         </Text>
-        <BalanceText balance={t.balance} align="right" />
+        <BalanceText balance={t.balance} closed={x.status === 'closed'} owes={t.payable < 0} align="right" />
       </View>
     </Pressable>
   );

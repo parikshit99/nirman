@@ -2,6 +2,8 @@ import {
   VARIANT_FIELDS,
   applyLearning,
   buildItemDatabase,
+  contractTermsProblem,
+  kindLockedNote,
   fitRow,
   extractedMaterialSchema,
   extractedQuoteLineSchema,
@@ -1322,10 +1324,18 @@ export async function confirmQuote(db: Db, id: string) {
 
 export type ContractInput = Omit<ContractRow, 'id' | 'status' | 'retention_released_at' | 'created_at' | 'updated_at'>;
 
-/** Add a contract, or update the terms of an existing one (its entries are kept). */
+/**
+ * Add a contract, or update the terms of an existing one (its entries are kept). Throws, saving nothing, when the
+ * terms are below 0 or the kind would change under work already recorded (sqft would be read as %, or back).
+ */
 export async function saveContract(db: Db, input: ContractInput, id?: string): Promise<string> {
+  const problem = contractTermsProblem(input);
+  if (problem) throw new Error(problem);
   return db.transaction(async (tx) => {
     const existing = id ? await getRow(tx, 'contracts', id) : undefined;
+    if (existing && existing.kind !== input.kind && (await tx.all("SELECT 1 FROM contract_entries WHERE contract_id = ? AND kind = 'work' LIMIT 1", [existing.id])).length) {
+      throw new Error(kindLockedNote(existing));
+    }
     const ts = nowISO();
     const row: ContractRow = {
       status: 'active',
@@ -1347,12 +1357,12 @@ export async function saveContract(db: Db, input: ContractInput, id?: string): P
   });
 }
 
-/** Close or reopen a contract; closing can release the retention on the same date. */
+/** Close or reopen a contract; closing can release the retention on the same date. Reopening keeps a release (hold it again with `setRetentionReleased`). */
 export async function setContractStatus(db: Db, id: string, status: ContractRow['status'], releaseRetentionOn = '') {
   await db.transaction(async (tx) => {
     const c = await getRow(tx, 'contracts', id);
     if (!c) return;
-    await writeRow(tx, 'contracts', { ...c, status, retention_released_at: releaseRetentionOn || (status === 'active' ? '' : c.retention_released_at), updated_at: nowISO() });
+    await writeRow(tx, 'contracts', { ...c, status, retention_released_at: releaseRetentionOn || c.retention_released_at, updated_at: nowISO() });
   });
 }
 

@@ -350,7 +350,8 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       editing,
       allHistory,
       contracts,
-      entriesFor: (contractId: string): ContractEntryRow[] => entriesByContract.get(contractId) ?? [],
+      /** Every entry of a contract, those waiting for Undo too (shown struck through); `entriesFor` is what counts. */
+      allEntriesFor: (contractId: string): ContractEntryRow[] => entriesByContract.get(contractId) ?? [],
       /** Sites from saved lists and contracts, for address suggestions. */
       allAddresses: [...new Set([project?.address ?? '', ...allHistory.map((h) => h.address), ...snapshot.contracts.map((c) => c.address), ...snapshot.projects.map((p) => p.address)].filter(Boolean))],
       itemsFor: (kind: ListKind) => byList.get(openIds[kind]) ?? [],
@@ -381,7 +382,24 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
     if (unusedHidden.length) void actions.unhideMaterials(unusedHidden);
   }, [unusedHidden, actions]);
 
-  return { snapshot, status, settings, actions, pendingDeletes, setEditing, ...derived };
+  // Contract entries deleted but still waiting for Undo leave every total at once, like the rows of a list.
+  const counted = useMemo(() => {
+    const live = pendingDeletes.size ? snapshot.contractEntries.filter((e) => !pendingDeletes.has(e.id)) : snapshot.contractEntries;
+    const byContract = new Map<string, ContractEntryRow[]>();
+    for (const e of live) {
+      const list = byContract.get(e.contract_id);
+      if (list) list.push(e);
+      else byContract.set(e.contract_id, [e]);
+    }
+    return {
+      /** Contract entries that count: all but those waiting for Undo. */
+      contractEntries: live,
+      /** A contract's entries that count (not those waiting for Undo): for totals, statements and reports. */
+      entriesFor: (contractId: string): ContractEntryRow[] => byContract.get(contractId) ?? [],
+    };
+  }, [snapshot.contractEntries, pendingDeletes]);
+
+  return { snapshot, status, settings, actions, pendingDeletes, setEditing, ...derived, ...counted };
 }
 
 export type AppState = ReturnType<typeof useAppStateValue>;

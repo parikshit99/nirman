@@ -142,10 +142,14 @@ flowchart LR
   C --> PY[Payments]
   C --> AD["Advances (kharcha)"]
   C --> DD[Deductions]
-  WM & PY & AD & DD --> BAL[Balance due<br/>retention held;<br/>Paid ahead in red if paid<br/>more than the work]
-  BAL --> CL[Close contract<br/>releases the retention]
+  WM & PY & AD & DD --> BAL[Balance due<br/>retention held;<br/>Paid ahead in red if paid<br/>more than the work,<br/>Overpaid once closed;<br/>Contractor owes if deductions<br/>are more than the work]
+  BAL --> CL[Close contract<br/>releases the retention;<br/>Reopen asks whether to hold it again]
   BAL --> ST[Statement · Site report<br/>PDF, Excel or JPG]
 ```
+
+A lump sum never earns more than its amount: work entries past 100% add nothing (the form warns when one would). A rate job is owed on everything measured, past its estimate too. Totals over several contracts (the Labour tab, the site report) show what is due, what was paid ahead and what contractors owe separately, never one netted against the other.
+
+The rate or lump sum must be above ₹0, the estimate not below 0, and retention 0 to 50%. Once work is recorded, a contract stays rate or lump sum (its work is in units or %). An entry deleted but still waiting for Undo no longer counts in any total.
 
 Labour entries never feed Rates. The project's site report brings purchases and labour together.
 

@@ -66,5 +66,8 @@ describe('order slip export', () => {
     expect(rows).toContainEqual(['2026-10-02', 'Work: 1,000 sqft @ 18', 18000, null, null, 18000]);
     expect(rows.at(-1)).toEqual([null, 'Balance due', null, null, null, 7100]);
     expect(buildContractStatementPdf(c, st, '').getNumberOfPages()).toBe(1);
+    // Deductions past the work: the contractor owes the difference.
+    const owing = [...entries, { id: 'd', contract_id: 'c', kind: 'deduction' as const, date: '2026-10-04', quantity: 0, amount: 20000, mode: '', note: '', created_at: ts }];
+    expect(values(contractStatementSheet(c, contractStatement(c, owing), '')).at(-1)).toEqual([null, 'Contractor owes', null, null, null, 12900]);
   });
 });

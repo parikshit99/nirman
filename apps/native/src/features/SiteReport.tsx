@@ -20,7 +20,9 @@ import { useColors } from '../theme';
 /** Everything bought (or delivered) for the open project, for any period and work types, as PDF / Excel / JPG. */
 export function SiteReport({ onClose }: { onClose(): void }) {
   const c = useColors();
-  const { snapshot, learning, categoryNames, project, projectId, contracts } = useAppState();
+  const { snapshot, learning, categoryNames, project, projectId, contracts: projectContracts, contractEntries, pendingDeletes } = useAppState();
+  // Contracts and entries waiting for Undo are left out, as they are on the Labour tab.
+  const contracts = useMemo(() => projectContracts.filter((x) => !pendingDeletes.has(x.id)), [projectContracts, pendingDeletes]);
   const dialogs = useDialogs();
   const lists = useMemo(() => snapshot.lists.filter((l) => l.project_id === projectId && l.kind === 'audit' && l.status === 'saved'), [snapshot.lists, projectId]);
   /** The report's heading: the project, and its site address when that says more. */
@@ -39,7 +41,7 @@ export function SiteReport({ onClose }: { onClose(): void }) {
   }, [lists, contracts, categoryNames]);
 
   const report = useMemo(() => buildSiteReport(lists, snapshot.items, learning, { from, to, categories, deliveredOnly }), [lists, snapshot.items, learning, from, to, categories, deliveredOnly]);
-  const labour = useMemo(() => buildLabourReport(contracts, snapshot.contractEntries, { from, to, categories }), [contracts, snapshot.contractEntries, from, to, categories]);
+  const labour = useMemo(() => buildLabourReport(contracts, contractEntries, { from, to, categories }), [contracts, contractEntries, from, to, categories]);
   const empty = report.lineCount === 0 && labour.rows.length === 0;
   const materialCount = report.categories.reduce((n, x) => n + x.materials.length, 0);
   const period = from || to ? `${from || 'start'} to ${to || 'today'}` : 'All time';
@@ -159,6 +161,8 @@ export function SiteReport({ onClose }: { onClose(): void }) {
             {empty && <Text style={{ fontSize: 12, color: c.gray500, textAlign: 'center' }}>Nothing matches.{deliveredOnly ? ' Tick deliveries in Saved → Deliveries, or include all saved purchases.' : ''}</Text>}
           </View>
         )}
+        {/* The share sheet goes inside this screen, or it opens behind it (#116). */}
+        {sharing && <ShareSheet title="site report" onShare={share} preview={() => buildSiteReportPdf(address, filters, report, labour)} onClose={() => setSharing(false)} />}
       </Sheet>
       {previewing && (
         <DocumentPreview
@@ -172,7 +176,6 @@ export function SiteReport({ onClose }: { onClose(): void }) {
           onClose={() => setPreviewing(false)}
         />
       )}
-      {sharing && <ShareSheet title="site report" onShare={share} preview={() => buildSiteReportPdf(address, filters, report, labour)} onClose={() => setSharing(false)} />}
     </>
   );
 }

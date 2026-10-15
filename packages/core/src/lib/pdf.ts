@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { describeTerms, formatQty, formatRupees, variantLabel, type ContractRow, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
+import { balanceLabel, describeTerms, formatQty, formatRupees, variantLabel, type ContractRow, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
 import { appIcon } from './pdfIcon.ts';
 
@@ -314,7 +314,10 @@ function drawLabour(doc: jsPDF, labour: LabourReport, materials: number, y: numb
     head: [['Contractor', 'Work', 'Work type', 'Work done', 'Paid', 'Balance now']],
     body: [
       ...labour.rows.map((r) => [r.contract.contractor, r.contract.work || '-', r.contract.category || '-', rupees(Math.round(r.workDone)), rupees(Math.round(r.paid)), rupees(Math.round(r.balance))]),
-      ['', '', bold('Labour total'), bold(rupees(Math.round(labour.workDone))), bold(rupees(Math.round(labour.paid))), bold(rupees(Math.round(labour.balance)))],
+      // What is due and what was paid ahead stay apart: one contractor's overpayment is not another's dues paid.
+      ['', '', bold('Labour total'), bold(rupees(Math.round(labour.workDone))), bold(rupees(Math.round(labour.paid))), bold(`Due ${rupees(Math.round(labour.due))}`)],
+      ...(labour.paidAhead > 0 ? [['', '', '', '', '', bold(`Paid ahead ${rupees(Math.round(labour.paidAhead))}`)]] : []),
+      ...(labour.owes > 0 ? [['', '', '', '', '', bold(`Contractor owes ${rupees(Math.round(labour.owes))}`)]] : []),
       ['', '', bold('GRAND TOTAL'), bold(rupees(Math.round(materials + labour.workDone))), { content: 'materials + labour work done', colSpan: 2, styles: { textColor: [120, 120, 120] } }],
     ],
     startY: y + 4,
@@ -362,7 +365,7 @@ export function buildContractStatementPdf(c: ContractRow, st: ContractStatement,
   if (c.retention_pct > 0) summary.push([`Less retention ${c.retention_pct}%${c.retention_released_at ? ' (released)' : ' (held)'}`, rupees(t.retention)]);
   if (t.deductions) summary.push(['Less deductions', rupees(t.deductions)]);
   summary.push(['Less paid', rupees(t.paid)]);
-  summary.push([t.balance < 0 ? 'Paid ahead of work' : 'Balance due', rupees(Math.abs(t.balance))]);
+  summary.push([t.balance ? balanceLabel(c, t) : 'Balance due', rupees(Math.abs(t.balance))]);
   autoTable(doc, {
     body: summary,
     startY: lastY(doc) + 6,

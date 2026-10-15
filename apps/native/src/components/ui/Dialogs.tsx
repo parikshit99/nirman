@@ -13,6 +13,8 @@ import { Sheet } from './Sheet';
 export interface Dialogs {
   alert(title: string, message?: string): Promise<void>;
   confirm(title: string, opts?: { message?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }): Promise<boolean>;
+  /** `confirm` where both buttons do something: true for the confirm button, false for the other, null when dismissed (Back or outside). */
+  choose(title: string, opts: { message?: string; confirmLabel: string; cancelLabel: string }): Promise<boolean | null>;
   prompt(title: string, defaultValue?: string): Promise<string | null>;
   /** A short note that something worked: a strip at the bottom that goes by itself (nothing to choose). */
   toast(message: string): void;
@@ -46,7 +48,8 @@ interface Asking {
   /** No cancel button: an alert, with only OK. */
   cancelLabel?: string;
   danger?: boolean;
-  resolve(ok: boolean): void;
+  /** null: dismissed with Back or a tap outside. */
+  resolve(answer: boolean | null): void;
 }
 
 /** `confirm` and `alert` are the app's own Material 3 dialog; `prompt` is a small one with a field; `toast` is a Snackbar above the tab bar. */
@@ -64,7 +67,11 @@ export function DialogProvider({ children }: { children: ReactNode }) {
         }),
       confirm: (title, opts = {}) =>
         new Promise<boolean>((resolve) => {
-          setAsking((q) => [...q, { id: nextId++, title, message: opts.message, confirmLabel: opts.confirmLabel ?? 'OK', cancelLabel: opts.cancelLabel ?? 'Cancel', danger: opts.danger, resolve }]);
+          setAsking((q) => [...q, { id: nextId++, title, message: opts.message, confirmLabel: opts.confirmLabel ?? 'OK', cancelLabel: opts.cancelLabel ?? 'Cancel', danger: opts.danger, resolve: (a) => resolve(a === true) }]);
+        }),
+      choose: (title, opts) =>
+        new Promise<boolean | null>((resolve) => {
+          setAsking((q) => [...q, { id: nextId++, title, message: opts.message, confirmLabel: opts.confirmLabel, cancelLabel: opts.cancelLabel, resolve }]);
         }),
       prompt: (title, defaultValue = '') => new Promise<string | null>((resolve) => setPrompting({ title, value: defaultValue, resolve })),
       toast: (message) => {
@@ -80,8 +87,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   );
 
   const current = asking[0];
-  const answer = (ok: boolean) => {
-    current?.resolve(ok);
+  const answer = (a: boolean | null) => {
+    current?.resolve(a);
     setAsking((q) => q.slice(1));
   };
 
@@ -94,7 +101,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     <DialogContext.Provider value={api}>
       {children}
       {current && (
-        <Sheet key={current.id} kind="dialog" closeOnBackdrop onClose={() => answer(false)} label={current.title} padding={24} gap={16}>
+        <Sheet key={current.id} kind="dialog" closeOnBackdrop onClose={() => answer(null)} label={current.title} padding={24} gap={16}>
           <AskBody asking={current} onAnswer={answer} />
         </Sheet>
       )}
