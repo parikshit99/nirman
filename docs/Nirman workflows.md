@@ -143,9 +143,11 @@ flowchart LR
   WM & PY & AD & DD --> BAL[Balance due<br/>retention held;<br/>Paid ahead in red if paid<br/>more than the work]
   BAL --> CL[Close contract<br/>releases the retention]
   BAL --> ST[Statement · Site report<br/>PDF, Excel or JPG]
+  C -. rate contracts, every project .-> LR[Rates → Labour<br/>guessTrade · labourRates<br/>one card per trade and unit]
+  LR -. tap a contract .-> C
 ```
 
-Labour entries never feed Rates. The project's site report brings purchases and labour together.
+Labour entries never feed material prices: they stay out of the Materials view, Last paid and price checks. A rate contract's rate (not its entries) shows in *Rates → Labour* (since 7.13), from every project, ongoing and closed; lump sums and contracts without a rate are left out. Its trade comes from the Work text (`guessTrade`, whole words, English and Hinglish), else its work type ("Civil, other work"); units are cleaned (sft → sqft) and units of one kind share a card, converted (sqm → sqft). Tapping a contract opens it in Labour, switching to its project first. The project's site report brings purchases and labour together.
 
 ## A-06 What leaves the phone
 

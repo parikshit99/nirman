@@ -36,13 +36,17 @@ import { shareFile, textToBase64 } from '../lib/files';
 import { plural, rupees, rupeesWhole } from '../lib/format';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
+import { LabourRates } from './LabourRates';
 
-type SubTab = 'materials' | 'categories';
+type SubTab = 'materials' | 'labour' | 'categories';
 
 const SUB_TABS: { id: SubTab; label: string; about: string }[] = [
   { id: 'materials', label: 'Materials', about: 'One card per material. Tap it (or Edit) to change its name, size, rate or vendor, merge it or delete it. Open Prices and tap a price to fix just that one.' },
+  { id: 'labour', label: 'Labour', about: 'Rates from your labour contracts, by trade, across all projects. Tap a trade to see each contract.' },
   { id: 'categories', label: 'Work types', about: 'Types of work (e.g. Earthwork) you can tag a saved purchase list or BOQ with, to filter by later.' },
 ];
+
+const SEARCH_PLACEHOLDER: Record<SubTab, string> = { materials: 'Search materials…', labour: 'Search trades or contractors…', categories: 'Search materials…' };
 
 const SORT_ICONS: Record<MaterialSort, IconName> = { newest: 'schedule', oldest: 'history', name: 'sort-by-alpha', nameDesc: 'sort-by-alpha' };
 
@@ -237,7 +241,7 @@ export function RatesScreen() {
       <ScreenHeader>
         <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: c.brandConcrete, borderRadius: 22, backgroundColor: c.white }}>
           <Icon name="search" size={18} color={c.gray500} />
-          <TextInput accessibilityLabel="Search" value={search} onChangeText={setSearch} placeholder="Search materials…" placeholderTextColor={c.gray500} style={{ flex: 1, fontSize: 14, color: c.brandDark, paddingVertical: 8 }} />
+          <TextInput accessibilityLabel="Search" value={search} onChangeText={setSearch} placeholder={SEARCH_PLACEHOLDER[tab]} placeholderTextColor={c.gray500} style={{ flex: 1, fontSize: 14, color: c.brandDark, paddingVertical: 8 }} />
           {!!search && (
             <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => setSearch('')} style={{ minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center', marginRight: -8 }}>
               <Icon name="close" size={16} color={c.gray500} />
@@ -248,6 +252,8 @@ export function RatesScreen() {
 
       {tab === 'categories' ? (
         <FlashList data={[]} renderItem={null} ListHeaderComponent={<>{header}<Categories /></>} />
+      ) : tab === 'labour' ? (
+        <LabourRates query={query} header={header} />
       ) : (
         <FlashList
           data={entries}

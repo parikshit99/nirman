@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { Pressable } from './ui/Pressable';
-import { parseAmount, todayISO, type ContractRow } from '@nirman/shared';
+import { contractTrade, parseAmount, todayISO, type ContractRow } from '@nirman/shared';
 import type { ContractInput } from '@nirman/core';
 import { useColors } from '../theme';
 import { Button } from './ui/Button';
@@ -138,7 +138,11 @@ export function ContractForm({
         </View>
       </View>
 
-      <SuggestInput label="Work" value={f.work} onChange={(v) => setValue('work', v)} suggestions={WORK_SUGGESTIONS} placeholder="e.g. Internal plaster, 2nd floor" />
+      <View style={{ gap: 4 }}>
+        <SuggestInput label="Work" value={f.work} onChange={(v) => setValue('work', v)} suggestions={WORK_SUGGESTIONS} placeholder="e.g. Internal plaster, 2nd floor" />
+        {/* Where its rate will show in Rates → Labour; a lump sum has no rate per unit, so it isn't there. */}
+        {isRate && <Text style={{ fontSize: 12, color: c.gray500 }}>In Labour rates as: {contractTrade(f)}</Text>}
+      </View>
 
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <View style={{ flex: 1 }}>

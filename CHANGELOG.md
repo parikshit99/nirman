@@ -2,6 +2,18 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 7.13 — Labour rates across your sites
+
+**Rates**
+- A new **Labour** switch, between *Materials* and *Work types*, shows what each trade has been paid per unit in your labour contracts, across all projects, ongoing and closed: one card per trade, such as Plaster, Tiling or Bar bending, with the range ("₹18 to ₹24 per sqft · 4 contracts") and the last rate agreed, with whom and where.
+- The trade is worked out from the contract's *Work* ("Internal plaster, 2nd floor" is Plaster; chinai, dhalai and sariya bandhai are understood too). Work it can't place shows under its work type, such as *Civil, other work*.
+- Rates per sqm and per sqft share one card, converted to one unit. Lump-sum contracts are not included.
+- Tap a trade to see each contract, newest first; tap a contract to open it in Labour (in its own project).
+- Search finds trades and contractors.
+
+**Labour**
+- Under *Work*, a new contract shows where its rate will appear: "In Labour rates as: Plaster".
+
 ## 7.5 — Saved lists of every project
 
 **Saved**
