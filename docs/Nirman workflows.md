@@ -60,6 +60,7 @@ Also on the phone:
 - **Backup** (`.zip`, by hand): everything, bill photos included, except entries not yet read.
 - **Problem log:** *Settings → Report a problem* / *Share log*.
 - **Bill photos:** kept with their lines.
+- **Home screen widget** (*Today's spend*, since 7.10): the app hands Android the open project's name, today's spend and bill count (`todaySpend`) whenever they change, kept in the app's own storage. The widget shows only those, never runs the app, and opens it with *Add bill* or on Purchases.
 
 ## A-02 Reading a bill
 

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Today's spend": the figures (shown once the app has sent some; until then, and in the widget picker, a note) and "Add bill". Tapping the rest opens Purchases. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/nirman_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/nirman_widget_background"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="14dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="10dp"
+    android:paddingBottom="8dp">
+
+  <LinearLayout
+      android:id="@+id/nirman_widget_figures"
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_weight="1"
+      android:orientation="vertical"
+      android:visibility="gone">
+
+    <TextView
+        android:id="@+id/nirman_widget_project"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textColor="@color/nirman_widget_text"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:text="@string/nirman_widget_spent_today"
+        android:textColor="@color/nirman_widget_text_secondary"
+        android:textSize="11sp" />
+
+    <TextView
+        android:id="@+id/nirman_widget_amount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textColor="@color/nirman_widget_text"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/nirman_widget_bills"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textColor="@color/nirman_widget_text_secondary"
+        android:textSize="11sp" />
+  </LinearLayout>
+
+  <TextView
+      android:id="@+id/nirman_widget_empty"
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_weight="1"
+      android:ellipsize="end"
+      android:maxLines="3"
+      android:text="@string/nirman_widget_open_app"
+      android:textColor="@color/nirman_widget_text"
+      android:textSize="13sp" />
+
+  <Button
+      android:id="@+id/nirman_widget_add"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="8dp"
+      android:background="@drawable/nirman_widget_button"
+      android:minWidth="0dp"
+      android:minHeight="40dp"
+      android:paddingStart="14dp"
+      android:paddingEnd="14dp"
+      android:text="@string/nirman_widget_add_bill"
+      android:textAllCaps="false"
+      android:textColor="@color/nirman_widget_on_accent"
+      android:textSize="14sp"
+      android:textStyle="bold" />
+</LinearLayout>

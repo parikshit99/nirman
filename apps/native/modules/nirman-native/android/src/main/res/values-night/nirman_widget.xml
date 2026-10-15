@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget in dark mode: raised, brandDark, gray500, brandPrimary, onPrimary of the app's dark theme. -->
+<resources>
+  <color name="nirman_widget_background">#FF26292E</color>
+  <color name="nirman_widget_text">#FFEAEBED</color>
+  <color name="nirman_widget_text_secondary">#FF999EA9</color>
+  <color name="nirman_widget_accent">#FFFF7A00</color>
+  <color name="nirman_widget_on_accent">#FF16181C</color>
+</resources>
