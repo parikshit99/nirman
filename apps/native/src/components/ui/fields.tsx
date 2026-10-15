@@ -10,7 +10,24 @@ export function Label({ children }: { children: ReactNode }) {
   return <Text style={[styles.label, { color: c.gray600 }]}>{children}</Text>;
 }
 
-/** A text field with the label above it. `mono` for amounts, rates and quantities. */
+/**
+ * How much of a field's limit is used ("180/200"), shown under it once it is 80% full, so the user sees why typing
+ * stops. Limits come from the row schemas: `maxLength={fieldLimits('contracts').phone}`.
+ */
+function LengthCount({ length, max }: { length: number; max?: number }) {
+  const c = useColors();
+  if (!max || length < max * 0.8) return null;
+  return (
+    <Text accessibilityLabel={`${length} of ${max} characters`} style={[styles.count, { color: c.gray500 }]}>
+      {length}/{max}
+    </Text>
+  );
+}
+
+/**
+ * A text field with the label above it. `mono` for amounts, rates and quantities. Give saved text a `maxLength`
+ * (from `fieldLimits`); the count shows as it nears the limit.
+ */
 export function Field({
   label,
   mono,
@@ -33,6 +50,7 @@ export function Field({
         {...input}
         style={[styles.input, { backgroundColor: c.white, borderColor: c.gray200, color: c.brandDark }, mono && styles.mono, bold && { fontWeight: '700' }, style]}
       />
+      <LengthCount length={typeof input.value === 'string' ? input.value.length : 0} max={input.maxLength} />
     </View>
   );
 }
@@ -88,6 +106,7 @@ export function SuggestInput({
         }}
         style={[styles.input, { backgroundColor: c.white, borderColor: c.gray200, color: c.brandDark }, input.style]}
       />
+      <LengthCount length={value.length} max={input.maxLength} />
       {shown.length > 0 && (
         <View accessibilityLabel="Suggestions" style={[styles.list, { backgroundColor: c.white, borderColor: c.gray200 }]}>
           {shown.map((s, i) => (
@@ -115,6 +134,7 @@ const styles = StyleSheet.create({
   field: { flexShrink: 1, minWidth: 0 },
   input: { minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderRadius: 10, fontSize: 14 },
   mono: { fontVariant: ['tabular-nums'] },
+  count: { marginTop: 2, alignSelf: 'flex-end', fontSize: 12, fontVariant: ['tabular-nums'] },
   list: { marginTop: 4, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
   suggestion: { minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
 });

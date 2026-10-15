@@ -2,11 +2,14 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Pressable } from './ui/Pressable';
 import type { ListMeta } from '@nirman/core';
+import { fieldLimits } from '@nirman/shared';
 import { useColors } from '../theme';
 import { Button } from './ui/Button';
 import { Field, SuggestInput } from './ui/fields';
 import { DateField, Select } from './ui/Select';
 import { Sheet, SheetHeader } from './ui/Sheet';
+
+const LIMIT = fieldLimits('lists');
 
 interface Props {
   initial: ListMeta;
@@ -52,10 +55,10 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
     <Sheet label={editing ? 'List details' : 'Save list'} onClose={onClose} padding={20} gap={16}>
       <SheetHeader icon="assignment-turned-in" title={editing ? 'List details' : 'Save list'} onClose={onClose} />
 
-      <Field label="Name" value={meta.title} onChangeText={set('title')} selectTextOnFocus placeholder="e.g. Cement order, Site visit" />
+      <Field label="Name" value={meta.title} onChangeText={set('title')} selectTextOnFocus placeholder="e.g. Cement order, Site visit" maxLength={LIMIT.title} />
 
       <View>
-        <Field label="Site address" value={meta.address} onChangeText={set('address')} placeholder="e.g. Sector 44, Gurgaon" />
+        <Field label="Site address" value={meta.address} onChangeText={set('address')} placeholder="e.g. Sector 44, Gurgaon" maxLength={LIMIT.address} />
         {suggestions.length > 0 && (
           <View style={{ marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             {suggestions.map((addr) => (
@@ -71,7 +74,7 @@ export function SaveModal({ initial, categories, recentAddresses, editing, allow
 
       {vendor && (
         <View>
-          <SuggestInput label="Vendor" value={vendorName} onChange={setVendorName} suggestions={vendor.known} placeholder={vendor.mixed ? 'Several: each line keeps its own' : 'Who sold it'} />
+          <SuggestInput label="Vendor" value={vendorName} onChange={setVendorName} suggestions={vendor.known} placeholder={vendor.mixed ? 'Several: each line keeps its own' : 'Who sold it'} maxLength={fieldLimits('items').vendor} />
           <Text style={{ fontSize: 12, color: c.gray500, marginTop: 4 }}>{vendor.mixed ? 'Type or pick one to put it on every line.' : 'Applies to every line in the list.'}</Text>
         </View>
       )}

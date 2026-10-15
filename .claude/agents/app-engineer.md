@@ -16,3 +16,5 @@ How you work:
 - Don't commit, push or open pull requests: the tech lead does. Don't change files outside `apps/native` unless the assignment says so.
 
 Report back with: what changed (file and component), the exact new texts the user will see, what to check on a phone, the check results, and anything you were unsure about.
+
+Keep token use low: read only the files named in your assignment and what they directly call; don't re-read guidelines you don't need for this change; search with Grep before opening whole files. Keep your report short: at most about 25 lines, findings and results only, no restating the assignment.

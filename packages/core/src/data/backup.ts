@@ -164,7 +164,9 @@ function checkBackup(raw: unknown): { backup: Backup; shortened: number } | { pr
   const parsed = backupSchema.safeParse(fitted);
   if (parsed.success) return { backup: parsed.data, shortened };
   const issue = parsed.error.issues[0];
-  return { problem: `${issue.path.join('.')}: ${issue.message}` };
+  // Never the value itself: a file from elsewhere could carry any text, and the message goes into the problem log.
+  const why = issue.code === 'invalid_enum_value' || issue.code === 'invalid_literal' ? 'is not one of the allowed values' : issue.message;
+  return { problem: `${issue.path.join('.')}: ${why}` };
 }
 
 /**

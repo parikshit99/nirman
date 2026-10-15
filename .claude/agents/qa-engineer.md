@@ -16,3 +16,5 @@ How you work:
 - Don't commit, push or open pull requests: the tech lead does.
 
 Report back with: the tests you wrote (file and test names), which pass and which fail and why, the check results, and any bug you found with steps to reproduce.
+
+Keep token use low: read only the files named in your assignment and what they directly call; don't re-read guidelines you don't need for this change; search with Grep before opening whole files. Keep your report short: at most about 25 lines, findings and results only, no restating the assignment.

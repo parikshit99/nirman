@@ -7,7 +7,7 @@ import { useDialogs } from '../components/ui/Dialogs';
 import { Icon } from '../components/ui/Icon';
 import { openNirmanDb } from '../data/db';
 import type { StartProblem as Problem } from '../data/startup';
-import { pickBackupFile } from '../lib/backupFile';
+import { pickBackupFile, shortenedNote } from '../lib/backupFile';
 import { shareBackupZip } from '../lib/files';
 import { plural } from '../lib/format';
 import { useColors } from '../theme';
@@ -52,7 +52,7 @@ export function StartProblem({ problem, onRestore, onContinue }: { problem: Prob
       const file = parseBackupFile(bytes);
       const saved = file.backup.lists.filter((l) => l.status === 'saved').length;
       const ok = await dialogs.confirm('Restore this backup?', {
-        message: `The backup from ${new Date(file.backup.exported_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}: ${plural(saved, 'saved list')}, ${plural(file.backup.items.length, 'item')}.`,
+        message: `The backup from ${new Date(file.backup.exported_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}: ${plural(saved, 'saved list')}, ${plural(file.backup.items.length, 'item')}.${file.shortened ? `\n${shortenedNote(file.shortened)}` : ''}`,
         confirmLabel: 'Restore',
       });
       if (!ok) return;

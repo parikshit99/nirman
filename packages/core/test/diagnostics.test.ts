@@ -49,9 +49,20 @@ describe('diagnostic log', () => {
     for (const text of ['Ramesh', '98765', 'Sector 44', 'bori', 'Sharma', '@380', 'Tower A', 'DLF']) expect(body).not.toContain(text);
     for (const text of ['Crashed on save', 'saveContract ms=120', 'reading ok engine=gemini lines=2', 'TypeError: x is undefined', 'where=saveDraftToHistory']) expect(body).toContain(text);
     expect(body).toMatch(/This issue is public/);
-    expect(body).toMatch(/no items, rates, vendors or addresses/);
+    expect(body).toMatch(/items, rates, vendors, addresses, phone numbers, photos and the API key are left out/);
     expect(body).toMatch(/Share log/);
     // Share log keeps everything.
     for (const text of ['Ramesh', 'Sharma Traders', 'DLF Phase 3']) expect(logAsText()).toContain(text);
+  });
+});
+
+describe('the public problem report and error messages', () => {
+  it('blanks quoted text and phone numbers in error messages, but the shared log keeps them', () => {
+    clearLog();
+    logError(new Error('Could not save "Ramesh Kumar, Sector 44" at ₹380, call 98765 43210'), 'saveContract');
+    const body = decodeURIComponent(new URL(issueUrl('owner/repo')).searchParams.get('body') ?? '');
+    for (const secret of ['Ramesh Kumar', 'Sector 44', '98765 43210']) expect(body).not.toContain(secret);
+    expect(body).toContain('Could not save');
+    expect(logAsText()).toContain('Ramesh Kumar');
   });
 });

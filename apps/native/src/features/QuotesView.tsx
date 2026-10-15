@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Image, ScrollView, Text, TextInput, View } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
-import { MAX_IMAGES, compareQuotes, parseAmount, todayISO, variantLabel, type QuoteRow } from '@nirman/shared';
+import { MAX_IMAGES, compareQuotes, fieldLimits, parseAmount, todayISO, variantLabel, type QuoteRow } from '@nirman/shared';
 import { PhotoSourceSheet } from '../components/PhotoSourceSheet';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
@@ -244,7 +244,7 @@ function AddQuote({ boqId, initial, onDone }: { boqId: string; initial?: Incomin
       </Text>
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1 }}>
-          <SuggestInput label="Vendor" value={vendor} onChange={setVendor} suggestions={knownVendors} placeholder="e.g. Sharma Traders" />
+          <SuggestInput label="Vendor" value={vendor} onChange={setVendor} suggestions={knownVendors} placeholder="e.g. Sharma Traders" maxLength={fieldLimits('quotes').vendor} />
         </View>
         <View style={{ width: 150 }}>
           <DateField label="Quote date" value={date} onChange={setDate} />

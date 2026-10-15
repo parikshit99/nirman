@@ -5,6 +5,7 @@ import { Text, TextInput, View } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
 import {
   VARIANT_FIELDS,
+  fieldLimits,
   filterMaterials,
   materialDatabaseToCSV,
   materialFilterOptions,
@@ -198,10 +199,10 @@ export function RatesScreen() {
             <View style={{ gap: 8, padding: 8, borderRadius: 12, borderWidth: 1, borderColor: c.gray200, backgroundColor: c.gray50 }}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <View style={{ flex: 1 }}>
-                  <Field label="New unit" value={bulk.unit} onChangeText={(t) => setBulk((p) => ({ ...p, unit: t }))} placeholder="New unit" />
+                  <Field label="New unit" value={bulk.unit} onChangeText={(t) => setBulk((p) => ({ ...p, unit: t }))} placeholder="New unit" maxLength={fieldLimits('items').unit} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Field label="Vendor" value={bulk.vendor} onChangeText={(t) => setBulk((p) => ({ ...p, vendor: t }))} placeholder="Vendor" />
+                  <Field label="Vendor" value={bulk.vendor} onChangeText={(t) => setBulk((p) => ({ ...p, vendor: t }))} placeholder="Vendor" maxLength={fieldLimits('items').vendor} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <NumberField label="Today's ₹" value={bulk.price} onChangeText={(t) => setBulk((p) => ({ ...p, price: t }))} placeholder="Today's ₹" />
@@ -795,7 +796,7 @@ function Categories() {
       <View style={{ padding: 16, gap: 16 }}>
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
           <View style={{ flex: 1 }}>
-            <Field label="New work type" value={name} onChangeText={setName} onSubmitEditing={add} placeholder="e.g. Earthwork" />
+            <Field label="New work type" value={name} onChangeText={setName} onSubmitEditing={add} placeholder="e.g. Earthwork" maxLength={fieldLimits('categories').name} />
           </View>
           <Button variant="primary" onPress={add}>
             Add

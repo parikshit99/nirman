@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Pressable } from './ui/Pressable';
-import { parseAmount, todayISO, type ContractRow } from '@nirman/shared';
+import { fieldLimits, parseAmount, todayISO, type ContractRow } from '@nirman/shared';
 import type { ContractInput } from '@nirman/core';
 import { useColors } from '../theme';
 import { Button } from './ui/Button';
@@ -15,6 +15,7 @@ import { rupeesWhole } from '../lib/format';
 /** Common jobs, offered as suggestions; anything can be typed. */
 const WORK_SUGGESTIONS = ['Masonry', 'Plaster', 'Tiling', 'Flooring', 'Plumbing', 'Electrical wiring', 'Painting', 'Carpentry', 'POP / false ceiling', 'Waterproofing', 'Fabrication', 'Shuttering', 'RCC / slab casting', 'Excavation'];
 const UNIT_SUGGESTIONS = ['sqft', 'rft', 'cft', 'sqm', 'cum', 'point', 'nos', 'day'];
+const LIMIT = fieldLimits('contracts');
 
 const blank = (category: string): Record<keyof ContractInput, string> => ({
   project_id: '',
@@ -131,18 +132,18 @@ export function ContractForm({
 
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <View style={{ flex: 1 }}>
-          <SuggestInput label="Contractor" style={{ fontWeight: '700' }} value={f.contractor} onChange={(v) => setValue('contractor', v)} suggestions={contractors.map((x) => x.name)} placeholder="Name" />
+          <SuggestInput label="Contractor" style={{ fontWeight: '700' }} value={f.contractor} onChange={(v) => setValue('contractor', v)} suggestions={contractors.map((x) => x.name)} placeholder="Name" maxLength={LIMIT.contractor} />
         </View>
         <View style={{ flex: 1 }}>
-          <Field label="Phone" keyboardType="phone-pad" value={f.phone} onChangeText={set('phone')} placeholder="98xxxxxxxx" />
+          <Field label="Phone" keyboardType="phone-pad" value={f.phone} onChangeText={set('phone')} placeholder="98xxxxxxxx" maxLength={LIMIT.phone} />
         </View>
       </View>
 
-      <SuggestInput label="Work" value={f.work} onChange={(v) => setValue('work', v)} suggestions={WORK_SUGGESTIONS} placeholder="e.g. Internal plaster, 2nd floor" />
+      <SuggestInput label="Work" value={f.work} onChange={(v) => setValue('work', v)} suggestions={WORK_SUGGESTIONS} placeholder="e.g. Internal plaster, 2nd floor" maxLength={LIMIT.work} />
 
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <View style={{ flex: 1 }}>
-          <SuggestInput label="Site address" value={f.address} onChange={(v) => setValue('address', v)} suggestions={addresses} placeholder="e.g. Sector 44" />
+          <SuggestInput label="Site address" value={f.address} onChange={(v) => setValue('address', v)} suggestions={addresses} placeholder="e.g. Sector 44" maxLength={LIMIT.address} />
         </View>
         <View style={{ flex: 1 }}>
           <Select label="Work type" value={f.category} options={[...new Set([f.category, ...categories])].filter(Boolean).map((x) => ({ value: x, label: x }))} onChange={set('category')} />
@@ -169,7 +170,7 @@ export function ContractForm({
             <NumberField label="Rate ₹" value={f.rate} onChangeText={set('rate')} placeholder="18" />
           </View>
           <View style={{ flex: 1 }}>
-            <SuggestInput label="Per" value={f.unit} onChange={(v) => setValue('unit', v)} suggestions={UNIT_SUGGESTIONS} />
+            <SuggestInput label="Per" value={f.unit} onChange={(v) => setValue('unit', v)} suggestions={UNIT_SUGGESTIONS} maxLength={LIMIT.unit} />
           </View>
           <View style={{ flex: 1 }}>
             <NumberField label="Est. qty" value={f.est_quantity} onChangeText={set('est_quantity')} placeholder="optional" />
@@ -194,19 +195,17 @@ export function ContractForm({
         </View>
       </View>
 
-      <View>
-        <Label>Notes / terms</Label>
-        <TextInput
-          accessibilityLabel="Contract notes"
-          multiline
-          value={f.notes}
-          onChangeText={set('notes')}
-          placeholder="e.g. Material by us, scaffolding by contractor"
-          placeholderTextColor={c.gray500}
-          textAlignVertical="top"
-          style={{ height: 64, padding: 12, borderWidth: 1, borderColor: c.gray200, borderRadius: 10, backgroundColor: c.white, color: c.brandDark, fontSize: 12 }}
-        />
-      </View>
+      <Field
+        label="Notes / terms"
+        accessibilityLabel="Contract notes"
+        multiline
+        value={f.notes}
+        onChangeText={set('notes')}
+        placeholder="e.g. Material by us, scaffolding by contractor"
+        textAlignVertical="top"
+        maxLength={LIMIT.notes}
+        style={{ height: 64, paddingVertical: 12, fontSize: 12 }}
+      />
 
       <Button variant="primary" block disabled={saving} onPress={save}>
         {contract ? 'Save changes' : 'Add contract'}

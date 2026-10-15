@@ -109,9 +109,12 @@ export function clearLog() {
 /** App version, phone and screen, from the app (`configureCore`). */
 export const deviceSummary = (): Record<string, string> => platform.deviceInfo();
 
-/** One entry as text; `withDetail` false leaves out what it worked on (for the public problem report). */
+/** Quoted text and long digit runs (names, phone numbers) taken out of a message, for the public problem report. */
+const blankQuoted = (msg: string) => msg.replace(/"[^"]*"|'[^']*'|“[^”]*”|‘[^’]*’/g, '"…"').replace(/\d[\d\s-]{6,}\d/g, '…');
+
+/** One entry as text; `withDetail` false leaves out what it worked on and anything quoted (for the public problem report). */
 const line = (e: LogEntry, withDetail = true) =>
-  `${e.t.slice(5, 19).replace('T', ' ')} ${e.kind.padEnd(5)} ${e.msg}${e.data ? ` ${Object.entries(e.data).map(([k, v]) => `${k}=${v}`).join(' ')}` : ''}${withDetail && e.detail ? `\n    ${e.detail}` : ''}`;
+  `${e.t.slice(5, 19).replace('T', ' ')} ${e.kind.padEnd(5)} ${withDetail ? e.msg : blankQuoted(e.msg)}${e.data ? ` ${Object.entries(e.data).map(([k, v]) => `${k}=${v}`).join(' ')}` : ''}${withDetail && e.detail ? `\n    ${e.detail}` : ''}`;
 
 /** Plain-text log for sharing: device details, then every entry (times in UTC). */
 export function logAsText(): string {
@@ -147,7 +150,7 @@ export function issueUrl(repo: string, note = ''): string {
       block('Recent errors', errors),
       block('Recent AI readings', ai),
       block('Last steps (UTC)', recent),
-      '_Sent from Nirman → Settings → Report a problem. This issue is public: it has the phone details, errors and the names of recent steps, but no items, rates, vendors or addresses, and never photos or the API key. The full log stays on the phone and is sent only with Settings → Share log._',
+      '_Sent from Nirman → Settings → Report a problem. This issue is public: items, rates, vendors, addresses, phone numbers, photos and the API key are left out. The full log stays on the phone (Settings → Share log)._',
     ].join('\n');
   // GitHub rejects very long URLs; drop the oldest entries, steps first, until it fits.
   let body = build();
