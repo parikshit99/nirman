@@ -9,7 +9,10 @@ export interface SharedPayload {
 
 export type HapticType = 'tap' | 'tick' | 'confirm' | 'reject';
 
-declare class NirmanNativeModule extends NativeModule<{ shared: () => void }> {
+/** Where the app was asked to open from outside it: the app shortcuts "New bill" and "New BOQ". */
+export type Launch = 'bill' | 'boq';
+
+declare class NirmanNativeModule extends NativeModule<{ shared: () => void; launch: () => void }> {
   /** Full path of a file in the app's databases folder (where the Capacitor app keeps its database). */
   databasePath(name: string): string;
   /** The database file (size includes its -wal/-journal files), the free space beside it, and whether the Capacitor app left files (it had data here). */
@@ -33,6 +36,8 @@ declare class NirmanNativeModule extends NativeModule<{ shared: () => void }> {
   systemAccent(): string | null;
   /** The share that started or reached the app, once; listen for "shared" to hear of a new one. */
   takeShared(): SharedPayload | null;
+  /** Where the app shortcut that started or reached the app asked to go, once; listen for "launch" to hear of a new one. */
+  takeLaunch(): Launch | null;
 }
 
 export default requireNativeModule<NirmanNativeModule>('Nirman');

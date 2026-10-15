@@ -2,6 +2,13 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 7.9 — Shortcuts on the app icon
+
+**Everywhere**
+- **Long press the Nirman icon** on your home screen for **New bill** and **New BOQ**. Each opens the open project's Purchases or BOQ tab with the entry form ready, straight from the home screen. Anything you had half-typed there is still in it.
+- Drag a shortcut onto the home screen to keep it there as its own icon.
+- If a form or message is already open in Nirman, the shortcut just brings the app back as you left it.
+
 ## 7.5 — Saved lists of every project
 
 **Saved**

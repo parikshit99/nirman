@@ -1,5 +1,5 @@
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
-import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Pressable } from './Pressable';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -44,11 +44,27 @@ interface SheetProps {
   children: ReactNode;
 }
 
+/** How many sheets, dialogs and screens are showing (open ones only; a hidden Add sheet doesn't count). */
+let shown = 0;
+
+/** Whether a sheet, dialog or screen is showing over the app: an app shortcut then leaves it as it is. */
+export function anySheetShown(): boolean {
+  return shown > 0;
+}
+
 /**
  * The one way to show something over the app. A `sheet` is Android's bottom sheet; a `dialog` and a `screen` are
  * native dialogs, so Back, the status bar and the gesture bar are handled by Android.
  */
 export function Sheet({ kind = 'sheet', onClose, onBack, backEnabled = true, busy = false, closeOnBackdrop = false, scroll = true, open = true, label, padding = 16, gap = 12, children }: SheetProps) {
+  // A layout effect, so one shown at start (the welcome, What's new) is counted before any effect asks.
+  useLayoutEffect(() => {
+    if (!open) return;
+    shown++;
+    return () => {
+      shown--;
+    };
+  }, [open]);
   const c = useColors();
   const handleBack = busy ? undefined : (onBack ?? onClose);
   const insets = useSafeAreaInsets();

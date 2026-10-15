@@ -16,6 +16,9 @@ import android.util.Log
 import android.view.HapticFeedbackConstants
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
@@ -31,7 +34,7 @@ import java.io.FileOutputStream
 /**
  * Nirman's own Android code, ported from the 6.x app's Capacitor plugins
  * (TextReaderPlugin, SharedFilesPlugin, HapticsPlugin) with the same logic,
- * plus where the Capacitor app keeps its database.
+ * plus where the Capacitor app keeps its database and the app shortcuts.
  */
 class NirmanModule : Module() {
   private val context: Context
@@ -42,10 +45,18 @@ class NirmanModule : Module() {
   /** The last share from another app, kept until the app takes it. */
   private var pendingShare: Map<String, Any>? = null
 
+  /** Where an app shortcut asked to go ("bill", "boq"), kept until the app takes it. */
+  private var pendingLaunch: String? = null
+
   override fun definition() = ModuleDefinition {
     Name("Nirman")
 
-    Events("shared")
+    Events("shared", "launch")
+
+    // The shortcuts on a long press of the app icon. Set each time the app starts, so their labels follow the app.
+    OnCreate {
+      appContext.reactContext?.applicationContext?.let { setShortcuts(it) }
+    }
 
     /** Full path of a database file in the app's databases folder, where @capacitor-community/sqlite keeps it. */
     Function("databasePath") { name: String -> context.getDatabasePath(name).absolutePath }
@@ -203,19 +214,30 @@ class NirmanModule : Module() {
 
     /** The share that started or reached the app, once: `{ files: [{ path, mimeType }], text }`, or null. */
     Function("takeShared") {
-      appContext.currentActivity?.let { activity ->
-        if (handle(activity.intent)) {
-          // Don't read the same share again if the activity is recreated.
-          activity.intent = Intent(Intent.ACTION_MAIN)
-        }
-      }
+      takeStartIntent()
       val share = pendingShare
       pendingShare = null
       share
     }
 
+    // --- App shortcuts ----------------------------------------------------------------------
+    // A shortcut opens the app with one of LAUNCHES' actions. Like a share, it is kept until the
+    // app takes it, so one that starts the app is not lost; "launch" says a new one arrived.
+
+    /** Where the app shortcut that started or reached the app asked to go ("bill", "boq"), once; or null. */
+    Function("takeLaunch") {
+      takeStartIntent()
+      val launch = pendingLaunch
+      pendingLaunch = null
+      launch
+    }
+
     OnNewIntent { intent ->
-      if (handle(intent) && pendingShare != null) sendEvent("shared", emptyMap<String, Any>())
+      if (handleLaunch(intent)) {
+        if (pendingLaunch != null) sendEvent("launch", emptyMap<String, Any>())
+      } else if (handleShare(intent) && pendingShare != null) {
+        sendEvent("shared", emptyMap<String, Any>())
+      }
     }
 
     OnDestroy {
@@ -250,7 +272,49 @@ class NirmanModule : Module() {
   private fun companions(file: File): List<File> =
     listOf("", "-wal", "-shm", "-journal").map { File(file.path + it) }.filter { it.exists() }
 
-  private fun handle(intent: Intent?): Boolean {
+  /** Reads the intent that started the app (a share or a shortcut) once, so a recreated activity doesn't repeat it. */
+  private fun takeStartIntent() {
+    val activity = appContext.currentActivity ?: return
+    if (handleLaunch(activity.intent) || handleShare(activity.intent)) activity.intent = Intent(Intent.ACTION_MAIN)
+  }
+
+  /** True for one of the app's own actions (LAUNCHES); keeps where it goes until the app takes it. */
+  private fun handleLaunch(intent: Intent?): Boolean {
+    if (intent == null) return false
+    val launch = intent.action?.let { LAUNCHES[it] } ?: return false
+    // Reopened from Recents after Android had closed the app: Android repeats the intent, but it was already used.
+    if ((intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0) pendingLaunch = launch
+    return true
+  }
+
+  /**
+   * "New bill" and "New BOQ" on a long press of the app icon. Each opens the app's own activity with its action;
+   * Kotlin only, so no config plugin or manifest entry is needed.
+   */
+  private fun setShortcuts(context: Context) {
+    try {
+      val activity = context.packageManager.getLaunchIntentForPackage(context.packageName)?.component ?: return
+      val shortcuts = listOf(
+        Shortcut("new_bill", ACTION_NEW_BILL, "New bill", "Add a bill to Purchases", R.drawable.nirman_shortcut_bill),
+        Shortcut("new_boq", ACTION_NEW_BOQ, "New BOQ", "Add items to the BOQ", R.drawable.nirman_shortcut_boq)
+      ).mapIndexed { rank, s ->
+        ShortcutInfoCompat.Builder(context, s.id)
+          .setShortLabel(s.shortLabel)
+          .setLongLabel(s.longLabel)
+          .setIcon(IconCompat.createWithResource(context, s.icon))
+          .setIntent(Intent(s.action).setComponent(activity))
+          .setRank(rank)
+          .build()
+      }
+      ShortcutManagerCompat.setDynamicShortcuts(context, shortcuts)
+    } catch (e: Exception) {
+      Log.e(SHORTCUTS_TAG, "Could not set the app shortcuts", e)
+    }
+  }
+
+  private data class Shortcut(val id: String, val action: String, val shortLabel: String, val longLabel: String, val icon: Int)
+
+  private fun handleShare(intent: Intent?): Boolean {
     if (intent == null) return false
     val action = intent.action
     if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return false
@@ -313,6 +377,14 @@ class NirmanModule : Module() {
 
   companion object {
     private const val TAG = "SharedFiles"
+    private const val SHORTCUTS_TAG = "Shortcuts"
     private const val MAX_FILES = 10
+
+    /** The app's own actions, used by the app shortcuts; the app opens on the screen each names. */
+    const val ACTION_NEW_BILL = "com.nirmaan.auditor.action.NEW_BILL"
+    const val ACTION_NEW_BOQ = "com.nirmaan.auditor.action.NEW_BOQ"
+
+    /** Each action and what `takeLaunch` gives the app for it. */
+    val LAUNCHES = mapOf(ACTION_NEW_BILL to "bill", ACTION_NEW_BOQ to "boq")
   }
 }

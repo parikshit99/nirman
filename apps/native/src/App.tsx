@@ -11,6 +11,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { DialogProvider } from './components/ui/Dialogs';
 import { restoreBeforeStart, startApp, type StartResult } from './data/startup';
 import { LabourScreen } from './features/LabourScreen';
+import { LaunchHost, useDropLaunches } from './features/LaunchHost';
 import { ListScreen } from './features/ListScreen';
 import { ProjectsHost } from './features/ProjectsSheet';
 import { QuotesHost, useQuotes } from './features/QuotesHost';
@@ -104,6 +105,8 @@ function Boot() {
   useEffect(() => {
     if (result) void SplashScreen.hideAsync();
   }, [result]);
+  // A shortcut used while the start-up problem shows only brings the app to the front.
+  useDropLaunches(result?.ok === false);
   if (!result) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.brandGray }}>
@@ -130,10 +133,12 @@ function Boot() {
           <SiteReportHost>
             <SettingsHost>
               <ShareHost>
-                <Stack.Navigator screenOptions={{ headerShown: false }}>
-                  {/* Full screens (Sheet kind="screen") are native dialogs for now; pushed routes can go above the tabs here. */}
-                  <Stack.Screen name="Home" component={Tabs} />
-                </Stack.Navigator>
+                <LaunchHost>
+                  <Stack.Navigator screenOptions={{ headerShown: false }}>
+                    {/* Full screens (Sheet kind="screen") are native dialogs for now; pushed routes can go above the tabs here. */}
+                    <Stack.Screen name="Home" component={Tabs} />
+                  </Stack.Navigator>
+                </LaunchHost>
               </ShareHost>
             </SettingsHost>
           </SiteReportHost>
