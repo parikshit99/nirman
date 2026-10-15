@@ -3,7 +3,9 @@ import { AppState as RNAppState } from 'react-native';
 import {
   buildItemDatabase,
   unusedHiddenMaterials,
+  withRates,
   type ContractEntryRow,
+  type ContractRateRow,
   type ExtractedMaterial,
   type ItemRow,
   type ListRow,
@@ -228,6 +230,8 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       saveContractEntry: write(repo.saveContractEntry),
       deleteContractLater: deleteLater(repo.deleteContract),
       deleteContractEntryLater: deleteLater(repo.deleteContractEntry),
+      saveContractRate: write(repo.saveContractRate),
+      deleteContractRateLater: deleteLater(repo.deleteContractRate),
       /** Strike through now, delete after UNDO_MS unless undone (or sooner via flushDeletes). */
       deleteItemLater: deleteLater(repo.deleteItem),
       deleteQuoteLineLater: deleteLater(repo.deleteQuoteLine),
@@ -307,7 +311,6 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
     const editingOf = (kind: ListKind) => history.find((h) => h.id === editingByProject[projectId]?.[kind] && h.kind === kind) ?? null;
     const editing: Record<ListKind, HistoryRecord | null> = { audit: editingOf('audit'), boq: editingOf('boq') };
     const openIds: Record<ListKind, string> = { audit: editing.audit?.id ?? draftIds.audit, boq: editing.boq?.id ?? draftIds.boq };
-    const contracts = snapshot.contracts.filter((c) => c.project_id === projectId);
     /** Saved lists, contracts and the money spent, per project, for the project list. */
     const projectSummary = (id: string) => {
       const saved = allHistory.filter((h) => h.project_id === id);
@@ -337,6 +340,12 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       if (list) list.push(e);
       else entriesByContract.set(e.contract_id, [e]);
     }
+    const ratesByContract = new Map<string, ContractRateRow[]>();
+    for (const r of snapshot.contractRates) {
+      const list = ratesByContract.get(r.contract_id);
+      if (list) list.push(r);
+      else ratesByContract.set(r.contract_id, [r]);
+    }
     return {
       projectId,
       project,
@@ -349,7 +358,8 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       /** The saved list each tab is editing, if any. */
       editing,
       allHistory,
-      contracts,
+      /** Every rate change of a contract, oldest first, those waiting for Undo too (shown struck through). */
+      allRatesFor: (contractId: string): ContractRateRow[] => ratesByContract.get(contractId) ?? [],
       /** Every entry of a contract, those waiting for Undo too (shown struck through); `entriesFor` is what counts. */
       allEntriesFor: (contractId: string): ContractEntryRow[] => entriesByContract.get(contractId) ?? [],
       /** Sites from saved lists and contracts, for address suggestions. */
@@ -382,8 +392,9 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
     if (unusedHidden.length) void actions.unhideMaterials(unusedHidden);
   }, [unusedHidden, actions]);
 
-  // Contract entries deleted but still waiting for Undo leave every total at once, like the rows of a list.
+  // Contract entries and rate changes deleted but still waiting for Undo leave every total at once, like the rows of a list.
   const counted = useMemo(() => {
+    const liveRates = pendingDeletes.size ? snapshot.contractRates.filter((r) => !pendingDeletes.has(r.id)) : snapshot.contractRates;
     const live = pendingDeletes.size ? snapshot.contractEntries.filter((e) => !pendingDeletes.has(e.id)) : snapshot.contractEntries;
     const byContract = new Map<string, ContractEntryRow[]>();
     for (const e of live) {
@@ -392,12 +403,17 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       else byContract.set(e.contract_id, [e]);
     }
     return {
+      /** The open project's contracts, each with its rate changes (not those waiting for Undo). */
+      contracts: withRates(
+        snapshot.contracts.filter((c) => c.project_id === projectId),
+        liveRates,
+      ),
       /** Contract entries that count: all but those waiting for Undo. */
       contractEntries: live,
       /** A contract's entries that count (not those waiting for Undo): for totals, statements and reports. */
       entriesFor: (contractId: string): ContractEntryRow[] => byContract.get(contractId) ?? [],
     };
-  }, [snapshot.contractEntries, pendingDeletes]);
+  }, [snapshot.contracts, snapshot.contractEntries, snapshot.contractRates, projectId, pendingDeletes]);
 
   return { snapshot, status, settings, actions, pendingDeletes, setEditing, ...derived, ...counted };
 }

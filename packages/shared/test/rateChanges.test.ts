@@ -99,9 +99,17 @@ describe('rate changes on labour contracts', () => {
     expect(describeEntry(lump, work[0])).toBe('Work: 40% of the job');
   });
 
-  it('accepts only rates above 0 and dates as YYYY-MM-DD in a stored change', () => {
+  it('accepts any rate in a stored change (so backups restore) but only dates as YYYY-MM-DD', () => {
     expect(contractRateRowSchema.safeParse(change('c1', '2026-10-01', 20)).success).toBe(true);
-    expect(contractRateRowSchema.safeParse(change('c1', '2026-10-01', 0)).success).toBe(false);
+    expect(contractRateRowSchema.safeParse(change('c1', '2026-10-01', 0)).success).toBe(true);
     expect(contractRateRowSchema.safeParse(change('c1', '1 Oct', 20)).success).toBe(false);
+  });
+
+  it('ignores a change not above 0', () => {
+    const [c] = withRates([plaster], [change('c1', '2026-10-01', 0), change('c1', '2026-11-01', -5)]);
+    expect(c.rates).toEqual([]);
+    const raw = { ...plaster, rates: [change('c1', '2026-10-01', 0)] };
+    expect(rateOn(raw, '2026-10-05')).toBe(18);
+    expect(describeTerms(raw, money)).not.toContain('from');
   });
 });

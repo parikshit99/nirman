@@ -262,7 +262,8 @@ export type ContractEntryRow = z.infer<typeof contractEntryRowSchema>;
 export const contractRateRowSchema = z.object({
   id,
   contract_id: id,
-  rate: z.number().positive(),
+  /** Any number, so every backup restores; a rate not above 0 is ignored by the rules (`withRates`, `rateOn`). */
+  rate: z.number(),
   from_date: isoDate,
   created_at: isoTimestamp,
   updated_at: isoTimestamp,

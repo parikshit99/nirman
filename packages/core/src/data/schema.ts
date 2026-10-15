@@ -246,7 +246,7 @@ const MIGRATIONS: string[] = [
   CREATE TABLE IF NOT EXISTS contract_rates (
     id TEXT PRIMARY KEY,
     contract_id TEXT NOT NULL,
-    rate REAL NOT NULL CHECK (rate > 0),
+    rate REAL NOT NULL,
     from_date TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL

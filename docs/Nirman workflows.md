@@ -142,6 +142,8 @@ flowchart LR
   C --> PY[Payments]
   C --> AD["Advances (kharcha)"]
   C --> DD[Deductions]
+  C --> RC[Rate changes<br/>new rate from a date;<br/>All work so far corrects<br/>the starting rate]
+  RC -->|each work entry valued at<br/>the rate on its date| WM
   WM & PY & AD & DD --> BAL[Balance due<br/>retention held;<br/>Paid ahead in red if paid<br/>more than the work,<br/>Overpaid once closed;<br/>Contractor owes if deductions<br/>are more than the work]
   BAL --> CL[Close contract<br/>releases the retention;<br/>Reopen asks whether to hold it again]
   BAL --> ST[Statement · Site report<br/>PDF, Excel or JPG]
@@ -150,6 +152,8 @@ flowchart LR
 A lump sum never earns more than its amount: work entries past 100% add nothing (the form warns when one would). A rate job is owed on everything measured, past its estimate too. Totals over several contracts (the Labour tab, the site report) show what is due, what was paid ahead and what contractors owe separately, never one netted against the other.
 
 The rate or lump sum must be above ₹0, the estimate not below 0, and retention 0 to 50%. Once work is recorded, a contract stays rate or lump sum (its work is in units or %). An entry deleted but still waiting for Undo no longer counts in any total.
+
+When the rate of a rate contract with work recorded is changed in *Edit terms*, the app asks *From when does ₹20 apply?*: **From a date** adds a rate change (work dated on or after it is valued at the new rate, earlier work keeps its rate; a second change on the same date replaces the first), and **All work so far** corrects the contract's starting rate (with rate changes saved, only the work before the first one). Each work entry is valued at the rate in effect on its date: the latest change on or before it, else the starting rate. The terms read *₹18 per sqft, ₹20 from 1 Oct*; the agreed value uses the latest rate; statements and the site report value each entry at its own date's rate. The contract screen lists the rate changes under the terms, each with a bin (Undo while it waits); deleting one puts its work back on the earlier rate. A lump sum has no rate changes (they go when a contract becomes one). A rate change of ₹0 or less, possible only from an edited backup, still restores and is ignored.
 
 Labour entries never feed Rates. The project's site report brings purchases and labour together.
 

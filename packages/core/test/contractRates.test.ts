@@ -106,7 +106,6 @@ describe('contract rate changes', () => {
     expect(snap.contractRates).toEqual([]);
     expect(contractTotals(contracts[0], snap.contractEntries).workDone).toBe(3600);
     await saveContractRate(db, id, 20, '2026-10-01');
-    await expect(db.run(`INSERT INTO contract_rates (id, contract_id, rate, from_date, created_at, updated_at) VALUES ('x', ?, 0, '2026-11-01', '', '')`, [id])).rejects.toThrow();
   });
 
   it('round-trips the changes through a backup, and restores a version 14 backup with none', async () => {
@@ -147,9 +146,17 @@ describe('contract rate changes', () => {
     expect(contractTotals(contracts[0], snap.contractEntries).workDone).toBe(1800);
   });
 
-  it('refuses a backup with a rate change not above 0, naming the field', () => {
-    const bad = { app: 'nirmaan-auditor', version: 15, exported_at: '2026-10-10T05:30:00.000Z', lists: [], items: [], indexed_rates: [], learned_terms: [], categories: [], contract_rates: [{ id: 'r', contract_id: 'c', rate: 0, from_date: '2026-10-01', created_at: '2026-10-01T00:00:00.000Z', updated_at: '2026-10-01T00:00:00.000Z' }] };
-    expect(() => parseBackup(JSON.stringify(bad))).toThrow('contract_rates.0.rate');
+  it('restores a backup with a rate of 0, and the rate is ignored', async () => {
+    const source = await freshDb();
+    const id = await plaster(source);
+    const backup = await exportBackup(source);
+    const zero = { id: 'r0', contract_id: id, rate: 0, from_date: '2026-10-01', created_at: '2026-10-01T00:00:00.000Z', updated_at: '2026-10-01T00:00:00.000Z' };
+    const db = await freshDb();
+    await restoreBackup(db, parseBackup(JSON.stringify({ ...backup, contract_rates: [zero] })));
+    const { snap, contracts } = await contractsOf(db);
+    expect(snap.contractRates).toHaveLength(1);
+    expect(contracts[0].rates).toEqual([]);
+    expect(contractTotals(contracts[0], snap.contractEntries).workDone).toBe(3600);
   });
 
   it('prints the statement and site report at the dated rates', async () => {

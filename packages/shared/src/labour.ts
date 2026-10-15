@@ -18,10 +18,11 @@ export type RateChange = Pick<ContractRateRow, 'rate' | 'from_date'>;
  */
 export type ContractWithRates = ContractRow & { rates?: readonly RateChange[] };
 
-/** Each contract with its own rate changes, oldest first: what the screens, statements and reports are given. */
+/** Each contract with its own rate changes, oldest first (any not above 0 left out): what the screens, statements and reports are given. */
 export function withRates<C extends ContractRow>(contracts: C[], rates: readonly ContractRateRow[]): (C & { rates: ContractRateRow[] })[] {
   const byContract = new Map<string, ContractRateRow[]>();
   for (const r of rates) {
+    if (!(r.rate > 0)) continue;
     const list = byContract.get(r.contract_id);
     if (list) list.push(r);
     else byContract.set(r.contract_id, [r]);
@@ -32,14 +33,14 @@ export function withRates<C extends ContractRow>(contracts: C[], rates: readonly
 
 /**
  * The rate in effect on a date: the latest change from that date or before, else the contract's own rate. Without a
- * date (a new entry not dated yet), the latest rate.
+ * date (a new entry not dated yet), the latest rate. A change not above 0 (only possible from an edited backup) is ignored.
  */
 export function rateOn(c: Pick<ContractWithRates, 'kind' | 'rate' | 'rates'>, date?: string): number {
   let rate = c.rate;
   let since = '';
   if (c.kind !== 'rate') return rate;
   for (const r of c.rates ?? []) {
-    if ((date === undefined || r.from_date <= date) && r.from_date >= since) {
+    if (r.rate > 0 && (date === undefined || r.from_date <= date) && r.from_date >= since) {
       rate = r.rate;
       since = r.from_date;
     }
@@ -216,7 +217,8 @@ export function shortDate(iso: string, today = todayISO()): string {
 
 /** The rate changes in words, oldest first, e.g. ", ₹20 from 1 Oct, ₹22 from 1 Jan 2027"; '' when none. */
 const describeRateChanges = (c: ContractWithRates, money: (n: number) => string, today: string) =>
-  [...(c.rates ?? [])]
+  (c.rates ?? [])
+    .filter((r) => r.rate > 0)
     .sort((a, b) => a.from_date.localeCompare(b.from_date))
     .map((r) => `, ${money(r.rate)} from ${shortDate(r.from_date, today)}`)
     .join('');
