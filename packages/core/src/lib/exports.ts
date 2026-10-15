@@ -102,6 +102,7 @@ export function siteReportSheet(address: string, filters: string, report: SiteRe
     rows.push([null, null, bold('Labour total'), { ...money(labour!.workDone), fontWeight: 'bold' }, { ...money(labour!.paid), fontWeight: 'bold' }, null]);
     rows.push([null, null, null, null, bold('Due'), { ...money(labour!.due), fontWeight: 'bold' }]);
     if (labour!.paidAhead > 0) rows.push([null, null, null, null, bold('Paid ahead'), { ...money(labour!.paidAhead), fontWeight: 'bold' }]);
+    if (labour!.owes > 0) rows.push([null, null, null, null, bold('Contractor owes'), { ...money(labour!.owes), fontWeight: 'bold' }]);
     rows.push([bold('GRAND TOTAL (materials + labour work done)'), null, null, null, null, { ...money(report.total + labour!.workDone), fontWeight: 'bold' }]);
   }
   rows.push([], [bold('All lines')]);
@@ -130,7 +131,7 @@ export function contractStatementSheet(c: ContractRow, st: ContractStatement, pe
   if (c.retention_pct > 0) rows.push([null, `Less retention ${c.retention_pct}%${c.retention_released_at ? ' (released)' : ' (held)'}`, null, null, null, money(t.retention)]);
   if (t.deductions) rows.push([null, 'Less deductions', null, null, null, money(t.deductions)]);
   rows.push([null, 'Less paid', null, null, null, money(t.paid)]);
-  rows.push([null, bold(t.balance ? balanceLabel(c, t.balance) : 'Balance due'), null, null, null, { ...money(Math.abs(t.balance)), fontWeight: 'bold' }]);
+  rows.push([null, bold(t.balance ? balanceLabel(c, t) : 'Balance due'), null, null, null, { ...money(Math.abs(t.balance)), fontWeight: 'bold' }]);
   return rows;
 }
 

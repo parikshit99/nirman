@@ -31,11 +31,14 @@ const STATUS_TABS: { id: StatusFilter; label: string }[] = [
   { id: 'all', label: 'All' },
 ];
 
-/** Balance due, or a warning when more was paid than the work measured is worth ("Overpaid" once the contract is closed). */
-export function BalanceText({ balance, closed, align }: { balance: number; closed?: boolean; align?: 'right' }) {
+/**
+ * Balance due, or a warning when more was paid than the work measured is worth ("Overpaid" once the contract is
+ * closed), or what the contractor owes when deductions are more than the work (`owes`).
+ */
+export function BalanceText({ balance, closed, owes, align }: { balance: number; closed?: boolean; owes?: boolean; align?: 'right' }) {
   const c = useColors();
   const style = { textAlign: align, fontWeight: '700' as const, fontSize: 12, fontVariant: ['tabular-nums' as const] };
-  if (balance < 0) return <Text style={[style, { color: c.red600 }]}>{closed ? 'Overpaid' : 'Paid ahead'} {rupeesWhole(-balance)}</Text>;
+  if (balance < 0) return <Text style={[style, { color: c.red600 }]}>{owes ? 'Contractor owes' : closed ? 'Overpaid' : 'Paid ahead'} {rupeesWhole(-balance)}</Text>;
   return <Text style={[style, { color: balance > 0 ? c.red600 : c.green700 }]}>{balance > 0 ? `Due ${rupeesWhole(balance)}` : 'Settled'}</Text>;
 }
 
@@ -43,7 +46,7 @@ export function BalanceText({ balance, closed, align }: { balance: number; close
 export function LabourScreen({ about }: { about: string }) {
   const c = useColors();
   const state = useAppState();
-  const { actions, contracts: everyContract, entriesFor, pendingDeletes, categoryNames, allAddresses, projects, projectId, project, uniqueAddresses } = state;
+  const { actions, contracts: everyContract, entriesFor, allEntriesFor, pendingDeletes, categoryNames, allAddresses, projects, projectId, project, uniqueAddresses } = state;
   const siteReport = useSiteReport();
   const dialogs = useDialogs();
   // A contract swiped away (or deleted in its sheet) leaves at once; the strip at the bottom offers Undo.
@@ -87,6 +90,8 @@ export function LabourScreen({ about }: { about: string }) {
   const form = contractForm && (
     <ContractForm
       contract={contractForm.contract}
+      // Entries waiting for Undo are still saved, so they keep the kind too.
+      hasWork={!!contractForm.contract && allEntriesFor(contractForm.contract.id).some((e) => e.kind === 'work')}
       defaults={{
         address: addressFilter !== 'All' ? addressFilter : project?.address || prefs.get('nirmaan_contract_site', ''),
         category: categoryFilter !== 'All' ? categoryFilter : categoryNames[0] || 'Civil',
@@ -118,9 +123,10 @@ export function LabourScreen({ about }: { about: string }) {
           </View>
           <View style={box}>
             <Text style={{ fontSize: 12, fontWeight: '600', color: c.gray500 }}>Balance</Text>
-            {/* Due and paid ahead stay apart: one contractor's overpayment doesn't settle another's dues. */}
-            {(totals.due > 0 || !totals.paidAhead) && <BalanceText balance={totals.due} />}
+            {/* Due, paid ahead and owed stay apart: one contractor's overpayment doesn't settle another's dues. */}
+            {(totals.due > 0 || (!totals.paidAhead && !totals.owes)) && <BalanceText balance={totals.due} />}
             {totals.paidAhead > 0 && <BalanceText balance={-totals.paidAhead} />}
+            {totals.owes > 0 && <BalanceText balance={-totals.owes} owes />}
           </View>
         </View>
       )}
@@ -154,6 +160,8 @@ export function LabourScreen({ about }: { about: string }) {
       <FlashList
         data={contracts}
         keyExtractor={(x) => x.id}
+        // Cards update when an entry is deleted (waiting for Undo) or comes back.
+        extraData={entriesFor}
         contentContainerStyle={{ paddingBottom: 96 }}
         onScroll={(e) => onListScroll(e.nativeEvent.contentOffset.y)}
         scrollEventThrottle={32}
@@ -227,7 +235,7 @@ function ContractCard({ contract: x, totals: t, onOpen, onDelete }: { contract: 
         <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray500 }}>
           Paid <Text style={{ fontWeight: '700', color: c.gray800 }}>{rupeesWhole(t.paid)}</Text>
         </Text>
-        <BalanceText balance={t.balance} closed={x.status === 'closed'} align="right" />
+        <BalanceText balance={t.balance} closed={x.status === 'closed'} owes={t.payable < 0} align="right" />
       </View>
     </Pressable>
   );

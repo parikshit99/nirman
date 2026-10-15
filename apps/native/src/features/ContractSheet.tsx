@@ -39,16 +39,17 @@ const KIND_LABEL: Record<ContractEntryKind, string> = { work: 'Work done', payme
  */
 export function ContractSheet({ contractId, onEdit, onClose, children }: { contractId: string; onEdit(c: ContractRow): void; onClose(): void; children?: ReactNode }) {
   const c = useColors();
-  const { contracts, entriesFor, actions, pendingDeletes } = useAppState();
+  const { contracts, entriesFor, allEntriesFor, actions, pendingDeletes } = useAppState();
   const dialogs = useDialogs();
   const contract = contracts.find((x) => x.id === contractId);
   const [entryForm, setEntryForm] = useState<{ kind: ContractEntryKind; entry?: ContractEntryRow } | null>(null);
   const [statementOpen, setStatementOpen] = useState(false);
   if (!contract) return null;
 
+  // Totals and the statement leave out entries waiting for Undo; the list still shows them, struck through.
   const entries = entriesFor(contract.id);
   const t = contractTotals(contract, entries);
-  const listed = [...entries].sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at));
+  const listed = [...allEntriesFor(contract.id)].sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at));
   const closed = contract.status === 'closed';
 
   const closeContract = async () => {
@@ -58,6 +59,20 @@ export function ContractSheet({ contractId, onEdit, onClose, children }: { contr
       confirmLabel: 'Close contract',
     });
     if (ok) await actions.setContractStatus(contract.id, 'closed', release ? todayISO() : '');
+  };
+  const reopen = async () => {
+    let hold = false;
+    if (contract.retention_pct > 0 && contract.retention_released_at) {
+      const answer = await dialogs.choose('Reopen this contract?', {
+        message: `The retention was released on ${contract.retention_released_at}. Hold it again?`,
+        confirmLabel: 'Hold again',
+        cancelLabel: 'Keep released',
+      });
+      if (answer === null) return;
+      hold = answer;
+    }
+    await actions.setContractStatus(contract.id, 'active');
+    if (hold) await actions.setRetentionReleased(contract.id, '');
   };
   const deleteContract = async () => {
     const ok = await dialogs.confirm(`Delete the contract with ${contract.contractor}?`, {
@@ -106,7 +121,7 @@ export function ContractSheet({ contractId, onEdit, onClose, children }: { contr
         {stat('Work done', rupeesWhole(t.workDone), pastEstimate(contract, t) ?? (t.progress !== null ? `${Math.round(t.progress * 100)}% of ${rupeesWhole(t.value)}` : undefined))}
         {stat('Paid', rupeesWhole(t.paid))}
         {stat(
-          balanceLabel(contract, t.balance),
+          balanceLabel(contract, t),
           <Text style={{ color: t.balance < 0 ? c.red600 : t.balance > 0 ? c.gray900 : c.green700 }}>{t.balance ? rupeesWhole(Math.abs(t.balance)) : 'Settled'}</Text>,
         )}
         {t.advances > 0 && stat('Advances (kharcha)', rupeesWhole(t.advances), 'in Paid')}
@@ -194,7 +209,7 @@ export function ContractSheet({ contractId, onEdit, onClose, children }: { contr
         <Button icon="edit" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => onEdit(contract)}>
           Edit terms
         </Button>
-        <Button style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => (closed ? actions.setContractStatus(contract.id, 'active') : closeContract())}>
+        <Button style={{ flexGrow: 1, flexBasis: '45%' }} onPress={() => (closed ? reopen() : closeContract())}>
           {closed ? 'Reopen' : 'Close contract'}
         </Button>
         <Button variant="dangerOutline" icon="delete-outline" style={{ flexGrow: 1, flexBasis: '45%' }} onPress={deleteContract}>

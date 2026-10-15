@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Pressable } from './ui/Pressable';
-import { fieldLimits, parseAmount, todayISO, type ContractRow } from '@nirman/shared';
+import { contractTermsProblem, fieldLimits, kindLockedNote, parseAmount, todayISO, type ContractRow } from '@nirman/shared';
 import type { ContractInput } from '@nirman/core';
 import { useColors } from '../theme';
 import { Button } from './ui/Button';
@@ -54,6 +54,7 @@ const asText = (c: ContractRow): Record<keyof ContractInput, string> => ({
 /** New labour contract, or edit the terms of one. */
 export function ContractForm({
   contract,
+  hasWork = false,
   defaults,
   addresses,
   categories,
@@ -63,6 +64,8 @@ export function ContractForm({
   onClose,
 }: {
   contract?: ContractRow;
+  /** The contract has work recorded: its kind stays (sqft would be read as %, or back). */
+  hasWork?: boolean;
   defaults: { address: string; category: string; project_id: string };
   /** Projects it can be in (a choice is shown when there are several). */
   projects: { id: string; name: string }[];
@@ -93,14 +96,15 @@ export function ContractForm({
     amount: f.amount.trim() ? parseAmount(f.amount) : 0,
     retention_pct: f.retention_pct.trim() ? parseAmount(f.retention_pct) : 0,
   };
+  const kindLocked = !!contract && hasWork;
   const preview = isRate ? (numbers.rate ?? 0) * (numbers.est_quantity ?? 0) : (numbers.amount ?? 0);
 
   const save = async () => {
     if (!f.contractor.trim()) return dialogs.alert('Enter the contractor’s name');
     const bad = Object.entries(numbers).find(([, n]) => n === null);
     if (bad) return dialogs.alert('Check the number', `“${f[bad[0] as keyof typeof f]}” is not a number. Use digits, e.g. 18 or 2,50,000.`);
-    if (isRate ? !numbers.rate : !numbers.amount) return dialogs.alert(isRate ? 'Enter the rate per unit' : 'Enter the contract amount');
-    if ((numbers.retention_pct ?? 0) > 50) return dialogs.alert('Retention is a percentage', 'Usually 5–10%.');
+    const problem = contractTermsProblem({ kind: f.kind as ContractRow['kind'], rate: numbers.rate!, amount: numbers.amount!, est_quantity: numbers.est_quantity!, retention_pct: numbers.retention_pct! });
+    if (problem) return dialogs.alert(problem);
     setSaving(true);
     try {
       await onSave({
@@ -156,12 +160,20 @@ export function ContractForm({
         <Label>Paid by</Label>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {(['rate', 'lump_sum'] as const).map((k) => (
-            <Pressable key={k} accessibilityRole="radio" accessibilityState={{ checked: f.kind === k }} onPress={() => setF((p) => ({ ...p, kind: k }))} style={{ flex: 1, minHeight: 48, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, borderColor: f.kind === k ? c.orange400 : c.gray200, backgroundColor: f.kind === k ? c.orange50 : 'transparent' }}>
+            <Pressable
+              key={k}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: f.kind === k, disabled: kindLocked }}
+              disabled={kindLocked}
+              onPress={() => setF((p) => ({ ...p, kind: k }))}
+              style={{ flex: 1, minHeight: 48, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, borderColor: f.kind === k ? c.orange400 : c.gray200, backgroundColor: f.kind === k ? c.orange50 : 'transparent', opacity: kindLocked && f.kind !== k ? 0.5 : 1 }}
+            >
               <Icon name={f.kind === k ? 'radio-button-checked' : 'radio-button-unchecked'} size={18} color={f.kind === k ? c.orange500 : c.gray400} />
               <Text style={{ flex: 1, fontSize: 12, fontWeight: '700', color: c.gray800 }}>{k === 'rate' ? 'Rate (per unit of work)' : 'Lump sum (fixed amount)'}</Text>
             </Pressable>
           ))}
         </View>
+        {kindLocked && contract && <Text style={{ marginTop: 4, fontSize: 12, color: c.gray500 }}>{kindLockedNote(contract)}</Text>}
       </View>
 
       {isRate ? (

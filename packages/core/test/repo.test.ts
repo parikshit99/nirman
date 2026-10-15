@@ -649,8 +649,10 @@ describe('labour contracts', () => {
     await setContractStatus(db, id, 'closed', '2026-10-01');
     snap = await loadSnapshot(db);
     expect(snap.contracts[0]).toMatchObject({ status: 'closed', retention_released_at: '2026-10-01' });
-    await setRetentionReleased(db, id, '');
+    // Reopening keeps a released retention; holding it again is a choice of its own.
     await setContractStatus(db, id, 'active');
+    expect((await loadSnapshot(db)).contracts[0]).toMatchObject({ status: 'active', retention_released_at: '2026-10-01' });
+    await setRetentionReleased(db, id, '');
     expect((await loadSnapshot(db)).contracts[0]).toMatchObject({ status: 'active', retention_released_at: '' });
 
     await deleteContractEntry(db, work);
@@ -658,6 +660,31 @@ describe('labour contracts', () => {
     await deleteContract(db, id);
     snap = await loadSnapshot(db);
     expect([snap.contracts.length, snap.contractEntries.length]).toEqual([0, 0]);
+  });
+
+  it('refuses terms below 0 or retention past 50%, and nothing is saved', async () => {
+    const db = await freshDb();
+    const project_id = await projectOf(db);
+    await expect(saveContract(db, { ...terms, project_id, rate: -18 })).rejects.toThrow('Enter a rate above ₹0.');
+    await expect(saveContract(db, { ...terms, project_id, est_quantity: -5 })).rejects.toThrow('The estimate can’t be below 0.');
+    await expect(saveContract(db, { ...terms, project_id, kind: 'lump_sum', rate: 0, amount: -1000 })).rejects.toThrow('Enter an amount above ₹0.');
+    await expect(saveContract(db, { ...terms, project_id, retention_pct: 60 })).rejects.toThrow('Retention is a percentage between 0 and 50.');
+    expect((await loadSnapshot(db)).contracts).toHaveLength(0);
+  });
+
+  it('keeps a contract’s kind once work is recorded', async () => {
+    const db = await freshDb();
+    const project_id = await projectOf(db);
+    const id = await saveContract(db, { ...terms, project_id });
+    // No work yet: the kind can change.
+    await saveContract(db, { ...terms, project_id, kind: 'lump_sum', rate: 0, unit: '', amount: 50000 }, id);
+    await saveContract(db, { ...terms, project_id }, id);
+    await saveContractEntry(db, { contract_id: id, kind: 'work', date: '2026-09-10', quantity: 100, amount: 0, mode: '', note: '' });
+    await expect(saveContract(db, { ...terms, project_id, kind: 'lump_sum', rate: 0, unit: '', amount: 50000 }, id)).rejects.toThrow('Work is recorded in sqft, so this contract stays a rate contract.');
+    expect((await loadSnapshot(db)).contracts[0].kind).toBe('rate');
+    // Other terms still change.
+    await saveContract(db, { ...terms, project_id, rate: 20 }, id);
+    expect((await loadSnapshot(db)).contracts[0].rate).toBe(20);
   });
 });
 

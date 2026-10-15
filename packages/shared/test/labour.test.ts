@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { balanceLabel, buildLabourReport, contractStatement, contractTotals, describeEntry, describeTerms, pastEstimate, sumTotals, type ContractEntryRow, type ContractRow } from '../src/index.ts';
+import { balanceLabel, buildLabourReport, contractStatement, contractTermsProblem, kindLockedNote, contractTotals, describeEntry, describeTerms, pastEstimate, sumTotals, type ContractEntryRow, type ContractRow } from '../src/index.ts';
 
 const ts = '2026-10-01T00:00:00.000Z';
 const plaster: ContractRow = {
@@ -117,10 +117,43 @@ describe('labour contracts', () => {
   });
 
   it('names the balance, and says Overpaid once a contract paid ahead is closed (#117)', () => {
-    expect(balanceLabel(plaster, 100)).toBe('Balance due');
-    expect(balanceLabel(plaster, 0)).toBe('Balance');
-    expect(balanceLabel(plaster, -100)).toBe('Paid ahead of work');
-    expect(balanceLabel({ ...plaster, status: 'closed' }, -100)).toBe('Overpaid');
-    expect(balanceLabel({ ...plaster, status: 'closed' }, 100)).toBe('Balance due');
+    expect(balanceLabel(plaster, { balance: 100, payable: 100 })).toBe('Balance due');
+    expect(balanceLabel(plaster, { balance: 0, payable: 0 })).toBe('Balance');
+    expect(balanceLabel(plaster, { balance: -100, payable: 50 })).toBe('Paid ahead of work');
+    expect(balanceLabel({ ...plaster, status: 'closed' }, { balance: -100, payable: 50 })).toBe('Overpaid');
+    expect(balanceLabel({ ...plaster, status: 'closed' }, { balance: 100, payable: 100 })).toBe('Balance due');
+  });
+
+  it('says the contractor owes when deductions are more than the work, and keeps that apart in totals', () => {
+    const job = { ...plaster, id: 'c6', retention_pct: 0, est_quantity: 0 };
+    const owing = [entry('c6', 'work', '2026-09-10', 100), entry('c6', 'deduction', '2026-09-11', 5000)];
+    const t = contractTotals(job, owing);
+    expect(t).toMatchObject({ payable: -3200, balance: -3200 });
+    expect(balanceLabel(job, t)).toBe('Contractor owes');
+    expect(balanceLabel({ ...job, status: 'closed' }, t)).toBe('Contractor owes');
+    const ahead = { ...plaster, id: 'c8', retention_pct: 0, est_quantity: 0 };
+    const both = [...owing, entry('c8', 'advance', '2026-09-12', 20000)];
+    expect(sumTotals([contractTotals(job, both), contractTotals(ahead, both)])).toMatchObject({ due: 0, paidAhead: 20000, owes: 3200, balance: -23200 });
+    expect(buildLabourReport([job, ahead], both, {})).toMatchObject({ due: 0, paidAhead: 20000, owes: 3200 });
+  });
+
+  it('checks contract terms: rate and amount above 0, estimate not below 0, retention 0 to 50%', () => {
+    const ok = { kind: 'rate' as const, rate: 18, amount: 0, est_quantity: 0, retention_pct: 5 };
+    expect(contractTermsProblem(ok)).toBeNull();
+    expect(contractTermsProblem({ ...ok, rate: -18 })).toBe('Enter a rate above ₹0.');
+    expect(contractTermsProblem({ ...ok, rate: 0 })).toBe('Enter a rate above ₹0.');
+    expect(contractTermsProblem({ ...ok, est_quantity: -1 })).toBe('The estimate can’t be below 0.');
+    expect(contractTermsProblem({ ...ok, kind: 'lump_sum', rate: 0, amount: -5 })).toBe('Enter an amount above ₹0.');
+    expect(contractTermsProblem({ ...ok, kind: 'lump_sum', rate: 0, amount: 1000 })).toBeNull();
+    expect(contractTermsProblem({ ...ok, retention_pct: -1 })).toBe('Retention is a percentage between 0 and 50.');
+    expect(contractTermsProblem({ ...ok, retention_pct: 51 })).toBe('Retention is a percentage between 0 and 50.');
+    expect(contractTermsProblem({ ...ok, retention_pct: 50 })).toBeNull();
+    expect(contractTermsProblem({ ...ok, rate: Number.NaN })).toBe('Enter a rate above ₹0.');
+  });
+
+  it('keeps the kind of a contract once work is recorded, and says why', () => {
+    expect(kindLockedNote(plaster)).toBe('Work is recorded in sqft, so this contract stays a rate contract.');
+    expect(kindLockedNote({ ...plaster, unit: '' })).toBe('Work is recorded in unit, so this contract stays a rate contract.');
+    expect(kindLockedNote(plumbing)).toBe('Work is recorded as % of the job, so this contract stays a lump sum.');
   });
 });

@@ -317,6 +317,7 @@ function drawLabour(doc: jsPDF, labour: LabourReport, materials: number, y: numb
       // What is due and what was paid ahead stay apart: one contractor's overpayment is not another's dues paid.
       ['', '', bold('Labour total'), bold(rupees(Math.round(labour.workDone))), bold(rupees(Math.round(labour.paid))), bold(`Due ${rupees(Math.round(labour.due))}`)],
       ...(labour.paidAhead > 0 ? [['', '', '', '', '', bold(`Paid ahead ${rupees(Math.round(labour.paidAhead))}`)]] : []),
+      ...(labour.owes > 0 ? [['', '', '', '', '', bold(`Contractor owes ${rupees(Math.round(labour.owes))}`)]] : []),
       ['', '', bold('GRAND TOTAL'), bold(rupees(Math.round(materials + labour.workDone))), { content: 'materials + labour work done', colSpan: 2, styles: { textColor: [120, 120, 120] } }],
     ],
     startY: y + 4,
@@ -364,7 +365,7 @@ export function buildContractStatementPdf(c: ContractRow, st: ContractStatement,
   if (c.retention_pct > 0) summary.push([`Less retention ${c.retention_pct}%${c.retention_released_at ? ' (released)' : ' (held)'}`, rupees(t.retention)]);
   if (t.deductions) summary.push(['Less deductions', rupees(t.deductions)]);
   summary.push(['Less paid', rupees(t.paid)]);
-  summary.push([t.balance ? balanceLabel(c, t.balance) : 'Balance due', rupees(Math.abs(t.balance))]);
+  summary.push([t.balance ? balanceLabel(c, t) : 'Balance due', rupees(Math.abs(t.balance))]);
   autoTable(doc, {
     body: summary,
     startY: lastY(doc) + 6,
