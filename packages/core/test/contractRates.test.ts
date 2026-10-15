@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildLabourReport, contractStatement, contractTotals, withRates } from '@nirman/shared';
+import { buildLabourReport, contractStatement, contractTotals, rateChangesLockedNote, withRates } from '@nirman/shared';
+import { createPendingDeletes } from '../src/data/pendingDeletes.ts';
 import { exportBackup, parseBackup, restoreBackup } from '../src/data/backup.ts';
 import {
   deleteContract,
@@ -42,7 +43,7 @@ describe('contract rate changes', () => {
     const id = await plaster(db);
     const first = await saveContractRate(db, id, 21, '2026-10-01');
     const again = await saveContractRate(db, id, 20, '2026-10-01');
-    expect(again).toBe(first);
+    expect(again).not.toBe(first);
     expect((await listContractRates(db, id)).map((r) => [r.from_date, r.rate])).toEqual([['2026-10-01', 20]]);
     const { snap, contracts } = await contractsOf(db);
     expect(contractTotals(contracts[0], snap.contractEntries)).toMatchObject({ workDone: 1800 + 2000, value: 80000 });
@@ -85,14 +86,30 @@ describe('contract rate changes', () => {
     expect((await loadSnapshot(db)).contractRates).toEqual([]);
   });
 
-  it('drops the changes of a rate contract made a lump sum (it has no work yet)', async () => {
+  it('keeps a change re-added on the date of one waiting to be deleted (Undo window)', async () => {
+    const db = await freshDb();
+    const id = await plaster(db);
+    const old = await saveContractRate(db, id, 20, '2026-10-01');
+    const pending = createPendingDeletes(10_000, () => {});
+    pending.add(old, () => deleteContractRate(db, old));
+    const fresh = await saveContractRate(db, id, 22, '2026-10-01');
+    expect(fresh).not.toBe(old);
+    await pending.flush();
+    expect((await listContractRates(db, id)).map((r) => [r.id, r.from_date, r.rate])).toEqual([[fresh, '2026-10-01', 22]]);
+  });
+
+  it('keeps a rate contract with rate changes (and no work) from becoming a lump sum, keeping its changes', async () => {
     const db = await freshDb();
     const id = await saveContract(db, { ...terms, project_id: await projectOf(db) });
     await saveContractRate(db, id, 20, '2026-10-01');
     await saveContract(db, { ...terms, rate: 25, project_id: await projectOf(db) }, id);
     expect(await listContractRates(db, id)).toHaveLength(1);
+    await expect(saveContract(db, { ...terms, kind: 'lump_sum', rate: 0, amount: 50000, project_id: await projectOf(db) }, id)).rejects.toThrow(rateChangesLockedNote);
+    expect((await loadSnapshot(db)).contracts[0]).toMatchObject({ kind: 'rate', rate: 25 });
+    expect(await listContractRates(db, id)).toHaveLength(1);
+    await deleteContractRate(db, (await listContractRates(db, id))[0].id);
     await saveContract(db, { ...terms, kind: 'lump_sum', rate: 0, amount: 50000, project_id: await projectOf(db) }, id);
-    expect(await listContractRates(db, id)).toEqual([]);
+    expect((await loadSnapshot(db)).contracts[0].kind).toBe('lump_sum');
   });
 
   it('adds the table to a phone on the last version, keeping its contracts as they were', async () => {

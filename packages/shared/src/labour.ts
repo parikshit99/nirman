@@ -186,6 +186,9 @@ export function kindLockedNote(c: Pick<ContractRow, 'kind' | 'unit'>): string {
   return c.kind === 'rate' ? `Work is recorded in ${c.unit || 'unit'}, so this contract stays a rate contract.` : 'Work is recorded as % of the job, so this contract stays a lump sum.';
 }
 
+/** Why a rate contract with rate changes (and no work) keeps its kind: a lump sum has no rate changes. */
+export const rateChangesLockedNote = 'This contract has rate changes, so it stays a rate contract. Delete them to change it.';
+
 /** "Measured 5,000 of about 4,000 sqft" for a rate job measured past its estimate (the rate is owed on all of it); otherwise null. */
 export function pastEstimate(c: ContractWithRates, t: Pick<ContractTotals, 'doneQty'>): string | null {
   if (c.kind !== 'rate' || !(c.est_quantity > 0) || t.doneQty <= c.est_quantity) return null;

@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { Pressable } from './ui/Pressable';
-import { contractTermsProblem, fieldLimits, kindLockedNote, parseAmount, rateOn, shortDate, todayISO, type ContractRow, type ContractWithRates } from '@nirman/shared';
+import { contractTermsProblem, fieldLimits, kindLockedNote, parseAmount, rateChangesLockedNote, rateOn, shortDate, todayISO, type ContractRow, type ContractWithRates } from '@nirman/shared';
 import type { ContractInput } from '@nirman/core';
 import { useColors } from '../theme';
 import { Button } from './ui/Button';
@@ -104,10 +104,11 @@ export function ContractForm({
     amount: f.amount.trim() ? parseAmount(f.amount) : 0,
     retention_pct: f.retention_pct.trim() ? parseAmount(f.retention_pct) : 0,
   };
-  const kindLocked = !!contract && hasWork;
   const preview = isRate ? (numbers.rate ?? 0) * (numbers.est_quantity ?? 0) : (numbers.amount ?? 0);
 
   const rateChanges = contract?.kind === 'rate' ? (contract.rates ?? []) : [];
+  // A lump sum has no rate changes, so a rate contract with any keeps its kind (the note for work comes first).
+  const kindLocked = !!contract && (hasWork || rateChanges.length > 0);
   const rateNow = contract ? rateOn(contract) : 0;
 
   const save = async () => {
@@ -249,7 +250,7 @@ export function ContractForm({
             </Pressable>
           ))}
         </View>
-        {kindLocked && contract && <Text style={{ marginTop: 4, fontSize: 12, color: c.gray500 }}>{kindLockedNote(contract)}</Text>}
+        {kindLocked && contract && <Text style={{ marginTop: 4, fontSize: 12, color: c.gray500 }}>{hasWork ? kindLockedNote(contract) : rateChangesLockedNote}</Text>}
       </View>
 
       {isRate ? (

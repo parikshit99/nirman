@@ -4,6 +4,7 @@ import {
   buildItemDatabase,
   contractTermsProblem,
   kindLockedNote,
+  rateChangesLockedNote,
   fitRow,
   extractedMaterialSchema,
   extractedQuoteLineSchema,
@@ -1334,17 +1335,18 @@ export type ContractInput = Omit<ContractRow, 'id' | 'status' | 'retention_relea
 
 /**
  * Add a contract, or update the terms of an existing one (its entries are kept). Throws, saving nothing, when the
- * terms are below 0 or the kind would change under work already recorded (sqft would be read as %, or back).
- * `rate` is the starting rate: with rate changes saved, it is the rate of work before the first one. A rate contract
- * that becomes a lump sum loses its rate changes (a lump sum has none).
+ * terms are below 0 or the kind would change under work already recorded (sqft would be read as %, or back) or under
+ * rate changes (a lump sum has none). `rate` is the starting rate: with rate changes saved, it is the rate of work
+ * before the first one.
  */
 export async function saveContract(db: Db, input: ContractInput, id?: string): Promise<string> {
   const problem = contractTermsProblem(input);
   if (problem) throw new Error(problem);
   return db.transaction(async (tx) => {
     const existing = id ? await getRow(tx, 'contracts', id) : undefined;
-    if (existing && existing.kind !== input.kind && (await tx.all("SELECT 1 FROM contract_entries WHERE contract_id = ? AND kind = 'work' LIMIT 1", [existing.id])).length) {
-      throw new Error(kindLockedNote(existing));
+    if (existing && existing.kind !== input.kind) {
+      if ((await tx.all("SELECT 1 FROM contract_entries WHERE contract_id = ? AND kind = 'work' LIMIT 1", [existing.id])).length) throw new Error(kindLockedNote(existing));
+      if ((await tx.all('SELECT 1 FROM contract_rates WHERE contract_id = ? AND rate > 0 LIMIT 1', [existing.id])).length) throw new Error(rateChangesLockedNote);
     }
     const ts = nowISO();
     const row: ContractRow = {
@@ -1363,7 +1365,6 @@ export async function saveContract(db: Db, input: ContractInput, id?: string): P
       updated_at: ts,
     };
     await writeRow(tx, 'contracts', row);
-    if (row.kind !== 'rate') await tx.run('DELETE FROM contract_rates WHERE contract_id = ?', [row.id]);
     return row.id;
   });
 }
@@ -1413,7 +1414,7 @@ export async function deleteContractEntry(db: Db, id: string) {
 
 /**
  * Change a rate contract's rate from a date: work dated then or later is valued at `rate`. A second change on the same
- * date replaces the first (keeping its id). Throws, saving nothing, when the rate is not above 0, the date is not
+ * date replaces the first (with a new id). Throws, saving nothing, when the rate is not above 0, the date is not
  * YYYY-MM-DD, or the contract is missing or a lump sum.
  */
 export async function saveContractRate(db: Db, contractId: string, rate: number, fromDate: string): Promise<string> {
@@ -1423,9 +1424,10 @@ export async function saveContractRate(db: Db, contractId: string, rate: number,
     const c = await getRow(tx, 'contracts', contractId);
     if (!c) throw new Error('This contract was deleted.');
     if (c.kind !== 'rate') throw new Error('Only a rate contract has rate changes.');
-    const [existing] = await tx.all<ContractRateRow>(`${selectWhere('contract_rates')} WHERE contract_id = ? AND from_date = ?`, [contractId, fromDate]);
+    // Always a new id: the old row's id may be waiting to be deleted (Undo window), and that delete must miss this one.
+    await tx.run('DELETE FROM contract_rates WHERE contract_id = ? AND from_date = ?', [contractId, fromDate]);
     const ts = nowISO();
-    const row: ContractRateRow = { id: existing?.id ?? newId(), contract_id: contractId, rate, from_date: fromDate, created_at: existing?.created_at ?? ts, updated_at: ts };
+    const row: ContractRateRow = { id: newId(), contract_id: contractId, rate, from_date: fromDate, created_at: ts, updated_at: ts };
     await writeRow(tx, 'contract_rates', row);
     await writeRow(tx, 'contracts', { ...c, updated_at: ts });
     return row.id;
