@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
-import { compareQuotes, normalizeTerm, parseAmount, variantDifferences, variantLabel, type QuoteLineRow, type QuoteRow, type VariantField } from '@nirman/shared';
+import { compareQuotes, fieldLimits, normalizeTerm, parseAmount, variantDifferences, variantLabel, type QuoteLineRow, type QuoteRow, type VariantField } from '@nirman/shared';
 import type { QuoteLinePatch } from '@nirman/core';
 import { VsLastBadge } from '../components/PriceBadges';
 import { UndoButton } from '../components/UndoButton';
@@ -60,6 +60,7 @@ export function QuoteReview({ boq, quote, onDone }: { boq: HistoryRecord; quote:
             value={vendor}
             editable={!readOnly}
             onChangeText={setVendor}
+            maxLength={fieldLimits('quotes').vendor}
             onEndEditing={() => vendor.trim() !== quote.vendor && actions.updateQuote(quote.id, { vendor: vendor.trim() })}
             style={{ minHeight: 44, paddingHorizontal: readOnly ? 0 : 12, borderWidth: readOnly ? 0 : 1, borderColor: c.gray200, borderRadius: 10, backgroundColor: readOnly ? 'transparent' : c.gray50, color: c.brandDark, fontSize: 14, fontWeight: readOnly ? '700' : '400' }}
           />
@@ -190,7 +191,7 @@ function LineCard({ line, match, duplicate, cell, boq, readOnly, onChange, onDel
           style={[input, { width: 112, fontVariant: ['tabular-nums'] }]}
         />
         <Text style={{ fontSize: 12, color: c.gray500 }}>per</Text>
-        <TextInput value={unit} editable={!readOnly} onChangeText={setUnit} onEndEditing={() => unit.trim() !== line.unit && onChange({ unit: unit.trim() || 'unit' })} accessibilityLabel="Unit" style={[input, { width: 80 }]} />
+        <TextInput value={unit} editable={!readOnly} onChangeText={setUnit} onEndEditing={() => unit.trim() !== line.unit && onChange({ unit: unit.trim() || 'unit' })} maxLength={fieldLimits('quote_lines').unit} accessibilityLabel="Unit" style={[input, { width: 80 }]} />
       </View>
 
       {!readOnly && (

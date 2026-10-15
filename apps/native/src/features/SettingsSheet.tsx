@@ -21,7 +21,7 @@ import {
   type ModelOption,
   type ReadingMode,
 } from '@nirman/core';
-import { ACCENTS, contrast, parseSize, sizeLabel, type SheetSize } from '@nirman/shared';
+import { ACCENTS, contrast, fieldLimits, parseSize, sizeLabel, type SheetSize } from '@nirman/shared';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { Field, Label, NumberField } from '../components/ui/fields';
@@ -29,7 +29,7 @@ import { Icon } from '../components/ui/Icon';
 import { Select } from '../components/ui/Select';
 import { Sheet, SheetHeader } from '../components/ui/Sheet';
 import { Tabs } from '../components/ui/Tabs';
-import { pickBackupFile } from '../lib/backupFile';
+import { pickBackupFile, shortenedNote } from '../lib/backupFile';
 import { latestNotes } from '../lib/changelog';
 import { APP_VERSION } from '../lib/coreSetup';
 import { shareBackupZip, shareFile, textToBase64 } from '../lib/files';
@@ -404,7 +404,7 @@ function BackupSection() {
       const when = new Date(backup.exported_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
       const saved = backup.lists.filter((l) => l.status === 'saved').length;
       const ok = await dialogs.confirm('Replace all data on this phone?', {
-        message: `Restore the backup from ${when} (${plural(saved, 'saved list')}, ${plural(backup.items.length, 'item')}, ${parsed.photos.size ? plural(parsed.photos.size, 'bill photo') : 'no bill photos'}).\nEverything currently on this phone, including queued entries, will be replaced.`,
+        message: `Restore the backup from ${when} (${plural(saved, 'saved list')}, ${plural(backup.items.length, 'item')}, ${parsed.photos.size ? plural(parsed.photos.size, 'bill photo') : 'no bill photos'}).${parsed.shortened ? `\n${shortenedNote(parsed.shortened)}` : ''}\nEverything currently on this phone, including queued entries, will be replaced.`,
         confirmLabel: 'Restore',
         danger: true,
       });
@@ -539,7 +539,7 @@ function DiagnosticsSection() {
 
   const report = () => {
     logStep('report problem');
-    // Opens the browser (signed in to GitHub there) on a new issue with the phone details and recent errors.
+    // Opens the browser (signed in to GitHub there) on a new public issue: phone details, recent errors and counts only.
     void Linking.openURL(issueUrl(REPO, note.trim())).catch((err: Error) => dialogs.alert('Could not open the browser', err.message));
   };
   const shareLog = async () => {
@@ -563,7 +563,7 @@ function DiagnosticsSection() {
         value={note}
         onChangeText={setNote}
         multiline
-        placeholder="What happened? (optional, you can also add it on GitHub)"
+        placeholder="What happened? (optional; the report is public, so leave out private details)"
         placeholderTextColor={c.gray500}
         style={{ minHeight: 64, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderRadius: 10, borderColor: c.gray200, backgroundColor: c.white, color: c.brandDark, fontSize: 12, textAlignVertical: 'top' }}
       />
@@ -575,7 +575,10 @@ function DiagnosticsSection() {
           Share log
         </Button>
       </View>
-      <Hint>Report a problem opens a GitHub issue with the phone details and recent errors filled in; you can add a screenshot there.</Hint>
+      <Hint>
+        Report a problem opens a public GitHub issue with the phone details, recent errors and counts. Your items, rates, vendors, addresses and phone numbers are left
+        out. Share log sends the full log, which includes them, to the app you pick: send it only to someone you trust.
+      </Hint>
       {log.length > 0 && (
         <View style={{ alignItems: 'flex-start' }}>
           <LinkButton
@@ -721,10 +724,10 @@ function LearnedCorrections({ onForgetAll }: { onForgetAll(): void }) {
             <Text style={{ fontSize: 12, fontVariant: ['tabular-nums'], color: c.gray600 }}>“{t.id}” is read as</Text>
             <View style={{ flexDirection: 'row', gap: 6 }}>
               <View style={{ flex: 1 }}>
-                <Field accessibilityLabel="Read as name" value={draft.item_name} onChangeText={(v) => setDraft((d) => ({ ...d, item_name: v }))} />
+                <Field accessibilityLabel="Read as name" value={draft.item_name} onChangeText={(v) => setDraft((d) => ({ ...d, item_name: v }))} maxLength={fieldLimits('learned_terms').item_name} />
               </View>
               <View style={{ width: 88 }}>
-                <Field accessibilityLabel="Read as unit" value={draft.unit} onChangeText={(v) => setDraft((d) => ({ ...d, unit: v }))} />
+                <Field accessibilityLabel="Read as unit" value={draft.unit} onChangeText={(v) => setDraft((d) => ({ ...d, unit: v }))} maxLength={fieldLimits('learned_terms').unit} />
               </View>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>

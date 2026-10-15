@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from 'react';
-import { Linking, Text, TextInput, View } from 'react-native';
+import { Linking, Text, View } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
 import {
   contractTotals,
   describeEntry,
   describeTerms,
+  fieldLimits,
   parseAmount,
   paymentModeLabel,
   paymentModes,
@@ -19,7 +20,7 @@ import { UndoButton } from '../components/UndoButton';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { Icon } from '../components/ui/Icon';
-import { NumberField } from '../components/ui/fields';
+import { Field, NumberField } from '../components/ui/fields';
 import { DateField } from '../components/ui/Select';
 import { Sheet } from '../components/ui/Sheet';
 import { plural } from '../lib/format';
@@ -251,13 +252,12 @@ function EntryForm({ contract, kind, entry, onDone }: { contract: ContractRow; k
           ))}
         </View>
       )}
-      <TextInput
+      <Field
         accessibilityLabel="Entry note"
         value={note}
         onChangeText={setNote}
         placeholder={isWork ? 'e.g. Ground floor walls' : kind === 'advance' ? 'e.g. Week 3 kharcha' : kind === 'payment' ? 'e.g. Bill for ground floor' : 'e.g. Cement supplied, 10 bags'}
-        placeholderTextColor={c.gray500}
-        style={{ minHeight: 44, paddingHorizontal: 12, borderWidth: 1, borderColor: c.gray200, borderRadius: 10, backgroundColor: c.white, color: c.brandDark, fontSize: 14 }}
+        maxLength={fieldLimits('contract_entries').note}
       />
       <Button variant="primary" block onPress={save}>
         {entry ? 'Save' : 'Add'}

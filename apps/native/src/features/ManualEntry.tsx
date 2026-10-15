@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
-import { VARIANT_FIELDS, parseAmount, todayISO, type MaterialEntry } from '@nirman/shared';
+import { VARIANT_FIELDS, fieldLimits, parseAmount, todayISO, type MaterialEntry } from '@nirman/shared';
 import type { ListKind } from '@nirman/core';
 import { QuantityHelper } from '../components/QuantityHelper';
 import { VariantFields } from '../components/VariantFields';
@@ -11,6 +11,8 @@ import { Icon } from '../components/ui/Icon';
 import { Field, NumberField, SuggestInput } from '../components/ui/fields';
 import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
+
+const LIMIT = fieldLimits('items');
 
 const EMPTY: Record<string, string> = { item_name: '', quantity: '', unit: '', unit_price: '', vendor: '', brand: '', model: '', spec: '', color: '', ordered_as: '' };
 
@@ -72,7 +74,7 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
           <Icon name="close" size={18} color={c.gray500} />
         </Pressable>
       </View>
-      <SuggestInput label="Item" style={{ fontWeight: '700' }} value={draft.item_name} onChange={pickName} suggestions={itemDatabase.map((e) => ({ value: e.name, hint: e.unit }))} placeholder="e.g. OPC Cement 53 grade" />
+      <SuggestInput label="Item" style={{ fontWeight: '700' }} value={draft.item_name} onChange={pickName} suggestions={itemDatabase.map((e) => ({ value: e.name, hint: e.unit }))} placeholder="e.g. OPC Cement 53 grade" maxLength={LIMIT.item_name} />
       {known && <LastPrice entry={known} />}
       <VariantFields value={draft} onChange={set} />
       <QuantityHelper itemName={draft.item_name} spec={draft.spec} onApply={(r) => setDraft((p) => ({ ...p, quantity: String(r.quantity), unit: r.unit, spec: r.spec, ordered_as: r.ordered_as }))} />
@@ -81,7 +83,7 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
           <NumberField label="Qty" value={draft.quantity} onChangeText={(t) => set('quantity', t)} />
         </View>
         <View style={{ flex: 1 }}>
-          <SuggestInput label="Unit" value={draft.unit} onChange={(v) => set('unit', v)} suggestions={units} placeholder="Bag" />
+          <SuggestInput label="Unit" value={draft.unit} onChange={(v) => set('unit', v)} suggestions={units} placeholder="Bag" maxLength={LIMIT.unit} />
         </View>
         {isAudit && (
           <View style={{ flex: 1 }}>
@@ -89,8 +91,8 @@ export function ManualEntry({ kind, onClose }: { kind: ListKind; onClose(): void
           </View>
         )}
       </View>
-      {!!draft.ordered_as && <Field label="Ordered as" value={draft.ordered_as} onChangeText={(t) => set('ordered_as', t)} />}
-      {isAudit && <SuggestInput label="Vendor" value={draft.vendor} onChange={(v) => set('vendor', v)} suggestions={knownVendors} />}
+      {!!draft.ordered_as && <Field label="Ordered as" value={draft.ordered_as} onChangeText={(t) => set('ordered_as', t)} maxLength={LIMIT.ordered_as} />}
+      {isAudit && <SuggestInput label="Vendor" value={draft.vendor} onChange={(v) => set('vendor', v)} suggestions={knownVendors} maxLength={LIMIT.vendor} />}
       <Button variant="primary" block icon="check" onPress={add}>
         {`Add to ${isAudit ? 'purchases' : 'BOQ'}`}
       </Button>

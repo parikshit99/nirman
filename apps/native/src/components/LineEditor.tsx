@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Pressable } from './ui/Pressable';
-import { VARIANT_FIELDS, parseAmount, type Variant, type VariantField } from '@nirman/shared';
+import { VARIANT_FIELDS, fieldLimits, parseAmount, type Variant, type VariantField } from '@nirman/shared';
 import { useAppState } from '../state/AppState';
 import { rupees } from '../lib/format';
 import { useColors } from '../theme';
@@ -11,6 +11,9 @@ import { QuantityHelper } from './QuantityHelper';
 import { VariantFields } from './VariantFields';
 import { Button } from './ui/Button';
 import { Field, NumberField, SuggestInput } from './ui/fields';
+
+/** A line's text limits; prices in Rates have the same for what they show. */
+const LIMIT = fieldLimits('items');
 
 /** What the editor changes on a line or a recorded price. */
 export interface LineValues extends Variant {
@@ -25,7 +28,8 @@ export interface LineValues extends Variant {
 }
 
 interface Props {
-  initial: LineValues;
+  /** With `total_amount` for a purchase line: its billed total, shown until Qty or Rate is changed. */
+  initial: LineValues & { total_amount?: number };
   /** Quantity (and the size helper); off for a rate, which has no quantity. */
   showQuantity?: boolean;
   /** Rate, vendor and the line total; off for a BOQ line. */
@@ -60,6 +64,10 @@ export function LineEditor({ initial, showQuantity = true, showPrice = true, onS
   }));
   const [excluded, setExcluded] = useState(!!initial.rates_excluded);
   const set = (key: string) => (value: string) => setDraft((p) => ({ ...p, [key]: value }));
+  // As saving does: the line keeps its own total (a bill's, with GST) unless Qty or Rate changes.
+  const quantityNow = draft.quantity.trim() ? parseAmount(draft.quantity) : 0;
+  const rateNow = draft.unit_price.trim() ? parseAmount(draft.unit_price) : 0;
+  const total = initial.total_amount !== undefined && quantityNow === initial.quantity && rateNow === initial.unit_price ? initial.total_amount : (quantityNow ?? 0) * (rateNow ?? 0);
 
   const save = async (to: Props['onSave'] = onSave) => {
     const quantity = draft.quantity.trim() ? parseAmount(draft.quantity) : 0;
@@ -82,7 +90,7 @@ export function LineEditor({ initial, showQuantity = true, showPrice = true, onS
 
   return (
     <View style={{ gap: 8 }}>
-      <Field label="Item" bold autoFocus value={draft.item_name} onChangeText={set('item_name')} />
+      <Field label="Item" bold autoFocus value={draft.item_name} onChangeText={set('item_name')} maxLength={LIMIT.item_name} />
       <VariantFields value={draft} onChange={(f, v) => set(f)(v)} />
       {showQuantity && (
         <QuantityHelper
@@ -91,7 +99,7 @@ export function LineEditor({ initial, showQuantity = true, showPrice = true, onS
           onApply={(r) => setDraft((p) => ({ ...p, quantity: String(r.quantity), unit: r.unit, spec: r.spec, ordered_as: r.ordered_as }))}
         />
       )}
-      {showQuantity && !!draft.ordered_as && <Field label="Ordered as" value={draft.ordered_as} onChangeText={set('ordered_as')} />}
+      {showQuantity && !!draft.ordered_as && <Field label="Ordered as" value={draft.ordered_as} onChangeText={set('ordered_as')} maxLength={LIMIT.ordered_as} />}
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {showQuantity && (
           <View style={{ flex: 1 }}>
@@ -99,7 +107,7 @@ export function LineEditor({ initial, showQuantity = true, showPrice = true, onS
           </View>
         )}
         <View style={{ flex: 1 }}>
-          <Field label="Unit" value={draft.unit} onChangeText={set('unit')} />
+          <Field label="Unit" value={draft.unit} onChangeText={set('unit')} maxLength={LIMIT.unit} />
         </View>
         {showPrice && (
           <View style={{ flex: 1 }}>
@@ -107,8 +115,8 @@ export function LineEditor({ initial, showQuantity = true, showPrice = true, onS
           </View>
         )}
       </View>
-      {showPrice && <SuggestInput label="Vendor" value={draft.vendor} onChange={set('vendor')} suggestions={knownVendors} placeholder="Vendor" />}
-      {showPrice && showQuantity && <Text style={{ fontVariant: ['tabular-nums'], fontSize: 14, fontWeight: '700', color: c.orange600, paddingTop: 4 }}>Total {rupees((parseAmount(draft.quantity) ?? 0) * (parseAmount(draft.unit_price) ?? 0))}</Text>}
+      {showPrice && <SuggestInput label="Vendor" value={draft.vendor} onChange={set('vendor')} suggestions={knownVendors} placeholder="Vendor" maxLength={LIMIT.vendor} />}
+      {showPrice && showQuantity && <Text style={{ fontVariant: ['tabular-nums'], fontSize: 14, fontWeight: '700', color: c.orange600, paddingTop: 4 }}>Total {rupees(total)}</Text>}
       {excludable && showPrice && (
         <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: excluded }} onPress={() => setExcluded(!excluded)} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, minHeight: 44, paddingVertical: 4 }}>
           <Icon name={excluded ? 'check-box' : 'check-box-outline-blank'} size={24} color={excluded ? c.orange500 : c.gray500} />

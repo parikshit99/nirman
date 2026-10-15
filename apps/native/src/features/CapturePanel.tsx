@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Text, TextInput, View } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
-import { MAX_IMAGES, todayISO } from '@nirman/shared';
+import { MAX_IMAGES, fieldLimits, todayISO } from '@nirman/shared';
 import { type Job, type ListKind, prefs, workTypeKey, type ReadingProgress } from '@nirman/core';
 import { PhotoSourceSheet } from '../components/PhotoSourceSheet';
 import { Button } from '../components/ui/Button';
+import { Field } from '../components/ui/fields';
 import { useDialogs } from '../components/ui/Dialogs';
 import { Icon } from '../components/ui/Icon';
 import { Select } from '../components/ui/Select';
@@ -255,14 +256,15 @@ function BoqNotes({ notes, onChange }: { notes: string; onChange(n: string): voi
           </Pressable>
         )}
       </View>
-      <TextInput
+      <Field
+        accessibilityLabel="General specifications"
         multiline
         value={value}
         onChangeText={update}
         placeholder="Enter color codes, finishes (glossy/matt), or specific brand requests here for the PDF..."
-        placeholderTextColor={c.gray500}
         textAlignVertical="top"
-        style={{ height: 96, padding: 12, borderWidth: 1, borderColor: c.blue100, borderRadius: 12, backgroundColor: c.blue50, color: c.brandDark, fontSize: 12 }}
+        maxLength={fieldLimits('lists').notes}
+        style={{ height: 96, paddingVertical: 12, borderColor: c.blue100, borderRadius: 12, backgroundColor: c.blue50, fontSize: 12 }}
       />
     </View>
   );

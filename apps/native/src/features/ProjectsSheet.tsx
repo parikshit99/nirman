@@ -2,7 +2,7 @@ import { createContext, useContext, useState, type ReactNode } from 'react';
 import { prefs } from '@nirman/core';
 import { Text, View } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
-import type { ProjectRow } from '@nirman/shared';
+import { fieldLimits, type ProjectRow } from '@nirman/shared';
 import { Button } from '../components/ui/Button';
 import { useDialogs } from '../components/ui/Dialogs';
 import { Icon } from '../components/ui/Icon';
@@ -16,6 +16,7 @@ import { useColors } from '../theme';
 
 /** Projects pinned to the top of the list, newest pin first. Kept on this phone (like the theme), not in backups. */
 const PINNED_PREF = 'nirmaan_pinned_projects';
+const LIMIT = fieldLimits('projects');
 
 /** Pick the project to work on, start a new one, or open one's details. */
 export function ProjectsSheet({ onClose, onNew, onEdit, backEnabled = true }: { onClose(): void; onNew(): void; onEdit(project: ProjectRow): void; backEnabled?: boolean }) {
@@ -138,7 +139,7 @@ export function ProjectForm({ project, onClose }: { project?: ProjectRow; onClos
       const s = projectSummary(project.id);
       const parts = [plural(s.lists, 'saved list'), plural(s.contracts, 'labour contract')];
       const ok = await dialogs.confirm(`Delete “${project.name}”?`, {
-        message: `${parts.join(' and ')}, the open purchase list and BOQ of this project will be removed from this phone. Prices in Rates stay.`,
+        message: `${parts.join(' and ')}, the open purchase list and BOQ of this project will be removed from this phone. Prices from its purchases stay in Rates.`,
         confirmLabel: 'Delete project',
         danger: true,
       });
@@ -151,9 +152,9 @@ export function ProjectForm({ project, onClose }: { project?: ProjectRow; onClos
   return (
     <Sheet label={project ? 'Project details' : 'New project'} onClose={onClose} busy={busy} padding={20} gap={16}>
       <SheetHeader icon="apartment" title={project ? 'Project details' : 'New project'} onClose={onClose} closeDisabled={busy} />
-      <Field label="Name" bold value={name} onChangeText={setName} placeholder="e.g. Sharma house" />
+      <Field label="Name" bold value={name} onChangeText={setName} placeholder="e.g. Sharma house" maxLength={LIMIT.name} />
       <View>
-        <SuggestInput label="Site address" value={address} onChange={setAddress} suggestions={allAddresses} placeholder="e.g. Sector 44, Gurgaon" />
+        <SuggestInput label="Site address" value={address} onChange={setAddress} suggestions={allAddresses} placeholder="e.g. Sector 44, Gurgaon" maxLength={LIMIT.address} />
         <Text style={{ fontSize: 12, color: c.gray500, marginTop: 4 }}>Filled in when you save a list or add a contract in this project.</Text>
       </View>
       <Button variant="primary" block disabled={busy} onPress={save}>
