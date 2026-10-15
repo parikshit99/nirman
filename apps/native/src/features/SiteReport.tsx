@@ -41,7 +41,7 @@ export function SiteReport({ onClose }: { onClose(): void }) {
   const report = useMemo(() => buildSiteReport(lists, snapshot.items, learning, { from, to, categories, deliveredOnly }), [lists, snapshot.items, learning, from, to, categories, deliveredOnly]);
   const labour = useMemo(() => buildLabourReport(contracts, snapshot.contractEntries, { from, to, categories }), [contracts, snapshot.contractEntries, from, to, categories]);
   const empty = report.lineCount === 0 && labour.rows.length === 0;
-  const materialCount = report.categories.reduce((n, x) => n + x.materials.length, 0);
+  const materialCount = report.categories.reduce((n, x) => n + x.materials.filter((m) => !m.charge).length, 0);
   const period = from || to ? `${from || 'start'} to ${to || 'today'}` : 'All time';
   const filters = [period, categories.length ? categories.join(', ') : 'All categories', deliveredOnly ? 'Delivered only' : 'All saved purchases'].join(' · ');
 
@@ -139,6 +139,7 @@ export function SiteReport({ onClose }: { onClose(): void }) {
               </Text>
               <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupeesWhole(report.total)}</Text>
             </View>
+            {report.charges > 0 && <Text style={{ fontSize: 12, color: c.gray500, marginTop: -8 }}>Of which transport and loading: {rupeesWhole(report.charges)}</Text>}
             {labour.rows.length > 0 && (
               <View style={panel}>
                 <Text style={{ flex: 1, fontSize: 14, color: c.gray600 }}>

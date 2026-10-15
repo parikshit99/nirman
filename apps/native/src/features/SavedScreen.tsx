@@ -4,7 +4,7 @@ import Fuse from 'fuse.js';
 import { useMemo, useState } from 'react';
 import { Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
-import { todayISO } from '@nirman/shared';
+import { isCharge, todayISO } from '@nirman/shared';
 import { prefs, type ListMeta } from '@nirman/core';
 import { ActionFab, useHideOnScroll, type FabAction } from '../components/ActionFab';
 import { BillPhotosSheet, BillThumbs, photoIdsOf } from '../components/BillPhotos';
@@ -243,7 +243,8 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
           </EmptyState>
         }
         renderItem={({ item: record }) => {
-          const delivered = record.items.filter((i) => i.delivered_at).length;
+          const deliverable = record.items.filter((i) => !isCharge(i.item_name));
+          const delivered = deliverable.filter((i) => i.delivered_at).length;
           const bills = photoIdsOf(record.items);
           return (
             <View style={{ marginHorizontal: 16, marginTop: 12, borderRadius: 16, overflow: 'hidden' }}>
@@ -264,7 +265,7 @@ export function SavedScreen({ about, onQuotes, onSiteReport }: { about: string; 
                       {record.address ? <Text numberOfLines={1} style={{ fontSize: 12, fontStyle: 'italic', color: c.gray500 }}>{record.address}</Text> : null}
                       <Text style={{ fontSize: 12, fontWeight: '700', color: c.gray500 }}>
                         {plural(record.items.length, 'item')}
-                        {record.items.length > 0 && <Text style={{ color: delivered === record.items.length ? c.green700 : c.gray500 }}>{` · ${delivered} of ${record.items.length} delivered`}</Text>}
+                        {deliverable.length > 0 && <Text style={{ color: delivered === deliverable.length ? c.green700 : c.gray500 }}>{` · ${delivered} of ${deliverable.length} delivered`}</Text>}
                       </Text>
                     </Pressable>
                     {bills.length > 0 && <BillThumbs photoIds={bills} max={width >= 400 ? 2 : 1} title={record.title} onPress={() => setPhotosOf(record)} />}

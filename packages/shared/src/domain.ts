@@ -1,3 +1,4 @@
+import { isCharge, type ChargeKind, chargeKind } from './charges.ts';
 import { VARIANT_FIELDS, type ExtractedMaterial, type IndexedRateRow, type ItemRow, type LearningMap, type ListRow, type QuoteLineRow, type QuoteRow, type Variant, type VariantField } from './schemas.ts';
 
 export const DEFAULT_CATEGORIES = ['Civil', 'Electrical', 'Plumbing', 'Carpenter', 'Hvac', 'Tile', 'Stone', 'Other'];
@@ -166,7 +167,7 @@ const countsInRates = (l: ListRow) => l.status === 'saved' || (l.status === 'dra
 /**
  * Build the material price database from saved lists, the open purchase list
  * (its prices count as soon as they are entered) and single added rates. A line
- * marked `rates_excluded` is left out. `deleted` maps a material key to when it was
+ * marked `rates_excluded`, and every transport or loading charge, is left out. `deleted` maps a material key to when it was
  * deleted from the database: everything recorded up to then is left out (saved
  * lists themselves are untouched), and anything recorded later shows again.
  */
@@ -217,6 +218,7 @@ export function buildItemDatabase(
     if (!list) continue;
 
     const { item_name, unit } = applyLearning(learning, raw);
+    if (isCharge(item_name)) continue;
     const key = materialKey(item_name, unit);
     const draft = list.status === 'draft';
     const recordedAt = draft ? raw.created_at || list.created_at : list.created_at;
@@ -253,6 +255,7 @@ export function buildItemDatabase(
 
   for (const rate of rates) {
     const { item_name, unit } = applyLearning(learning, rate);
+    if (isCharge(item_name)) continue;
     const key = materialKey(item_name, unit);
     if (isDeleted(key, rate.indexed_at)) continue;
     const variant = variantOf(rate);
@@ -337,11 +340,12 @@ export function unusedHiddenMaterials(
     const list = savedLists.get(raw.list_id);
     if (!list || !raw.item_name || raw.rates_excluded) continue;
     const { item_name, unit } = applyLearning(learning, raw);
+    if (isCharge(item_name)) continue;
     seen(item_name, unit, list.status === 'draft' ? raw.created_at || list.created_at : list.created_at);
   }
   for (const rate of rates) {
     const { item_name, unit } = applyLearning(learning, rate);
-    seen(item_name, unit, rate.indexed_at);
+    if (!isCharge(item_name)) seen(item_name, unit, rate.indexed_at);
   }
   return hidden
     .filter((h) => {
@@ -421,7 +425,7 @@ export interface SiteReportOptions {
   to?: string;
   /** Work categories to include; empty means all. */
   categories?: string[];
-  /** Only lines ticked as delivered. */
+  /** Only lines ticked as delivered (transport and loading charges are never delivered, so they are left out). */
   deliveredOnly: boolean;
 }
 
@@ -443,6 +447,8 @@ export interface SiteReportMaterial {
   /** Number of saved sessions (bills) it appears in. */
   bills: number;
   lines: SiteReportLine[];
+  /** Set for a transport or loading charge, listed after the materials of its work type. */
+  charge?: ChargeKind;
 }
 
 export interface SiteReportCategory {
@@ -454,6 +460,8 @@ export interface SiteReportCategory {
 export interface SiteReport {
   categories: SiteReportCategory[];
   total: number;
+  /** Of the total, transport and loading charges. */
+  charges: number;
   lineCount: number;
 }
 
@@ -470,7 +478,8 @@ export function siteHasDeliveries(lists: ListRow[], items: ItemRow[], address?: 
 
 /**
  * Saved purchases for one site, grouped by work category and then by material
- * (names tidied by learned corrections, as in the price database).
+ * (names tidied by learned corrections, as in the price database). Transport and
+ * loading charges come after the materials of their work category.
  */
 export function buildSiteReport(lists: ListRow[], items: ItemRow[], learning: LearningMap, opts: SiteReportOptions): SiteReport {
   const wanted = new Set((opts.categories ?? []).map((c) => c.trim().toLowerCase()));
@@ -487,7 +496,9 @@ export function buildSiteReport(lists: ListRow[], items: ItemRow[], learning: Le
   for (const item of items) {
     const list = siteLists.get(item.list_id);
     if (!list || !item.item_name) continue;
-    if (opts.deliveredOnly && !item.delivered_at) continue;
+    const { item_name, unit } = applyLearning(learning, item);
+    const charge = chargeKind(item_name);
+    if (opts.deliveredOnly && (!item.delivered_at || charge)) continue;
     const date = siteReportDate(item, list);
     if (opts.from && date < opts.from) continue;
     if (opts.to && date > opts.to) continue;
@@ -495,11 +506,10 @@ export function buildSiteReport(lists: ListRow[], items: ItemRow[], learning: Le
     const category = list.category || UNCATEGORISED;
     let materials = byCategory.get(category);
     if (!materials) byCategory.set(category, (materials = new Map()));
-    const { item_name, unit } = applyLearning(learning, item);
     const key = materialKey(item_name, unit);
     let m = materials.get(key);
     if (!m) {
-      m = { name: item_name, unit, quantity: 0, amount: 0, vendors: new Set(), bills: new Set(), pricedQty: 0, pricedAmount: 0, lines: [] };
+      m = { name: item_name, unit, quantity: 0, amount: 0, vendors: new Set(), bills: new Set(), pricedQty: 0, pricedAmount: 0, lines: [], ...(charge ? { charge } : {}) };
       materials.set(key, m);
     }
     m.quantity += item.quantity || 0;
@@ -524,11 +534,12 @@ export function buildSiteReport(lists: ListRow[], items: ItemRow[], learning: Le
           bills: bills.size,
           lines: lines.sort((a, b) => a.date.localeCompare(b.date)),
         }))
-        .sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
+        .sort((a, b) => Number(!!a.charge) - Number(!!b.charge) || b.amount - a.amount || a.name.localeCompare(b.name));
       return { name, amount: list.reduce((sum, m) => sum + m.amount, 0), materials: list };
     })
     .sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
-  return { categories, total: categories.reduce((sum, c) => sum + c.amount, 0), lineCount };
+  const charges = categories.reduce((sum, c) => sum + c.materials.reduce((s, m) => s + (m.charge ? m.amount : 0), 0), 0);
+  return { categories, total: categories.reduce((sum, c) => sum + c.amount, 0), charges, lineCount };
 }
 
 /** Indian financial year (1 April – 31 March) containing `date`, or the one before it. */

@@ -2,7 +2,7 @@ import Fuse from 'fuse.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BackHandler, Text, TextInput, View } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
-import { guessCategory, todayISO } from '@nirman/shared';
+import { guessCategory, isCharge, todayISO } from '@nirman/shared';
 import { buildPdf, logStep, prefs, workTypeKey, type ListKind, type ListMeta } from '@nirman/core';
 import { ActionFab, useHideOnScroll, type FabAction } from '../components/ActionFab';
 import { DocumentPreview } from '../components/DocumentPreview';
@@ -160,8 +160,10 @@ export function ListScreen({
   useEffect(clearSelection, [projectId, kind, query, clearSelection]);
   const pickedItems = filteredItems.filter((i) => selected.has(i.id));
   const markPickedDelivered = () => {
-    const allDelivered = pickedItems.every((i) => i.delivered_at);
-    void actions.setDelivered(pickedItems.map((i) => i.id), allDelivered ? '' : todayISO());
+    // Transport and loading lines are never delivered.
+    const deliverable = pickedItems.filter((i) => !isCharge(i.item_name));
+    const allDelivered = deliverable.every((i) => i.delivered_at);
+    void actions.setDelivered(deliverable.map((i) => i.id), allDelivered ? '' : todayISO());
     clearSelection();
   };
   const deletePicked = () => {
@@ -212,7 +214,7 @@ export function ListScreen({
             {pickedItems.length < filteredItems.length && (
               <Button size="sm" variant="ghost" icon="select-all" label="Pick all" onPress={() => setSelected(new Set(filteredItems.map((i) => i.id)))} />
             )}
-            <Button size="sm" variant="ghost" icon="local-shipping" label={pickedItems.every((i) => i.delivered_at) ? 'Mark not delivered' : 'Mark delivered'} onPress={markPickedDelivered} />
+            <Button size="sm" variant="ghost" icon="local-shipping" label={pickedItems.filter((i) => !isCharge(i.item_name)).every((i) => i.delivered_at) ? 'Mark not delivered' : 'Mark delivered'} onPress={markPickedDelivered} />
             <Button size="sm" variant="ghost" icon="delete-outline" label="Delete" onPress={deletePicked} />
           </View>
         ) : (

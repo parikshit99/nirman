@@ -256,6 +256,7 @@ export function buildSiteReportPdf(address: string, filters: string, report: Sit
     summary.push(['', '', { content: `${c.name} total`, styles: { fontStyle: 'bold', halign: 'right' } }, { content: rupees(Math.round(c.amount)), styles: { fontStyle: 'bold' } }, '', '']);
   }
   summary.push(['', '', { content: hasLabour ? 'MATERIALS TOTAL' : 'GRAND TOTAL', styles: { fontStyle: 'bold', halign: 'right' } }, { content: rupees(Math.round(report.total)), styles: { fontStyle: 'bold' } }, '', '']);
+  if (report.charges) summary.push(['', '', { content: 'Of which transport and loading', styles: { halign: 'right' } }, rupees(Math.round(report.charges)), '', '']);
   autoTable(doc, {
     head: [['Material', 'Quantity', 'Avg rate', 'Amount', 'Vendors', 'Bills']],
     body: summary,

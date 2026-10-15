@@ -2,6 +2,20 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 7.12 — Transport and loading as their own lines
+
+**Reading bills**
+- Transport and loading charged on a bill are now lines of their own: **Transport** (freight, cartage, bhada, gaadi bhada, truck or tractor charges, delivery charges) and **Loading and unloading** (hamali, palledari, chadhai, utrai). A charge with only an amount ("Freight 1500") is 1 trip at that amount. Gemini reads them the same way and never adds them into a material's price.
+
+**Purchases and Saved**
+- They count in *Spent*, the list's total and its PDF, Excel and JPG, but have no *Delivered* tick or swipe. Editing one says they count in Spent and the site report, not in Rates.
+
+**Rates**
+- Transport and loading are never in Rates, so they never show *Last paid* and are not kept in Rates when a project is deleted. *Leave out of Rates* is still there for a rate with transport included.
+
+**Site report**
+- Transport and loading come after the materials of their work type, and the summary says how much of the total they are ("Of which transport and loading: ₹6,500"). *Only lines marked delivered* leaves them out.
+
 ## 7.5 — Saved lists of every project
 
 **Saved**

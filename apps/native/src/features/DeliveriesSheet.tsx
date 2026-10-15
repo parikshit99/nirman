@@ -1,5 +1,5 @@
 import { ScrollView, Text, View } from 'react-native';
-import { todayISO } from '@nirman/shared';
+import { isCharge, todayISO } from '@nirman/shared';
 import { DeliveredToggle } from '../components/DeliveredToggle';
 import { Button } from '../components/ui/Button';
 import { Sheet, SheetHeader } from '../components/ui/Sheet';
@@ -13,14 +13,16 @@ export function DeliveriesSheet({ recordId, onClose }: { recordId: string; onClo
   const { allHistory, actions } = useAppState();
   const record: HistoryRecord | undefined = allHistory.find((h) => h.id === recordId);
   if (!record) return null;
-  const pending = record.items.filter((i) => !i.delivered_at);
+  // Transport and loading lines are never delivered.
+  const lines = record.items.filter((i) => !isCharge(i.item_name));
+  const pending = lines.filter((i) => !i.delivered_at);
 
   return (
     <Sheet kind="screen" scroll={false} label="Deliveries" onClose={onClose}>
       <SheetHeader title="Deliveries" subtitle={`${record.title}${record.address ? ` · ${record.address}` : ''}`} onClose={onClose} />
       <Text style={{ fontSize: 12, color: c.gray500 }}>Tick each line when it reaches the site.{record.kind === 'audit' ? ' Site reports can count only delivered material.' : ' See what is still to come on this order.'}</Text>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
-        {record.items.map((item) => (
+        {lines.map((item) => (
           <View key={item.id} style={{ paddingVertical: 8, gap: 4, borderBottomWidth: 1, borderBottomColor: c.gray100 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
               <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: '700', color: c.brandDark }}>
