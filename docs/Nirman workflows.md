@@ -85,6 +85,7 @@ flowchart LR
 Notes:
 - The 75% threshold is `PHONE_CONFIDENCE` in `worker.ts`.
 - **One name per material** (since 7.1, `standardizeLine`; lines typed with *Add item manually* too): a line whose name is a material already in Rates with a different spacing, punctuation or one letter off ("Mount air" / "Mountair") gets that name; otherwise one in the starter catalog ("Cement - UT" → Cement, brand UltraTech). A unit of the same kind is converted (2 MT → 2000 kg; the total stays). The line shows *Matched to Rates* with *Undo*. Words the owner already merged keep their learned name.
+- **Transport and loading** (since 7.12, `chargeName` in `charges.ts`): freight, cartage, bhada, gaadi bhada, truck/tractor/tempo charges and delivery charges become a *Transport* line; loading, unloading, hamali, palledari, chadhai and utrai a *Loading and unloading* line (whole words; tractor, tempo or truck alone is a unit). The phone reads a charge with one amount as 1 trip at that amount; Gemini's rule 8 asks for the same and never folds a charge into a material's price.
 - Temporary errors back off; 3 time-outs in a row stop the queue.
 - **Deleting the list an entry is for** (a saved list open for editing) drops its entries still waiting. One already being read is dropped when it finishes; its lines are not stored. At start, `removeOrphans` clears what earlier versions left in that case.
 - **Vendor quotes** follow the same path (since 5.3): read on the phone and each line matched to the BOQ there, so they work offline. Gemini is asked only when the phone is unsure and the phone is online. In phone-only mode a quote the phone can't read fails with "Use *Type rates*".
@@ -100,7 +101,7 @@ flowchart LR
   C[Confirmed vendor quotes<br/>stored as added rates] --> DB
   D[Today's price<br/>added by hand in Rates] --> DB
   E[Purchases of a deleted project<br/>kept as added rates] --> DB
-  DB[[Rates · buildItemDatabase<br/>− lines left out of Rates<br/>− materials deleted, up to that day<br/>→ learned names merge spellings<br/>→ grouped by brand / size / colour]]
+  DB[[Rates · buildItemDatabase<br/>− lines left out of Rates<br/>− transport and loading lines<br/>− materials deleted, up to that day<br/>→ learned names merge spellings<br/>→ grouped by brand / size / colour]]
   DB --> L[Last paid check on each line<br/>higher red, lower green ±2%]
   DB --> RT[Rates tab<br/>trend, range, vendors, filters, edit]
   DB --> QC[Quote comparison<br/>vendor rate vs last paid]
@@ -110,6 +111,7 @@ flowchart LR
 
 - **Last paid** and the quote comparison check this project's last price first. Only when this site has none is another site's price shown, with its address ("Last paid at Dwarka"). Since 5.1.
 - A price check never compares a line with itself.
+- **Transport and loading lines** (since 7.12, `chargeKind` on the learned name) never reach Rates, Last paid or the names sent to Gemini, and are not kept when a project is deleted. They count in Spent, list exports and the site report (after the materials of their work type, with an *Of which transport and loading* line; left out with *Only lines marked delivered*).
 - **Deleting a project** keeps its prices in Rates. Each of its purchase lines with a rate (except those left out of Rates) is kept as an added rate, with its work type and site address. These and its confirmed quotes' rates are then left with no project, or go to another project with the same site address if there is one. Its lists, BOQs, quotes and contracts are deleted.
 - **Merging** two materials in Rates (since 7.1) converts quantities and rates between units of one kind (MT, quintal, kg; brass, cft, cum; sqm, sqft), keeping totals. Units that don't convert (Bag and kg) are merged without converting, and the dialog says so.
 

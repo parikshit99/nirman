@@ -276,7 +276,7 @@ export function RatesScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 12, fontWeight: '700', color: c.gray700 }}>Where prices come from</Text>
                 <Text style={{ fontSize: 12, lineHeight: 18, color: c.gray500 }}>
-                  Every purchase with a rate, as soon as it is added (the open purchase list and saved lists), confirmed vendor quotes, and rates added on their own. Fixing or removing a price here changes its list too. To keep one price out (e.g. transport included), edit the purchase and tick Leave out of Rates.
+                  Every purchase with a rate, as soon as it is added (the open purchase list and saved lists), confirmed vendor quotes, and rates added on their own. Fixing or removing a price here changes its list too. Transport and loading lines are never in Rates. To keep another price out (e.g. a rate with transport included), edit the purchase and tick Leave out of Rates.
                 </Text>
               </View>
             </View>

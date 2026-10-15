@@ -3,6 +3,7 @@ import {
   applyLearning,
   buildItemDatabase,
   fitRow,
+  isCharge,
   extractedMaterialSchema,
   extractedQuoteLineSchema,
   materialKey,
@@ -283,8 +284,9 @@ export async function setProjectStatus(db: Db, id: string, status: ProjectRow['s
 
 /**
  * Delete a project with all its lists, BOQs (and their vendor quotes) and labour contracts. Its prices stay in
- * Rates: the prices of its purchase lines are first kept as added rates (keepProjectRates), and rates it already
- * had stay without a project. A new "My site" is made if it was the last project.
+ * Rates: the prices of its purchase lines (not transport or loading, which Rates never shows) are first kept as
+ * added rates (keepProjectRates), and rates it already had stay without a project. A new "My site" is made if it
+ * was the last project.
  */
 export async function deleteProject(db: Db, id: string) {
   await db.transaction(async (tx) => {
@@ -682,7 +684,7 @@ export async function renameMaterial(db: Db, key: string, to: { item_name: strin
 
 /**
  * Materials in Rates (by their learned names), with how many lines and rates use each: what a new reading is
- * matched to. Lines and materials deleted from Rates are left out.
+ * matched to. Lines and materials deleted from Rates, and transport and loading charges, are left out.
  */
 export async function knownMaterials(db: Db): Promise<KnownMaterial[]> {
   const learning = learningMap(await db.all<LearnedTermRow>(selectAll('learned_terms', 'id')));
@@ -699,7 +701,7 @@ export async function knownMaterials(db: Db): Promise<KnownMaterial[]> {
     if (!row.item_name.trim()) continue;
     const { item_name, unit } = applyLearning(learning, row);
     const key = materialKey(item_name, unit);
-    if (hidden.has(key)) continue;
+    if (hidden.has(key) || isCharge(item_name)) continue;
     const k = byKey.get(key);
     if (k) k.uses = (k.uses ?? 0) + 1;
     else byKey.set(key, { name: item_name, unit, uses: 1 });

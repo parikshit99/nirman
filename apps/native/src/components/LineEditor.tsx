@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Pressable } from './ui/Pressable';
-import { VARIANT_FIELDS, fieldLimits, parseAmount, type Variant, type VariantField } from '@nirman/shared';
+import { VARIANT_FIELDS, fieldLimits, isCharge, parseAmount, type Variant, type VariantField } from '@nirman/shared';
 import { useAppState } from '../state/AppState';
 import { rupees } from '../lib/format';
 import { useColors } from '../theme';
@@ -117,7 +117,8 @@ export function LineEditor({ initial, showQuantity = true, showPrice = true, onS
       </View>
       {showPrice && <SuggestInput label="Vendor" value={draft.vendor} onChange={set('vendor')} suggestions={knownVendors} placeholder="Vendor" maxLength={LIMIT.vendor} />}
       {showPrice && showQuantity && <Text style={{ fontVariant: ['tabular-nums'], fontSize: 14, fontWeight: '700', color: c.orange600, paddingTop: 4 }}>Total {rupees(total)}</Text>}
-      {excludable && showPrice && (
+      {excludable && showPrice && isCharge(draft.item_name) && <Text style={{ fontSize: 12, color: c.gray500 }}>Transport and loading count in Spent and the site report, not in Rates.</Text>}
+      {excludable && showPrice && !isCharge(draft.item_name) && (
         <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: excluded }} onPress={() => setExcluded(!excluded)} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, minHeight: 44, paddingVertical: 4 }}>
           <Icon name={excluded ? 'check-box' : 'check-box-outline-blank'} size={24} color={excluded ? c.orange500 : c.gray500} />
           <View style={{ flex: 1 }}>

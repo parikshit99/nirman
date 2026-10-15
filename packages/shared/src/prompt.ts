@@ -45,6 +45,9 @@ export function buildSystemInstruction({ learning, materials, category, captureD
        - Tiles and ACP sheets: put the size in mm in spec as "600x1200". If sqft is written, quantity is the sqft with
          unit "sqft"; if only a count of pieces is written, give it with unit "piece".
        - Otherwise leave ordered_as "".
+    8. Transport, freight, cartage, bhada, loading, unloading, hamali or palledari charged on the bill: return each as its
+       own item with item_name exactly "Transport" or "Loading and unloading", original_term as written, quantity = number
+       of trips if written else 1, unit "trip", unit_price = the charge per trip. Never add these charges into another item's price.
     ${learningContext(learning)}
     ${materialsContext(materials)}
     ${categoryContext}

@@ -95,6 +95,7 @@ export function siteReportSheet(address: string, filters: string, report: SiteRe
   }
   const hasLabour = !!labour?.rows.length;
   rows.push([bold(hasLabour ? 'MATERIALS TOTAL' : 'GRAND TOTAL'), null, null, null, null, { ...money(report.total), fontWeight: 'bold' }, null, null]);
+  if (report.charges) rows.push(['Of which transport and loading', null, null, null, null, money(report.charges), null, null]);
   if (hasLabour) {
     rows.push([], [bold('Labour')], ['Contractor', 'Work', 'Work type', 'Work done', 'Paid', 'Balance now'].map(bold));
     for (const r of labour!.rows) rows.push([r.contract.contractor, r.contract.work, r.contract.category, money(r.workDone), money(r.paid), money(r.balance)]);

@@ -1,4 +1,5 @@
 import { toBilledUnits, DEFAULT_CONVERSIONS, type ConversionSettings } from './conversions.ts';
+import { chargeName, TRIP } from './charges.ts';
 import { applyLearning } from './domain.ts';
 import type { ExtractedMaterial, LearningMap } from './schemas.ts';
 
@@ -49,11 +50,11 @@ export const UNITS: Record<string, string> = {
   mtr: 'm', mtrs: 'm', meter: 'm', metre: 'm', m: 'm', ft: 'ft', feet: 'ft',
   box: 'box', boxes: 'box', bundle: 'bundle', bundles: 'bundle', coil: 'coil', coils: 'coil', roll: 'roll', rolls: 'roll',
   set: 'set', sets: 'set', pair: 'pair', pairs: 'pair', trolley: 'trolley', tractor: 'trolley', dozen: 'dozen', doz: 'dozen',
-  sheet: 'sheet', sheets: 'sheet', length: 'length', lengths: 'length',
+  sheet: 'sheet', sheets: 'sheet', length: 'length', lengths: 'length', trip: 'trip', trips: 'trip',
 };
 
 /** Rows that are about the bill, not an item on it. */
-const NOT_ITEM = /\b(total|sub ?total|grand|gst|cgst|sgst|igst|tax|invoice|bill\s*no|gstin|phone|mob(ile)?|ph\.?|address|thank|rupees|amount in words|round(ed)? ?off|discount|freight|cartage|balance|paid|signature|e\.?\s*&\s*o\.?\s*e|state|code|hsn\/sac|terms|bank|ifsc|a\/c|date)\b/i;
+const NOT_ITEM = /\b(total|sub ?total|grand|gst|cgst|sgst|igst|tax|invoice|bill\s*no|gstin|phone|mob(ile)?|ph\.?|address|thank|rupees|amount in words|round(ed)? ?off|discount|balance|paid|signature|e\.?\s*&\s*o\.?\s*e|state|code|hsn\/sac|terms|bank|ifsc|a\/c|date)\b/i;
 const TOTAL = /\b(grand\s*total|net\s*(amount|total)|total(\s*amount)?)\b/i;
 const VENDORISH = /\b(traders?|trading|enterprises?|hardware|stores?|agenc(y|ies)|electricals?|electronics|sanitary|steels?|cement|suppliers?|sons|brothers|bros|& co|company|marbles?|tiles|paints?|timber|plywood|building material|depot|mart|centre|center)\b/i;
 
@@ -156,7 +157,10 @@ export function parseRow(row: string): BillLine | null {
       }
     }
   }
-  if (!confidence || confidence < 1) {
+  // "Freight 1500": a transport or loading charge with one amount is one trip at that amount.
+  const charge = chargeName(name);
+  if (charge && numbers.length === 1) [quantity, rate, amount, confidence] = [1, numbers[0], numbers[0], 1];
+  if (confidence < 1) {
     if (numbers.length >= 2) {
       // "Cement 50 bags 380": quantity then rate; "@" also marks the rate.
       [quantity, rate] = [numbers[0], numbers[1]];
@@ -169,10 +173,10 @@ export function parseRow(row: string): BillLine | null {
   }
   return {
     item: {
-      item_name: name,
+      item_name: charge ?? name,
       original_term: name,
       quantity,
-      unit: unit || 'unit',
+      unit: unit || (charge ? TRIP : 'unit'),
       unit_price: rate,
       total_amount: amount,
       vendor: '',

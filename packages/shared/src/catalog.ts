@@ -1,4 +1,5 @@
 import { UNITS } from './billParser.ts';
+import { chargeName, isCharge, TRIP } from './charges.ts';
 import { nameSimilarity, normalizeTerm } from './domain.ts';
 import type { LearningMap } from './schemas.ts';
 
@@ -160,7 +161,7 @@ export function findBrand(name: string): { brand: string; rest: string; material
 const PLAIN_WORDS = new Set(
   ('river fine coarse red clay grey gray loose steel bar bars rod rods pipe pipes block blocks brick bricks cement sand wire ready mix concrete ' +
     'wall x inch inches for of and the no nos type quality best local std standard ordinary portland pozzolana size thick mtr length lengths feet ft ' +
-    'cu cft brass sqft bag bags kg kgs mt ton tons qtl quintal grade gr opc ppc psc fe mm d white').split(' '),
+    'cu cft brass tractor trolley sqft bag bags kg kgs mt ton tons qtl quintal grade gr opc ppc psc fe mm d white').split(' '),
 );
 
 /**
@@ -232,6 +233,13 @@ export function standardizeLine<T extends MatchableLine>(line: T, known: KnownMa
   const term = normalizeTerm(line.original_term || line.item_name);
   // A word the owner already merged shows under its learned name in Rates; their merge wins over any match here.
   if (term && learning[term]) return { line };
+  // Transport and loading charges get their own standard name, never a material's ("Cartage" → Transport).
+  const charge = chargeName(line.item_name) ?? chargeName(line.original_term);
+  if (charge) {
+    const next: T = { ...line, item_name: charge, unit: noUnit(unit) ? TRIP : unit, original_term: line.original_term || line.item_name };
+    const changed = charge !== line.item_name || next.unit !== line.unit;
+    return changed ? { line: next, readAs: read } : { line: next };
+  }
   const brand = line.brand ? null : findBrand(line.item_name);
   const catalog = findCatalogMaterial(line.item_name) ?? (brand?.material ? (CATALOG.find((c) => c.name === brand.material) ?? null) : null);
   const names = [line.item_name, brand?.rest, catalog?.name].filter((n): n is string => !!n && !!n.trim());
@@ -289,7 +297,8 @@ export function namesForReading(known: KnownMaterial[], limit = 150): { name: st
     seen.add(key);
     out.push({ name, unit });
   };
-  for (const k of [...known].sort((a, b) => (b.uses ?? 0) - (a.uses ?? 0))) add(k.name, k.unit);
+  // Charges are not materials: Gemini names them by its own rule.
+  for (const k of [...known].sort((a, b) => (b.uses ?? 0) - (a.uses ?? 0))) if (!isCharge(k.name)) add(k.name, k.unit);
   for (const c of CATALOG) add(c.name, c.unit ?? '');
   return out;
 }

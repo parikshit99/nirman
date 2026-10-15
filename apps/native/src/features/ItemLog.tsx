@@ -2,7 +2,7 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { LayoutAnimation, Text, View } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
-import { lastPaidFor, materialKey, todayISO, variantLabel, type ItemRow, type LastPaid, type MaterialEntry, type ReadAs } from '@nirman/shared';
+import { isCharge, lastPaidFor, materialKey, todayISO, variantLabel, type ItemRow, type LastPaid, type MaterialEntry, type ReadAs } from '@nirman/shared';
 import type { ListKind } from '@nirman/core';
 import { BillPhotosSheet } from '../components/BillPhotos';
 import { DeliveredToggle } from '../components/DeliveredToggle';
@@ -68,7 +68,8 @@ export function ItemLog({ kind, items: allItems, searching, onAdd, header, onScr
   // Leaving the list carries out any delete still waiting for undo.
   useEffect(() => () => void actions.flushDeletes(), [actions]);
 
-  const undelivered = items.filter((i) => !i.delivered_at && !pendingDeletes.has(i.id));
+  // Transport and loading lines are never delivered.
+  const undelivered = items.filter((i) => !i.delivered_at && !pendingDeletes.has(i.id) && !isCharge(i.item_name));
 
   return (
     <>
@@ -156,7 +157,7 @@ export function ItemLog({ kind, items: allItems, searching, onAdd, header, onScr
             </View>
           );
           // Swipe right: delivered (or not). Not while editing or picking. Delete is the bin on the line.
-          return editingId === item.id || selecting ? row : (
+          return editingId === item.id || selecting || isCharge(item.item_name) ? row : (
             <SwipeRow
               left={item.delivered_at ? { icon: 'undo', label: 'Not delivered', color: c.gray600, onPress: () => actions.setDelivered([item.id], '') } : { icon: 'check', label: 'Delivered', color: c.green600, onPress: () => actions.setDelivered([item.id], todayISO()) }}
             >
@@ -252,7 +253,7 @@ function ItemCard({ item, isAudit, lastPaid, projectName, onEdit, onLongPress, o
             <Text style={{ fontSize: 12, fontWeight: '700', color: c.gray600 }}>Bill</Text>
           </Pressable>
         ) : null}
-        <DeliveredToggle name={item.item_name} deliveredAt={item.delivered_at} onChange={onDelivered} />
+        {!isCharge(item.item_name) && <DeliveredToggle name={item.item_name} deliveredAt={item.delivered_at} onChange={onDelivered} />}
         {isAudit && !!item.rates_excluded && (
           <View style={[chip, { backgroundColor: c.gray100, minHeight: 28 }]}>
             <Icon name="visibility-off" size={12} color={c.gray600} />
