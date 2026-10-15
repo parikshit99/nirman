@@ -9,11 +9,11 @@ const APP_ID = 'nirmaan-auditor';
 /**
  * 2 added vendor quotes, 3 hidden materials, 4 brand/model/spec/colour, 8 labour contracts, 9 items.photo_id,
  * 10 items.rates_excluded, 11 projects, 12 bill photos (a .zip: backup.json plus photos/*.jpg), 13 advance (kharcha) entries,
- * 14 items.read_as (what a matched line was read as);
- * older files still restore
+ * 14 items.read_as (what a matched line was read as), 15 contract_rates (rate changes on labour contracts);
+ * older files still restore (with no rate changes)
  * (their lists go into projects by site address; .json files have no photos).
  */
-const VERSION = 14;
+const VERSION = 15;
 /** Every version from 1 to this one restores. */
 const isReadableVersion = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= VERSION;
 
@@ -35,6 +35,7 @@ const backupSchema = z.object({
   hidden_materials: z.array(rowSchemas.hidden_materials).default([]),
   contracts: z.array(rowSchemas.contracts).default([]),
   contract_entries: z.array(rowSchemas.contract_entries).default([]),
+  contract_rates: z.array(rowSchemas.contract_rates).default([]),
   bill_photos: z.array(billPhotoSchema).default([]),
 });
 export type Backup = z.infer<typeof backupSchema>;

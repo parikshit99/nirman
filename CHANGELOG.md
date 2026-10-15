@@ -2,6 +2,15 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 7.15 — Rate changes on labour contracts
+
+**Labour**
+- When a contractor's rate changes partway through a job, change it **from a date**: work on or after that date is paid at the new rate, and work before it keeps the old one. *All work so far* still corrects the starting rate.
+- The terms show every change, e.g. *₹18 per sqft, ₹20 from 1 Oct*, and each work entry shows the rate it was valued at.
+- The agreed value uses the latest rate. Statements (PDF and Excel) and the site report use the rate of each entry's date.
+- Delete a rate change to put its work back on the earlier rate.
+- Rate changes are kept in backups; older backups still restore, with none.
+
 ## 7.5 — Saved lists of every project
 
 **Saved**

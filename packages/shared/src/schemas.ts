@@ -255,7 +255,21 @@ export const contractEntryRowSchema = z.object({
 });
 export type ContractEntryRow = z.infer<typeof contractEntryRowSchema>;
 
-export const dataTables = ['projects', 'lists', 'items', 'indexed_rates', 'learned_terms', 'categories', 'quotes', 'quote_lines', 'hidden_materials', 'contracts', 'contract_entries'] as const;
+/**
+ * A rate change on a rate contract: work dated on or after `from_date` is valued at `rate` (until a later change).
+ * Work before the first change keeps the contract's own rate. One per contract and date.
+ */
+export const contractRateRowSchema = z.object({
+  id,
+  contract_id: id,
+  rate: z.number().positive(),
+  from_date: isoDate,
+  created_at: isoTimestamp,
+  updated_at: isoTimestamp,
+});
+export type ContractRateRow = z.infer<typeof contractRateRowSchema>;
+
+export const dataTables = ['projects', 'lists', 'items', 'indexed_rates', 'learned_terms', 'categories', 'quotes', 'quote_lines', 'hidden_materials', 'contracts', 'contract_entries', 'contract_rates'] as const;
 export type DataTable = (typeof dataTables)[number];
 
 export const rowSchemas = {
@@ -270,6 +284,7 @@ export const rowSchemas = {
   hidden_materials: hiddenMaterialRowSchema,
   contracts: contractRowSchema,
   contract_entries: contractEntryRowSchema,
+  contract_rates: contractRateRowSchema,
 } as const;
 
 /** Column names of each table, in schema order. */
@@ -289,6 +304,7 @@ export interface RowTypes {
   hidden_materials: HiddenMaterialRow;
   contracts: ContractRow;
   contract_entries: ContractEntryRow;
+  contract_rates: ContractRateRow;
 }
 
 // ---------------------------------------------------------------------------

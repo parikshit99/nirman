@@ -35,6 +35,7 @@ The `nirmaan` names are the original internal ids. They stay unchanged so existi
 | `hidden_materials` | material deleted from the Rates tab and price checks | `id` is the material's key (see Conventions); `name`, `unit`, `hidden_at`. Prices recorded up to `hidden_at` are left out; later ones show again. Saved lists are not changed; removing the row restores it. The app removes a row once no saved line or rate recorded up to `hidden_at` is left for it (`unusedHiddenMaterials`). *Clear* in Settings makes them final: the `indexed_rates` they hid are deleted, the saved lines they hid get `rates_excluded = 1`, and the rows go. |
 | `contracts` | labour contract | `project_id`; `contractor`, `phone`, `address`, `category`, `work`; `kind`: `rate` (paid `rate` per `unit`, optional `est_quantity`) or `lump_sum` (`amount`); `retention_pct`; `start_date`; `status`: `active` or `closed`; `retention_released_at` (blank while held); `notes` |
 | `contract_entries` | something recorded on a contract | `contract_id`, `date`; `kind`: `work` (`quantity` in the contract's unit, or % of a lump sum), `payment` against measured work (`amount`, `mode`: cash / upi / bank / cheque), `advance` (kharcha: cash given before the work is measured; `amount`, `mode`), or `deduction` (`amount`); `note`. Payments and advances both count as paid; a negative balance (paid more than the work measured, less retention and deductions) is shown as *Paid ahead of work* |
+| `contract_rates` | rate change on a rate contract (since 7.15) | `contract_id`, `rate` (above 0), `from_date` (YYYY-MM-DD); one per contract and date (a second change on the same date replaces the first). A work entry is valued at the rate of the latest change dated on or before it, else at the contract's own `rate` (the starting rate); the agreed value is `est_quantity` × the latest rate. Lump sums have none. Deleted with their contract or project |
 | `jobs`, `job_images` | entry waiting to be read by Gemini (with its photos as base64) | temporary; deleted once read |
 | `training_samples` | opt-in (*Keep bill photos for training*): a photographed bill kept for training an on-phone model | `engine` (`phone` or `gemini`, what read it), `ocr_text` (text the phone read), `images` (JSON array of base64 JPEGs), `item_ids` (JSON array of the `items` it became), `category`. Not in backups; exported from Settings as JSON Lines with each bill's current lines |
 | `bill_photos` | photographed bill whose lines were read | `images` (JSON array of base64 JPEGs, each at most 1200 px, JPEG quality 0.8), `created_at`. Lines point to it with `items.photo_id` (a saved copy of a line keeps it); deleted once no line does. In backups as JPEG files in the zip |
@@ -81,11 +82,11 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
 ```json
 {
   "app": "nirmaan-auditor",
-  "version": 14,
+  "version": 15,
   "exported_at": "2026-10-03T19:13:38.586Z",
   "projects": [], "lists": [], "items": [], "indexed_rates": [], "learned_terms": [],
   "categories": [], "quotes": [], "quote_lines": [], "hidden_materials": [],
-  "contracts": [], "contract_entries": [],
+  "contracts": [], "contract_entries": [], "contract_rates": [],
   "bill_photos": [{ "id": "…", "created_at": "…", "files": ["photos/…-1.jpg"] }]
 }
 ```
@@ -107,7 +108,8 @@ Add a new migration to the end of `MIGRATIONS` in `schema.ts`. Never edit one th
   - version 10 (before projects) has no `projects`, and `lists`, `contracts` and `indexed_rates` rows without `project_id`; they are sorted into projects as described above;
   - version 11 (before bill photos in backups) is a plain `.json` file with no `bill_photos`;
   - version 12 (before advances) has no `contract_entries` of kind `advance`;
-  - version 13 (before matching on reading) has `items` rows without `read_as`.
+  - version 13 (before matching on reading) has `items` rows without `read_as`;
+  - version 14 (before rate changes) has no `contract_rates`: every contract keeps its own rate throughout.
 - Restoring replaces everything on the phone.
 - Text longer than its column's limit (see *Conventions*) is shortened to the limit on restore, and the app says how many values it shortened: a value that is too long no longer stops a restore, and no row is left out. Restore still refuses a file that isn't a Nirman backup, comes from a newer version, or is really damaged (not JSON, a table missing, a wrong type).
 - *Save backup* checks its own file before finishing, and stops with an error rather than write one that wouldn't restore.

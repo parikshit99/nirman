@@ -241,6 +241,18 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE items ADD COLUMN read_as TEXT NOT NULL DEFAULT '';
   `,
+  // 7.15: rate changes on rate contracts. Work dated on or after from_date is valued at rate; one change per contract and date.
+  `
+  CREATE TABLE IF NOT EXISTS contract_rates (
+    id TEXT PRIMARY KEY,
+    contract_id TEXT NOT NULL,
+    rate REAL NOT NULL CHECK (rate > 0),
+    from_date TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS contract_rates_contract_date_idx ON contract_rates (contract_id, from_date);
+  `,
 ];
 
 /** Default categories sort before anything the user adds. */
