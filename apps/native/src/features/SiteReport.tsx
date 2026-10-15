@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { Pressable } from '../components/ui/Pressable';
-import { buildLabourReport, buildSiteReport, financialYear, siteHasDeliveries, todayISO } from '@nirman/shared';
+import { EXPENSES_FILTERED_NOTE, NO_EXPENSES_MATCH, buildExpenseReport, buildLabourReport, buildSiteReport, financialYear, siteHasDeliveries, siteReportGrandTotal, siteReportParts, todayISO } from '@nirman/shared';
 import { pdfFile, siteReportSheet, type ExportFormat, buildSiteReportPdf, logStep } from '@nirman/core';
 import { DocumentPreview } from '../components/DocumentPreview';
 import { ShareSheet } from '../components/ShareSheet';
@@ -20,7 +20,8 @@ import { useColors } from '../theme';
 /** Everything bought (or delivered) for the open project, for any period and work types, as PDF / Excel / JPG. */
 export function SiteReport({ onClose }: { onClose(): void }) {
   const c = useColors();
-  const { snapshot, learning, categoryNames, project, projectId, contracts } = useAppState();
+  const { snapshot, learning, categoryNames, project, projectId, contracts, expenses: allExpenses, pendingDeletes } = useAppState();
+  const expenses = useMemo(() => allExpenses.filter((e) => !pendingDeletes.has(e.id)), [allExpenses, pendingDeletes]);
   const dialogs = useDialogs();
   const lists = useMemo(() => snapshot.lists.filter((l) => l.project_id === projectId && l.kind === 'audit' && l.status === 'saved'), [snapshot.lists, projectId]);
   /** The report's heading: the project, and its site address when that says more. */
@@ -40,19 +41,21 @@ export function SiteReport({ onClose }: { onClose(): void }) {
 
   const report = useMemo(() => buildSiteReport(lists, snapshot.items, learning, { from, to, categories, deliveredOnly }), [lists, snapshot.items, learning, from, to, categories, deliveredOnly]);
   const labour = useMemo(() => buildLabourReport(contracts, snapshot.contractEntries, { from, to, categories }), [contracts, snapshot.contractEntries, from, to, categories]);
-  const empty = report.lineCount === 0 && labour.rows.length === 0;
+  const expenseReport = useMemo(() => buildExpenseReport(expenses, { from, to, categories }), [expenses, from, to, categories]);
+  const { hasLabour, showExpenses, withExpenses, grandParts } = siteReportParts(labour, expenseReport);
+  const empty = report.lineCount === 0 && labour.rows.length === 0 && !(withExpenses && expenseReport.lineCount);
   const materialCount = report.categories.reduce((n, x) => n + x.materials.length, 0);
   const period = from || to ? `${from || 'start'} to ${to || 'today'}` : 'All time';
   const filters = [period, categories.length ? categories.join(', ') : 'All categories', deliveredOnly ? 'Delivered only' : 'All saved purchases'].join(' · ');
 
   const share = async (format: ExportFormat) => {
-    logStep('share', { what: 'site report', format, lines: report.lineCount, contracts: labour.rows.length, deliveredOnly, categories: categories.length, dated: !!(from || to) });
+    logStep('share', { what: 'site report', format, lines: report.lineCount, contracts: labour.rows.length, expenses: expenseReport.lineCount, deliveredOnly, categories: categories.length, dated: !!(from || to) });
     const name = `Site_report_${address.replace(/[^\w-]+/g, '_').slice(0, 40)}_${todayISO()}`;
     try {
       if (format === 'xlsx') {
-        await shareFiles([await sheetToXlsx(siteReportSheet(address, filters, report, labour), `${name}.xlsx`, 'Site report', [16, 30, 12, 12, 12, 14, 24, 10, 8, 26, 12, 14, 18, 20, 14])]);
+        await shareFiles([await sheetToXlsx(siteReportSheet(address, filters, report, labour, expenseReport), `${name}.xlsx`, 'Site report', [16, 30, 12, 12, 12, 14, 24, 10, 8, 26, 12, 14, 18, 20, 14])]);
       } else {
-        const doc = buildSiteReportPdf(address, filters, report, labour);
+        const doc = buildSiteReportPdf(address, filters, report, labour, expenseReport);
         await shareFiles(format === 'pdf' ? [pdfFile(doc, name)] : await pdfToJpegs(doc, name));
       }
     } catch (err) {
@@ -68,10 +71,10 @@ export function SiteReport({ onClose }: { onClose(): void }) {
   return (
     <>
       <Sheet kind="screen" label="Site report" onClose={onClose} backEnabled={!sharing && !previewing} padding={20} gap={16}>
-        <SheetHeader title="Site report" subtitle="Everything bought for this project, grouped by work type and material, with every line listed, plus labour contracts." onClose={onClose} />
+        <SheetHeader title="Site report" subtitle="Everything bought for this project, grouped by work type and material, with every line listed, plus labour contracts and expenses." onClose={onClose} />
 
-        {lists.length === 0 && contracts.length === 0 ? (
-          <Text style={{ fontSize: 14, color: c.gray500 }}>Save a purchase list or add a labour contract in this project first.</Text>
+        {lists.length === 0 && contracts.length === 0 && expenses.length === 0 ? (
+          <Text style={{ fontSize: 14, color: c.gray500 }}>Save a purchase list, add a labour contract or record an expense in this project first.</Text>
         ) : (
           <View style={{ gap: 16 }}>
             <View style={{ padding: 12, borderRadius: 12, backgroundColor: c.gray50 }}>
@@ -147,6 +150,36 @@ export function SiteReport({ onClose }: { onClose(): void }) {
                 <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupeesWhole(labour.workDone)}</Text>
               </View>
             )}
+            {showExpenses &&
+              (withExpenses ? (
+                <View accessibilityLabel="Expenses" style={{ padding: 12, gap: 6, borderRadius: 12, backgroundColor: c.gray50 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: c.gray800 }}>Expenses</Text>
+                  {expenseReport.lineCount === 0 && <Text style={{ fontSize: 14, color: c.gray500 }}>{NO_EXPENSES_MATCH}</Text>}
+                  {expenseReport.kinds.map((k) => (
+                    <View key={k.kind} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+                      <Text style={{ flex: 1, fontSize: 14, color: c.gray600 }}>
+                        {k.label} · {plural(k.lines.length, 'line')}
+                      </Text>
+                      <Text style={{ fontVariant: ['tabular-nums'], fontSize: 14, color: c.gray800 }}>{rupeesWhole(k.amount)}</Text>
+                    </View>
+                  ))}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: c.gray200 }}>
+                    <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: c.gray600 }}>Expenses total</Text>
+                    <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupeesWhole(expenseReport.total)}</Text>
+                  </View>
+                </View>
+              ) : (
+                <Text style={{ fontSize: 12, color: c.gray500 }}>{EXPENSES_FILTERED_NOTE}</Text>
+              ))}
+            {(hasLabour || withExpenses) && (
+              <View style={[panel, { borderWidth: 1, borderColor: c.gray200 }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: c.gray800 }}>Grand total</Text>
+                  <Text style={{ fontSize: 12, color: c.gray500 }}>{grandParts}</Text>
+                </View>
+                <Text style={{ fontVariant: ['tabular-nums'], fontWeight: '700', fontSize: 14, color: c.brandDark }}>{rupeesWhole(siteReportGrandTotal(report, labour, expenseReport))}</Text>
+              </View>
+            )}
 
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <Button icon="visibility" style={{ flex: 1 }} disabled={empty} onPress={() => setPreviewing(true)}>
@@ -163,7 +196,7 @@ export function SiteReport({ onClose }: { onClose(): void }) {
       {previewing && (
         <DocumentPreview
           title={`Site report: ${address}`}
-          build={() => buildSiteReportPdf(address, filters, report, labour)}
+          build={() => buildSiteReportPdf(address, filters, report, labour, expenseReport)}
           onShare={() => {
             setPreviewing(false);
             setSharing(true);
@@ -172,7 +205,7 @@ export function SiteReport({ onClose }: { onClose(): void }) {
           onClose={() => setPreviewing(false)}
         />
       )}
-      {sharing && <ShareSheet title="site report" onShare={share} preview={() => buildSiteReportPdf(address, filters, report, labour)} onClose={() => setSharing(false)} />}
+      {sharing && <ShareSheet title="site report" onShare={share} preview={() => buildSiteReportPdf(address, filters, report, labour, expenseReport)} onClose={() => setSharing(false)} />}
     </>
   );
 }

@@ -10,6 +10,7 @@ import {
   variantOf,
   normalizeTerm,
   dataTables,
+  expenseProblem,
   tableColumns,
   todayISO,
   standardizeLine,
@@ -20,6 +21,7 @@ import {
   type CategoryRow,
   type ContractEntryRow,
   type ContractRow,
+  type ExpenseRow,
   type MaterialInput,
   type QuoteLineInput,
   type Variant,
@@ -82,6 +84,8 @@ export interface Snapshot {
   hidden: HiddenMaterialRow[];
   contracts: ContractRow[];
   contractEntries: ContractEntryRow[];
+  /** Every project's, newest first. */
+  expenses: ExpenseRow[];
 }
 
 export interface ListMeta {
@@ -148,7 +152,8 @@ export async function loadSnapshot(db: Db): Promise<Snapshot> {
     const hidden = await tx.all<HiddenMaterialRow>(selectAll('hidden_materials', 'hidden_at'));
     const contracts = await tx.all<ContractRow>(selectAll('contracts', 'created_at DESC'));
     const contractEntries = await tx.all<ContractEntryRow>(selectAll('contract_entries', 'date, created_at'));
-    return { projects, lists, items, rates, learned, categories, jobs, quotes, quoteLines, hidden, contracts, contractEntries };
+    const expenses = await tx.all<ExpenseRow>(selectAll('expenses', 'date DESC, created_at DESC'));
+    return { projects, lists, items, rates, learned, categories, jobs, quotes, quoteLines, hidden, contracts, contractEntries, expenses };
   });
 }
 
@@ -209,6 +214,10 @@ async function ensureProjectRows(tx: SqlExecutor) {
     for (const row of rows) {
       if (!known.has(row.project_id)) await tx.run(`UPDATE ${table} SET project_id = ? WHERE id = ?`, [await projectFor(row.address, row.created_at), row.id]);
     }
+  }
+  // Expenses have no site address: one whose project is unknown (a hand-edited backup) goes to the project without one.
+  for (const row of await tx.all<{ id: string; created_at: string; project_id: string }>('SELECT id, created_at, project_id FROM expenses ORDER BY created_at')) {
+    if (!known.has(row.project_id)) await tx.run('UPDATE expenses SET project_id = ? WHERE id = ?', [await projectFor('', row.created_at), row.id]);
   }
   // Rates from confirmed quotes: the project of their site, where there is one.
   for (const rate of await tx.all<{ id: string; address: string }>(`SELECT id, address FROM indexed_rates WHERE project_id = '' AND address != ''`)) {
@@ -282,7 +291,7 @@ export async function setProjectStatus(db: Db, id: string, status: ProjectRow['s
 }
 
 /**
- * Delete a project with all its lists, BOQs (and their vendor quotes) and labour contracts. Its prices stay in
+ * Delete a project with all its lists, BOQs (and their vendor quotes), labour contracts and expenses. Its prices stay in
  * Rates: the prices of its purchase lines are first kept as added rates (keepProjectRates), and rates it already
  * had stay without a project. A new "My site" is made if it was the last project.
  */
@@ -296,6 +305,7 @@ export async function deleteProject(db: Db, id: string) {
     await tx.run('DELETE FROM lists WHERE project_id = ?', [id]);
     await tx.run('DELETE FROM contract_entries WHERE contract_id IN (SELECT id FROM contracts WHERE project_id = ?)', [id]);
     await tx.run('DELETE FROM contracts WHERE project_id = ?', [id]);
+    await tx.run('DELETE FROM expenses WHERE project_id = ?', [id]);
     await tx.run(`UPDATE indexed_rates SET project_id = '' WHERE project_id = ?`, [id]);
     await tx.run('DELETE FROM projects WHERE id = ?', [id]);
     await pruneBillPhotos(tx);
@@ -1387,6 +1397,49 @@ export async function saveContractEntry(db: Db, input: ContractEntryInput, id?: 
 
 export async function deleteContractEntry(db: Db, id: string) {
   await db.run('DELETE FROM contract_entries WHERE id = ?', [id]);
+}
+
+// ---------------------------------------------------------------------------
+// Site expenses (rent, transport, food…)
+// ---------------------------------------------------------------------------
+
+export type ExpenseInput = Pick<ExpenseRow, 'project_id' | 'date' | 'kind' | 'amount' | 'paid_to' | 'mode' | 'note'>;
+
+/** A project's expenses, newest first. */
+export function listExpenses(db: Db, projectId: string): Promise<ExpenseRow[]> {
+  return db.all<ExpenseRow>(`SELECT ${tableColumns.expenses.join(', ')} FROM expenses WHERE project_id = ? ORDER BY date DESC, created_at DESC`, [projectId]);
+}
+
+/**
+ * Add an expense, or change one with an id. Throws with the words to show (expenseProblem) when it can't be saved:
+ * an amount of 0 or less, a date not YYYY-MM-DD, an unknown kind or mode.
+ */
+export async function saveExpense(db: Db, input: ExpenseInput, id?: string): Promise<string> {
+  const problem = expenseProblem(input);
+  if (problem) throw new Error(problem);
+  return db.transaction(async (tx) => {
+    const existing = id ? await getRow(tx, 'expenses', id) : undefined;
+    const ts = nowISO();
+    const row: ExpenseRow = {
+      id: existing?.id ?? newId(),
+      project_id: input.project_id,
+      date: input.date,
+      kind: input.kind,
+      amount: input.amount,
+      paid_to: input.paid_to.trim(),
+      mode: input.mode,
+      note: input.note.trim(),
+      created_at: existing?.created_at ?? ts,
+      updated_at: ts,
+    };
+    await writeRow(tx, 'expenses', row);
+    return row.id;
+  });
+}
+
+/** Delete one expense; the app waits the undo window first (deleteLater), as for contracts. */
+export async function deleteExpense(db: Db, id: string) {
+  await db.run('DELETE FROM expenses WHERE id = ?', [id]);
 }
 
 export async function clearAllData(tx: SqlExecutor, { seedDefaults = true } = {}) {

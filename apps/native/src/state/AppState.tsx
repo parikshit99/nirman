@@ -228,6 +228,8 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       saveContractEntry: write(repo.saveContractEntry),
       deleteContractLater: deleteLater(repo.deleteContract),
       deleteContractEntryLater: deleteLater(repo.deleteContractEntry),
+      saveExpense: write(repo.saveExpense),
+      deleteExpenseLater: deleteLater(repo.deleteExpense),
       /** Strike through now, delete after UNDO_MS unless undone (or sooner via flushDeletes). */
       deleteItemLater: deleteLater(repo.deleteItem),
       deleteQuoteLineLater: deleteLater(repo.deleteQuoteLine),
@@ -308,12 +310,15 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
     const editing: Record<ListKind, HistoryRecord | null> = { audit: editingOf('audit'), boq: editingOf('boq') };
     const openIds: Record<ListKind, string> = { audit: editing.audit?.id ?? draftIds.audit, boq: editing.boq?.id ?? draftIds.boq };
     const contracts = snapshot.contracts.filter((c) => c.project_id === projectId);
-    /** Saved lists, contracts and the money spent, per project, for the project list. */
+    /** The open project's expenses (rent, food, transport…), newest first. */
+    const expenses = snapshot.expenses.filter((e) => e.project_id === projectId);
+    /** Saved lists, contracts, expenses and the money spent, per project, for the project list. */
     const projectSummary = (id: string) => {
       const saved = allHistory.filter((h) => h.project_id === id);
       return {
         lists: saved.length,
         contracts: snapshot.contracts.filter((c) => c.project_id === id).length,
+        expenses: snapshot.expenses.filter((e) => e.project_id === id).length,
         spent: saved.filter((h) => h.kind === 'audit').reduce((n, h) => n + h.items.reduce((m, i) => m + (i.total_amount || 0), 0), 0),
       };
     };
@@ -350,6 +355,7 @@ function useAppStateValue({ db, worker, settings: settingsRef, onDataChanged }: 
       editing,
       allHistory,
       contracts,
+      expenses,
       entriesFor: (contractId: string): ContractEntryRow[] => entriesByContract.get(contractId) ?? [],
       /** Sites from saved lists and contracts, for address suggestions. */
       allAddresses: [...new Set([project?.address ?? '', ...allHistory.map((h) => h.address), ...snapshot.contracts.map((c) => c.address), ...snapshot.projects.map((p) => p.address)].filter(Boolean))],

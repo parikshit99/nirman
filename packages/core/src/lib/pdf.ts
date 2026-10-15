@@ -1,6 +1,24 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { describeTerms, formatQty, formatRupees, variantLabel, type ContractRow, type ContractStatement, type ItemRow, type LabourReport, type ListRow, type QuoteComparison, type SiteReport } from '@nirman/shared';
+import {
+  EXPENSES_FILTERED_NOTE,
+  NO_EXPENSES_MATCH,
+  describeTerms,
+  formatQty,
+  formatRupees,
+  paymentModeLabel,
+  siteReportGrandTotal,
+  siteReportParts,
+  variantLabel,
+  type ContractRow,
+  type ContractStatement,
+  type ExpenseReport,
+  type ItemRow,
+  type LabourReport,
+  type ListRow,
+  type QuoteComparison,
+  type SiteReport,
+} from '@nirman/shared';
 import type { ListKind } from '../data/repo.ts';
 import { appIcon } from './pdfIcon.ts';
 
@@ -224,10 +242,10 @@ export function buildOrderSlipPdf(items: ItemRow[], d: OrderSlipDetails): jsPDF 
 const lastY = (doc: jsPDF) => (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
 
 /**
- * Everything bought for one site: a summary per work category and material,
- * then every line with its date. `filters` describes what was included.
+ * Everything bought for one site: a summary per work category and material, labour, expenses,
+ * then every purchase line with its date. `filters` describes what was included.
  */
-export function buildSiteReportPdf(address: string, filters: string, report: SiteReport, labour?: LabourReport): jsPDF {
+export function buildSiteReportPdf(address: string, filters: string, report: SiteReport, labour?: LabourReport, expenses?: ExpenseReport): jsPDF {
   const doc = new jsPDF();
   drawTitle(doc, 'SITE REPORT', 22);
   doc.setFontSize(11);
@@ -238,11 +256,18 @@ export function buildSiteReportPdf(address: string, filters: string, report: Sit
   doc.text(doc.splitTextToSize(filters, 180), 14, 34);
   doc.text(madeByLine(), 14, 43);
 
-  const hasLabour = !!labour?.rows.length;
+  const { hasLabour, showExpenses, withExpenses, grandParts } = siteReportParts(labour, expenses);
+  const grand = { amount: siteReportGrandTotal(report, labour, expenses), parts: grandParts };
+  /** Labour and expenses from `y`; the grand total goes under the last of them. Returns where the next part starts. */
+  const drawOthers = (y: number) => {
+    if (hasLabour) y = drawLabour(doc, labour!, withExpenses ? null : grand, y) + 12;
+    if (showExpenses) y = drawExpenses(doc, expenses!, grand, y) + 12;
+    return y;
+  };
   if (report.lineCount === 0) {
     doc.setFontSize(11);
     doc.text('No purchases match these filters.', 14, 55);
-    if (hasLabour) drawLabour(doc, labour!, report.total, 62);
+    drawOthers(62);
     return doc;
   }
 
@@ -255,7 +280,7 @@ export function buildSiteReportPdf(address: string, filters: string, report: Sit
     }
     summary.push(['', '', { content: `${c.name} total`, styles: { fontStyle: 'bold', halign: 'right' } }, { content: rupees(Math.round(c.amount)), styles: { fontStyle: 'bold' } }, '', '']);
   }
-  summary.push(['', '', { content: hasLabour ? 'MATERIALS TOTAL' : 'GRAND TOTAL', styles: { fontStyle: 'bold', halign: 'right' } }, { content: rupees(Math.round(report.total)), styles: { fontStyle: 'bold' } }, '', '']);
+  summary.push(['', '', { content: hasLabour || withExpenses ? 'MATERIALS TOTAL' : 'GRAND TOTAL', styles: { fontStyle: 'bold', halign: 'right' } }, { content: rupees(Math.round(report.total)), styles: { fontStyle: 'bold' } }, '', '']);
   autoTable(doc, {
     head: [['Material', 'Quantity', 'Avg rate', 'Amount', 'Vendors', 'Bills']],
     body: summary,
@@ -266,12 +291,11 @@ export function buildSiteReportPdf(address: string, filters: string, report: Sit
     columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 5: { halign: 'center', cellWidth: 12 } },
   });
 
-  if (hasLabour) drawLabour(doc, labour!, report.total, lastY(doc) + 12);
+  let y = drawOthers(lastY(doc) + 12);
 
   // Appendix: every line, oldest first.
   const lines = report.categories.flatMap((c) => c.materials.flatMap((m) => m.lines.map((l) => ({ ...l, category: c.name, material: m.name }))));
   lines.sort((a, b) => a.date.localeCompare(b.date));
-  let y = lastY(doc) + 12;
   if (y > 260) {
     doc.addPage();
     y = 20;
@@ -300,8 +324,12 @@ export function buildSiteReportPdf(address: string, filters: string, report: Sit
   return doc;
 }
 
-/** Labour on the site: one row per contract, then materials + labour. */
-function drawLabour(doc: jsPDF, labour: LabourReport, materials: number, y: number) {
+type GrandTotal = { amount: number; parts: string };
+const boldCell = (content: string) => ({ content, styles: { fontStyle: 'bold' as const } });
+const grandRow = (g: GrandTotal) => ['', '', boldCell('GRAND TOTAL'), boldCell(rupees(Math.round(g.amount))), { content: g.parts, colSpan: 2, styles: { textColor: [120, 120, 120] as [number, number, number] } }];
+
+/** Labour on the site: one row per contract, then the grand total unless expenses follow. Returns where it ends. */
+function drawLabour(doc: jsPDF, labour: LabourReport, grand: GrandTotal | null, y: number): number {
   if (y > 250) {
     doc.addPage();
     y = 20;
@@ -315,7 +343,7 @@ function drawLabour(doc: jsPDF, labour: LabourReport, materials: number, y: numb
     body: [
       ...labour.rows.map((r) => [r.contract.contractor, r.contract.work || '-', r.contract.category || '-', rupees(Math.round(r.workDone)), rupees(Math.round(r.paid)), rupees(Math.round(r.balance))]),
       ['', '', bold('Labour total'), bold(rupees(Math.round(labour.workDone))), bold(rupees(Math.round(labour.paid))), bold(rupees(Math.round(labour.balance)))],
-      ['', '', bold('GRAND TOTAL'), bold(rupees(Math.round(materials + labour.workDone))), { content: 'materials + labour work done', colSpan: 2, styles: { textColor: [120, 120, 120] } }],
+      ...(grand ? [grandRow(grand)] : []),
     ],
     startY: y + 4,
     theme: 'grid',
@@ -323,6 +351,46 @@ function drawLabour(doc: jsPDF, labour: LabourReport, materials: number, y: numb
     headStyles: { fillColor: [18, 18, 18], textColor: [255, 255, 255] },
     columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } },
   });
+  return lastY(doc);
+}
+
+/**
+ * Expenses on the site: each kind with its lines and subtotal, the expenses total and the grand total; or only the
+ * note that they are left out when work types are picked. Returns where it ends.
+ */
+function drawExpenses(doc: jsPDF, expenses: ExpenseReport, grand: GrandTotal, y: number): number {
+  if (y > 250) {
+    doc.addPage();
+    y = 20;
+  }
+  if (!expenses.included) {
+    doc.setFontSize(9);
+    doc.setTextColor(100);
+    doc.text(EXPENSES_FILTERED_NOTE, 14, y);
+    return y;
+  }
+  doc.setFontSize(12);
+  doc.setTextColor(30);
+  doc.text('Expenses', 14, y);
+  const body: (string | { content: string; colSpan?: number; styles?: object })[][] = [];
+  if (!expenses.lineCount) body.push([{ content: NO_EXPENSES_MATCH, colSpan: 6, styles: { textColor: [100, 100, 100] } }]);
+  for (const k of expenses.kinds) {
+    body.push([{ content: k.label.toUpperCase(), colSpan: 6, styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } }]);
+    for (const e of k.lines) body.push([e.date, e.paid_to || '-', e.mode ? paymentModeLabel(e.mode) : '-', rupees(Math.round(e.amount)), { content: e.note || '', colSpan: 2 }]);
+    body.push(['', '', { content: `${k.label} total`, styles: { fontStyle: 'bold', halign: 'right' } }, boldCell(rupees(Math.round(k.amount))), '', '']);
+  }
+  body.push(['', '', { content: 'Expenses total', styles: { fontStyle: 'bold', halign: 'right' } }, boldCell(rupees(Math.round(expenses.total))), '', '']);
+  body.push(grandRow(grand));
+  autoTable(doc, {
+    head: [['Date', 'Paid to', 'Mode', 'Amount', { content: 'Note', colSpan: 2 }]],
+    body,
+    startY: y + 4,
+    theme: 'grid',
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [18, 18, 18], textColor: [255, 255, 255] },
+    columnStyles: { 3: { halign: 'right' } },
+  });
+  return lastY(doc);
 }
 
 const formatAmount = (n: number) => (n ? rupees(Math.round(n * 100) / 100) : '');

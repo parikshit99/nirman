@@ -2,6 +2,15 @@
 
 Versions are MAJOR.MINOR.PATCH. Each section here is a feature (minor) or major release; fixes in between only raise the last number and are not listed. Newest first.
 
+## 7.14 — Rent, food and other site expenses
+
+**Expenses**
+- Record money spent on a project that is neither material nor labour: rent, transport, food and tea, electricity and water, permits and fees, and anything else. Each has a date, an amount, who was paid, how (cash, UPI, bank transfer, cheque) and a note.
+- On the **Labour** tab, the *Expenses* card shows the project's total and opens the list: newest first, chips for each kind, tap one to change it, the bin to delete it (with Undo). *Add expense* is also in the tab's + menu.
+- Deleting a project deletes its expenses too; the confirm says how many.
+- The **site report** has an *Expenses* part, with a subtotal for each kind and an *Expenses total*; the grand total is now materials + labour + expenses. Expenses have no work type, so they show only with all work types.
+- Expenses are in backups. Backups made by earlier versions still restore, with no expenses.
+
 ## 7.5 — Saved lists of every project
 
 **Saved**

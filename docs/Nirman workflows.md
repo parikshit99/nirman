@@ -145,9 +145,12 @@ flowchart LR
   WM & PY & AD & DD --> BAL[Balance due<br/>retention held;<br/>Paid ahead in red if paid<br/>more than the work]
   BAL --> CL[Close contract<br/>releases the retention]
   BAL --> ST[Statement · Site report<br/>PDF, Excel or JPG]
+  EX[Expenses<br/>rent, transport, food and tea,<br/>electricity and water, permits, other] --> SR[Site report<br/>subtotal per kind,<br/>Expenses total]
+  ST --> GT[Grand total<br/>materials + labour work done + expenses]
+  SR --> GT
 ```
 
-Labour entries never feed Rates. The project's site report brings purchases and labour together.
+Labour entries and expenses never feed Rates. Expenses are kept per project from the *Expenses* card at the top of the Labour tab (or *Add expense* in its + menu). The project's site report brings purchases, labour and expenses together; expenses have no work type, so they are in it only when all work types are picked (the date filter applies to them).
 
 ## A-06 What leaves the phone
 

@@ -1,0 +1,37 @@
+{
+  "app": "nirmaan-auditor",
+  "version": 14,
+  "exported_at": "2026-10-10T06:30:00.000Z",
+  "projects": [
+    { "id": "p-sector44", "name": "Sector 44", "address": "Sector 44", "status": "active", "created_at": "2026-09-01T04:00:00.000Z", "updated_at": "2026-10-01T04:00:00.000Z" }
+  ],
+  "lists": [
+    { "id": "draft-audit-p-sector44", "kind": "audit", "status": "draft", "project_id": "p-sector44", "title": "", "address": "", "category": "", "site_date": null, "notes": "", "created_at": "2026-09-01T04:00:00.001Z", "updated_at": "2026-09-01T04:00:00.001Z" },
+    { "id": "draft-boq-p-sector44", "kind": "boq", "status": "draft", "project_id": "p-sector44", "title": "", "address": "", "category": "", "site_date": null, "notes": "", "created_at": "2026-09-01T04:00:00.002Z", "updated_at": "2026-09-01T04:00:00.002Z" },
+    { "id": "l-day1", "kind": "audit", "status": "saved", "project_id": "p-sector44", "title": "Day 1", "address": "Sector 44", "category": "Civil", "site_date": "2026-09-30", "notes": "", "created_at": "2026-09-30T05:00:00.000Z", "updated_at": "2026-09-30T05:00:00.000Z" }
+  ],
+  "items": [
+    {
+      "id": "i-cement", "list_id": "l-day1", "item_name": "Cement", "original_term": "bori", "quantity": 15, "unit": "Bag", "unit_price": 500, "total_amount": 7500, "vendor": "Sharma", "date": "2026-09-30",
+      "brand": "UltraTech", "model": "", "spec": "53 grade", "color": "", "delivered_at": "2026-10-01", "ordered_as": "", "photo_id": "", "rates_excluded": 0, "read_as": "",
+      "created_at": "2026-09-30T05:00:00.000Z", "updated_at": "2026-09-30T05:00:00.000Z"
+    }
+  ],
+  "indexed_rates": [],
+  "learned_terms": [{ "id": "bori", "item_name": "Cement", "unit": "Bag", "updated_at": "2026-09-30T05:00:00.000Z" }],
+  "categories": [{ "id": "civil", "name": "Civil", "created_at": "2000-01-01T00:00:00.000Z" }],
+  "quotes": [],
+  "quote_lines": [],
+  "hidden_materials": [],
+  "contracts": [
+    {
+      "id": "c-plaster", "project_id": "p-sector44", "contractor": "Ramesh", "phone": "", "address": "Sector 44", "category": "Civil", "work": "Plaster", "kind": "lump_sum", "rate": 0, "unit": "",
+      "est_quantity": 0, "amount": 90000, "retention_pct": 0, "start_date": "", "status": "active", "retention_released_at": "", "notes": "",
+      "created_at": "2026-10-01T04:00:00.000Z", "updated_at": "2026-10-02T04:00:00.000Z"
+    }
+  ],
+  "contract_entries": [
+    { "id": "e-1", "contract_id": "c-plaster", "kind": "advance", "date": "2026-10-02", "quantity": 0, "amount": 5000, "mode": "cash", "note": "", "created_at": "2026-10-02T04:00:00.000Z" }
+  ],
+  "bill_photos": []
+}

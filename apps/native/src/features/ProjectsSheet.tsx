@@ -137,9 +137,9 @@ export function ProjectForm({ project, onClose }: { project?: ProjectRow; onClos
     run(async () => {
       if (!project) return;
       const s = projectSummary(project.id);
-      const parts = [plural(s.lists, 'saved list'), plural(s.contracts, 'labour contract')];
+      const parts = [plural(s.lists, 'saved list'), plural(s.contracts, 'labour contract'), ...(s.expenses ? [plural(s.expenses, 'expense')] : [])];
       const ok = await dialogs.confirm(`Delete “${project.name}”?`, {
-        message: `${parts.join(' and ')}, the open purchase list and BOQ of this project will be removed from this phone. Prices from its purchases, with their vendor and site address, stay in Rates.`,
+        message: `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}, the open purchase list and BOQ of this project will be removed from this phone. Prices from its purchases, with their vendor and site address, stay in Rates.`,
         confirmLabel: 'Delete project',
         danger: true,
       });

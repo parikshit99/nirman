@@ -255,7 +255,31 @@ export const contractEntryRowSchema = z.object({
 });
 export type ContractEntryRow = z.infer<typeof contractEntryRowSchema>;
 
-export const dataTables = ['projects', 'lists', 'items', 'indexed_rates', 'learned_terms', 'categories', 'quotes', 'quote_lines', 'hidden_materials', 'contracts', 'contract_entries'] as const;
+export const expenseKinds = ['rent', 'transport', 'food', 'utilities', 'permits', 'other'] as const;
+export type ExpenseKind = (typeof expenseKinds)[number];
+
+/**
+ * Money spent on a project that is neither material nor a labour contract: site or room rent, transport, food and
+ * tea, electricity and water, permits and fees. It has no work type.
+ */
+export const expenseRowSchema = z.object({
+  id,
+  project_id: id,
+  date: isoDate,
+  kind: z.enum(expenseKinds),
+  /** Above 0 when saved (saveExpense checks it); any number restores. */
+  amount: z.number(),
+  /** Who was paid, e.g. the landlord or the tea stall. */
+  paid_to: z.string().max(200),
+  /** Cash, UPI, bank, cheque (paymentModes), or blank. */
+  mode: z.string().max(40),
+  note: z.string().max(500),
+  created_at: isoTimestamp,
+  updated_at: isoTimestamp,
+});
+export type ExpenseRow = z.infer<typeof expenseRowSchema>;
+
+export const dataTables = ['projects', 'lists', 'items', 'indexed_rates', 'learned_terms', 'categories', 'quotes', 'quote_lines', 'hidden_materials', 'contracts', 'contract_entries', 'expenses'] as const;
 export type DataTable = (typeof dataTables)[number];
 
 export const rowSchemas = {
@@ -270,6 +294,7 @@ export const rowSchemas = {
   hidden_materials: hiddenMaterialRowSchema,
   contracts: contractRowSchema,
   contract_entries: contractEntryRowSchema,
+  expenses: expenseRowSchema,
 } as const;
 
 /** Column names of each table, in schema order. */
@@ -289,6 +314,7 @@ export interface RowTypes {
   hidden_materials: HiddenMaterialRow;
   contracts: ContractRow;
   contract_entries: ContractEntryRow;
+  expenses: ExpenseRow;
 }
 
 // ---------------------------------------------------------------------------
