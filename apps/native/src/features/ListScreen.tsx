@@ -20,6 +20,7 @@ import { useAppState } from '../state/AppState';
 import { useColors } from '../theme';
 import { CapturePanel, QueuedReadings } from './CapturePanel';
 import { ItemLog } from './ItemLog';
+import { useLaunchAdd } from './LaunchHost';
 import { useIncomingShare } from './ShareHost';
 import { ListShare } from './ListShare';
 
@@ -179,6 +180,13 @@ export function ListScreen({
   useEffect(() => {
     if (incoming.share) setAddOpen(true);
   }, [incoming.share]);
+  // The app shortcuts "New bill" and "New BOQ" open the entry form, with a half-typed entry still in it.
+  const { request: launchRequest, used: launchUsed } = useLaunchAdd(kind);
+  useEffect(() => {
+    if (launchRequest == null) return;
+    setAddOpen(true);
+    launchUsed();
+  }, [launchRequest, launchUsed]);
   useEffect(() => logStep('tab', { to: kind }), [kind]);
 
   const banner = (
